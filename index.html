@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Jeux</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            font-size: 3em;
+            margin-bottom: 20px;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .subtitle {
+            color: rgba(255, 255, 255, 0.9);
+            text-align: center;
+            font-size: 1.2em;
+            margin-bottom: 50px;
+        }
+
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            padding: 20px 0;
+        }
+
+        .game-card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .game-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .game-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .game-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .game-description {
+            color: #666;
+            line-height: 1.6;
+            font-size: 1em;
+        }
+
+        .game-card:nth-child(1) {
+            background: linear-gradient(135deg, #fff5f5 0%, #ffe5e5 100%);
+        }
+
+        .game-card:nth-child(2) {
+            background: linear-gradient(135deg, #f0fff4 0%, #d4f4dd 100%);
+        }
+
+        .game-card:nth-child(3) {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        }
+
+        .game-card:nth-child(4) {
+            background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%);
+        }
+
+        .game-card:nth-child(5) {
+            background: linear-gradient(135deg, #fdf2f2 0%, #e8d5d5 100%);
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2em;
+            }
+
+            .games-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Mini Jeux</h1>
+        <p class="subtitle">Choisissez un jeu pour commencer à jouer</p>
+
+        <div class="games-grid">
+            <a href="frog/index.html" class="game-card">
+                <span class="game-icon">🐸</span>
+                <div class="game-title">Frog Fly Catcher</div>
+                <div class="game-description">
+                    Attrapez les mouches avec votre langue ! Cliquez pour lancer la langue et mangez toutes les mouches avant qu'il y en ait 50 à l'écran.
+                </div>
+            </a>
+
+            <a href="ronds/index.html" class="game-card">
+                <span class="game-icon">⚽</span>
+                <div class="game-title">Balle Rebondissante</div>
+                <div class="game-description">
+                    Cliquez pour ajouter des balles rebondissantes colorées. Regardez-les rebondir dans tous les sens !
+                </div>
+            </a>
+
+            <a href="monster/index.html" class="game-card">
+                <span class="game-icon">🔫</span>
+                <div class="game-title">Monster Hunter 2D</div>
+                <div class="game-description">
+                    Éliminez les monstres avec votre pistolet ! Survivez aux vagues de zombies, démons et fantômes.
+                </div>
+            </a>
+
+            <a href="augustus/index.html" class="game-card">
+                <span class="game-icon">⚔️</span>
+                <div class="game-title">Augustus</div>
+                <div class="game-description">
+                    Conquérez le monde romain ! Gérez vos villes, recrutez des armées et menez des batailles épiques en temps réel.
+                </div>
+            </a>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,461 @@
+{
+  "#323232": {
+    "id": "roma",
+    "name": "Rome",
+    "faction": "julii",
+    "population": 50000,
+    "isCapital": true,
+    "coastal": false,
+    "terrain": "plains",
+    "buildings": [
+      "forum",
+      "temple_jupiter",
+      "barracks",
+      "walls"
+    ],
+    "garrison": {
+      "hastati": 2,
+      "principes": 1,
+      "equites": 1
+    }
+  },
+  "#577ba3": {
+    "id": "capua",
+    "name": "Capoue",
+    "faction": "scipii",
+    "population": 15000,
+    "isCapital": false,
+    "coastal": false,
+    "terrain": "plains",
+    "buildings": [
+      "forum",
+      "barracks"
+    ],
+    "garrison": {
+      "hastati": 1
+    }
+  },
+  "#7cc44c": {
+    "id": "tarentum",
+    "name": "Tarente",
+    "faction": "brutii",
+    "population": 12000,
+    "isCapital": false,
+    "coastal": true,
+    "terrain": "hills",
+    "buildings": [
+      "forum",
+      "port"
+    ],
+    "garrison": {
+      "hastati": 1
+    }
+  },
+  "#a145bd": {
+    "id": "mediolanum",
+    "name": "Milan",
+    "faction": "rebels",
+    "population": 8000,
+    "isCapital": false,
+    "coastal": false,
+    "terrain": "plains",
+    "buildings": [
+      "village"
+    ],
+    "garrison": {
+      "warband": 2
+    }
+  },
+  "#c68e66": {
+    "id": "ravenna",
+    "name": "Ravenne",
+    "faction": "rebels",
+    "population": 6000,
+    "isCapital": false,
+    "coastal": true,
+    "terrain": "marsh",
+    "buildings": [
+      "village",
+      "port"
+    ],
+    "garrison": {
+      "warband": 1
+    }
+  },
+  "#ebd7d7": {
+    "id": "lugdunum",
+    "name": "Lyon",
+    "faction": "gauls",
+    "population": 10000,
+    "isCapital": true,
+    "coastal": false,
+    "terrain": "hills",
+    "buildings": [
+      "oppidum",
+      "smith"
+    ],
+    "garrison": {
+      "warband": 3,
+      "cavalry": 1
+    }
+  },
+  "#485880": {
+    "id": "massilia",
+    "name": "Marseille",
+    "faction": "rebels",
+    "population": 12000,
+    "isCapital": false,
+    "coastal": true,
+    "terrain": "hills",
+    "buildings": [
+      "forum",
+      "port",
+      "market"
+    ],
+    "garrison": {
+      "hoplites": 1
+    }
+  },
+  "#6da1f1": {
+    "id": "narbo",
+    "name": "Narbonne",
+    "faction": "rebels",
+    "population": 7000,
+    "isCapital": false,
+    "coastal": true,
+    "terrain": "plains",
+    "buildings": [
+      "village",
+      "port"
+    ],
+    "garrison": {
+      "warband": 1
+    }
+  },
+  "#92ea9a": {
+    "id": "lutetia",
+    "name": "Lutèce",
+    "faction": "gauls",
+    "population": 5000,
+    "isCapital": false,
+    "coastal": false,
+    "terrain": "plains",
+    "buildings": [
+      "village"
+    ],
+    "garrison": {
+      "warband": 2
+    }
+  },
+  "#b76b43": {
+    "id": "carthago_nova",
+    "name": "Carthagène",
+    "faction": "carthage",
+    "population": 15000,
+    "isCapital": false,
+    "coastal": true,
+    "terrain": "hills",
+    "buildings": [
+      "forum",
+      "port",
+      "barracks"
+    ],
+    "garrison": {
+      "infantry": 2,
+      "elephants": 1
+    }
+  },
+  "#dcb4b4": {
+    "id": "tarraco",
+    "name": "Tarragone",
+    "faction": "rebels",
+    "population": 8000,
+    "isCapital": false,
+    "coastal": true,
+    "terrain": "hills",
+    "buildings": [
+      "village",
+      "port"
+    ],
+    "garrison": {
+      "warband": 1
+    }
+  },
+  "#39355d": {
+    "id": "corduba",
+    "name": "Cordoue",
+    "faction": "rebels",
+    "population": 10000,
+    "isCapital": false,
+    "coastal": false,
+    "terrain": "plains",
+    "buildings": [
+      "village",
+      "mine"
+    ],
+    "garrison": {
+      "warband": 2
+    }
+  },
+  "#5e7ece": {
+    "id": "carthago",
+    "name": "Carthage",
+    "faction": "carthage",
+    "population": 40000,
+    "isCapital": true,
+    "coastal": true,
+    "terrain": "desert",
+    "buildings": [
+      "palace",
+      "temple",
+      "port",
+      "barracks",
+      "walls",
+      "market"
+    ],
+    "garrison": {
+      "infantry": 3,
+      "sacred_band": 1,
+      "elephants": 2,
+      "cavalry": 2
+    }
+  },
+  "#83c777": {
+    "id": "tingis",
+    "name": "Tanger",
+    "faction": "numidia",
+    "population": 8000,
+    "isCapital": false,
+    "coastal": true,
+    "terrain": "desert",
+    "buildings": [
+      "village",
+      "port"
+    ],
+    "garrison": {
+      "cavalry": 2
+    }
+  },
+  "#a848e8": {
+    "id": "cirta",
+    "name": "Cirta",
+    "faction": "numidia",
+    "population": 6000,
+    "isCapital": true,
+    "coastal": false,
+    "terrain": "desert",
+    "buildings": [
+      "oppidum"
+    ],
+    "garrison": {
+      "cavalry": 3
+    }
+  },
+  "#cd9191": {
+    "id": "alexandria",
+    "name": "Alexandrie",
+    "faction": "egypt",
+    "population": 35000,
+    "isCapital": true,
+    "coastal": true,
+    "terrain": "desert",
+    "buildings": [
+      "palace",
+      "library",
+      "port",
+      "lighthouse",
+      "barracks"
+    ],
+    "garrison": {
+      "phalanx": 2,
+      "cavalry": 1
+    }
+  },
+  "#f2da3a": {
+    "id": "thessalonica",
+    "name": "Thessalonique",
+    "faction": "macedon",
+    "population": 18000,
+    "isCapital": false,
+    "coastal": true,
+    "terrain": "hills",
+    "buildings": [
+      "forum",
+      "port",
+      "barracks"
+    ],
+    "garrison": {
+      "phalanx": 2
+    }
+  },
+  "#4f5bab": {
+    "id": "athenae",
+    "name": "Athènes",
+    "faction": "greek_cities",
+    "population": 25000,
+    "isCapital": true,
+    "coastal": true,
+    "terrain": "hills",
+    "buildings": [
+      "acropolis",
+      "agora",
+      "port",
+      "academy"
+    ],
+    "garrison": {
+      "hoplites": 2,
+      "peltasts": 1
+    }
+  },
+  "#74a454": {
+    "id": "sparta",
+    "name": "Sparte",
+    "faction": "greek_cities",
+    "population": 10000,
+    "isCapital": false,
+    "coastal": false,
+    "terrain": "mountains",
+    "buildings": [
+      "barracks",
+      "training_ground"
+    ],
+    "garrison": {
+      "spartan_hoplites": 2
+    }
+  },
+  "#99edc5": {
+    "id": "pella",
+    "name": "Pella",
+    "faction": "macedon",
+    "population": 15000,
+    "isCapital": true,
+    "coastal": false,
+    "terrain": "plains",
+    "buildings": [
+      "palace",
+      "barracks",
+      "stables"
+    ],
+    "garrison": {
+      "phalanx": 2,
+      "companion_cavalry": 1
+    }
+  },
+  "#be6e6e": {
+    "id": "sinope",
+    "name": "Sinope",
+    "faction": "pontus",
+    "population": 12000,
+    "isCapital": true,
+    "coastal": true,
+    "terrain": "hills",
+    "buildings": [
+      "palace",
+      "port",
+      "barracks"
+    ],
+    "garrison": {
+      "infantry": 2,
+      "cavalry": 1
+    }
+  },
+  "#e3b7df": {
+    "id": "pergamum",
+    "name": "Pergame",
+    "faction": "rebels",
+    "population": 15000,
+    "isCapital": false,
+    "coastal": false,
+    "terrain": "hills",
+    "buildings": [
+      "acropolis",
+      "library"
+    ],
+    "garrison": {
+      "hoplites": 1
+    }
+  },
+  "#403888": {
+    "id": "ephesus",
+    "name": "Éphèse",
+    "faction": "seleucid",
+    "population": 18000,
+    "isCapital": false,
+    "coastal": true,
+    "terrain": "hills",
+    "buildings": [
+      "temple_artemis",
+      "port",
+      "market"
+    ],
+    "garrison": {
+      "phalanx": 1,
+      "cavalry": 1
+    }
+  },
+  "#6581f9": {
+    "id": "mogontiacum",
+    "name": "Mayence",
+    "faction": "germans",
+    "population": 4000,
+    "isCapital": false,
+    "coastal": false,
+    "terrain": "forest",
+    "buildings": [
+      "village"
+    ],
+    "garrison": {
+      "warband": 2
+    }
+  },
+  "#8acaa2": {
+    "id": "londinium",
+    "name": "Londres",
+    "faction": "britons",
+    "population": 3000,
+    "isCapital": true,
+    "coastal": true,
+    "terrain": "plains",
+    "buildings": [
+      "village"
+    ],
+    "garrison": {
+      "warband": 2,
+      "chariots": 1
+    }
+  },
+  "#af4b4b": {
+    "id": "syracusae",
+    "name": "Syracuse",
+    "faction": "greek_cities",
+    "population": 20000,
+    "isCapital": false,
+    "coastal": true,
+    "terrain": "hills",
+    "buildings": [
+      "forum",
+      "port",
+      "walls",
+      "theater"
+    ],
+    "garrison": {
+      "hoplites": 2
+    }
+  },
+  "#d494bc": {
+    "id": "panormus",
+    "name": "Palerme",
+    "faction": "carthage",
+    "population": 8000,
+    "isCapital": false,
+    "coastal": true,
+    "terrain": "hills",
+    "buildings": [
+      "port",
+      "barracks"
+    ],
+    "garrison": {
+      "infantry": 1
+    }
+  }
+}

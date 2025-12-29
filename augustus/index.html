@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Augustus - Rome Total War</title>
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+    <a href="../index.html" id="backButton">← Menu</a>
+
+    <!-- Menu Principal -->
+    <div id="mainMenu" class="screen active">
+        <div class="menu-content">
+            <h1>⚔️ AUGUSTUS ⚔️</h1>
+            <h2>Rome Total War</h2>
+            <div class="menu-buttons">
+                <button data-action="newGame">Nouvelle Campagne</button>
+                <button data-action="loadGame" id="loadBtn" disabled>Charger Partie</button>
+                <button data-action="showGuide">Guide du Jeu</button>
+                <button data-action="showCredits">Crédits</button>
+            </div>
+        </div>
+        <div class="menu-footer">
+            <p>Une simulation de conquête romaine</p>
+        </div>
+    </div>
+
+    <!-- Sélection de Faction -->
+    <div id="factionSelect" class="screen">
+        <h1>Choisissez votre Famille</h1>
+        <div id="factionGrid" class="faction-grid"></div>
+        <button class="back-btn" data-action="showMenu">Retour</button>
+    </div>
+
+    <!-- Écran de Campagne -->
+    <div id="campaignScreen" class="screen">
+        <!-- Barre supérieure -->
+        <div id="topBar">
+            <div class="resources">
+                <span id="goldDisplay">💰 0</span>
+                <span id="foodDisplay">🌾 0</span>
+                <span id="populationDisplay">👥 0</span>
+                <span id="politicsDisplay">🏛️ 0</span>
+            </div>
+            <div class="turn-info">
+                <span id="turnDisplay">Tour 1</span>
+                <span id="seasonDisplay">Printemps 270 av. J.-C.</span>
+            </div>
+            <div class="actions">
+                <button id="endTurnBtn" data-action="endTurn">Fin du Tour</button>
+                <button data-action="saveGame">Sauvegarder</button>
+                <button data-action="showMenu">Menu</button>
+            </div>
+        </div>
+
+        <!-- Carte de campagne -->
+        <canvas id="campaignMap"></canvas>
+
+        <!-- Panneau latéral -->
+        <div id="sidePanel" class="hidden">
+            <div id="panelContent"></div>
+        </div>
+
+        <!-- Mini-carte -->
+        <div id="minimap">
+            <canvas id="minimapCanvas"></canvas>
+        </div>
+
+        <!-- Actions rapides -->
+        <div id="quickActions" class="hidden">
+            <button id="attackBtn" data-action="attack">Attaquer</button>
+            <button id="recruitBtn" data-action="showRecruit">Recruter</button>
+        </div>
+    </div>
+
+    <!-- Écran de Ville -->
+    <div id="cityScreen" class="screen">
+        <div id="cityHeader">
+            <h1 id="cityName">Rome</h1>
+            <button class="close-btn" data-action="closeCityView">✕</button>
+        </div>
+        <div id="cityContent">
+            <div id="cityStats">
+                <div class="stat">
+                    <span class="label">Population</span>
+                    <span id="cityPop">0</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Revenus</span>
+                    <span id="cityIncome">+0</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Nourriture</span>
+                    <span id="cityFood">+0</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Hygiène</span>
+                    <span id="cityHealth">0%</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Ordre Public</span>
+                    <span id="cityOrder">0%</span>
+                </div>
+            </div>
+            <div id="cityBuildings">
+                <h3>Bâtiments</h3>
+                <div id="buildingsList"></div>
+            </div>
+            <div id="cityConstruction">
+                <h3>Construction</h3>
+                <div id="constructionQueue"></div>
+                <div id="availableBuildings"></div>
+            </div>
+            <div id="cityRecruitment">
+                <h3>Recrutement</h3>
+                <div id="recruitmentQueue"></div>
+                <div id="availableUnits"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Écran de Bataille -->
+    <div id="battleScreen" class="screen">
+        <div id="battleHeader">
+            <div id="attackerInfo" class="army-info"></div>
+            <div id="battleTitle">⚔️ BATAILLE ⚔️</div>
+            <div id="defenderInfo" class="army-info"></div>
+        </div>
+        <canvas id="battleCanvas"></canvas>
+        <div id="battleControls">
+            <div id="unitCards"></div>
+            <div id="battleActions">
+                <button data-action="battlePause">⏸️ Pause</button>
+                <button data-action="battleSpeedUp">⏩ Vitesse</button>
+                <button data-action="battleRetreat">🏃 Retraite</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Écran de Résultat de Bataille -->
+    <div id="battleResult" class="screen">
+        <div id="resultContent">
+            <h1 id="resultTitle">Victoire!</h1>
+            <div id="resultStats"></div>
+            <div id="capturedOptions" class="hidden">
+                <h3>Prisonniers capturés: <span id="capturedCount">0</span></h3>
+                <div class="prisoner-options">
+                    <button data-action="executePrisoners">⚔️ Exécuter (-Politique)</button>
+                    <button data-action="enslavePrisoners">⛓️ Réduire en esclavage (+Or)</button>
+                    <button data-action="releasePrisoners">🕊️ Libérer (+Politique)</button>
+                </div>
+            </div>
+            <button data-action="endBattle">Continuer</button>
+        </div>
+    </div>
+
+    <!-- Écran Guide -->
+    <div id="guideScreen" class="screen">
+        <div id="guideHeader">
+            <h1>Guide du Jeu</h1>
+            <button class="close-btn" data-action="closeGuide">✕</button>
+        </div>
+        <div id="guideContent"></div>
+    </div>
+
+    <!-- Notifications -->
+    <div id="notifications"></div>
+
+    <!-- Tooltip -->
+    <div id="tooltip" class="hidden"></div>
+
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>
