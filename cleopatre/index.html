@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cléopâtre - Le Village du Nil</title>
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+    <a href="../index.html" id="backButton">← Menu</a>
+
+    <!-- Menu Principal -->
+    <div id="mainMenu" class="screen active">
+        <div class="menu-content">
+            <h1>🏛️ CLÉOPÂTRE 🏛️</h1>
+            <h2>Le Village du Nil</h2>
+            <div class="menu-buttons">
+                <button data-action="newGame">Nouvelle Partie</button>
+                <button data-action="loadGame" id="loadBtn" disabled>Charger</button>
+                <button data-action="showGuide">Guide du Jeu</button>
+            </div>
+        </div>
+        <div class="menu-footer">
+            <p>Construisez et gérez votre village pour Cléopâtre</p>
+        </div>
+    </div>
+
+    <!-- Sélection du personnage -->
+    <div id="characterSelect" class="screen">
+        <h1>Choisissez votre Chef de Village</h1>
+        <div class="character-grid">
+            <div class="character-card" data-gender="male">
+                <div class="character-icon">👨</div>
+                <div class="character-name">Chef du Village</div>
+                <div class="character-desc">Un homme sage et déterminé</div>
+            </div>
+            <div class="character-card" data-gender="female">
+                <div class="character-icon">👩</div>
+                <div class="character-name">Cheffe du Village</div>
+                <div class="character-desc">Une femme courageuse et avisée</div>
+            </div>
+        </div>
+        <button class="back-btn" data-action="showMenu">Retour</button>
+    </div>
+
+    <!-- Écran de Jeu Principal -->
+    <div id="gameScreen" class="screen">
+        <!-- Barre supérieure -->
+        <div id="topBar">
+            <div class="resources">
+                <span id="moneyDisplay" title="Argent">💰 1000</span>
+                <span id="foodDisplay" title="Nourriture">🍞 0</span>
+                <span id="waterDisplay" title="Eau">💧 0</span>
+                <span id="populationDisplay" title="Population">👥 100</span>
+                <span id="peasantsDisplay" title="Paysans disponibles">🧑‍🌾 10</span>
+                <span id="rationTimerDisplay" class="ration-timer" title="Prochaine ration">🍽️ 1:00</span>
+            </div>
+            <div class="goal-info">
+                <span id="goalDisplay">Objectif: 10 000 habitants</span>
+            </div>
+            <div class="actions">
+                <button data-action="saveGame">Sauvegarder</button>
+                <button data-action="showMenu">Menu</button>
+            </div>
+        </div>
+
+        <!-- Zone de jeu principale (contient canvas + panneau d'actions) -->
+        <div id="gameArea">
+            <!-- Zone du village avec canvas -->
+            <div id="villageArea">
+                <canvas id="villageCanvas"></canvas>
+
+                <!-- Panneau de Cléopâtre (overlay sur le canvas) -->
+                <div id="cleopatraPanel">
+                    <div class="cleopatra-portrait">
+                        <div class="portrait-frame">👑</div>
+                    </div>
+                    <div class="cleopatra-info">
+                        <div class="cleopatra-message">
+                            <div class="message-header">Cléopâtre</div>
+                            <div id="cleopatraText">Bienvenue, chef de village. J'attends beaucoup de vous.</div>
+                        </div>
+                        <div class="cleopatra-mood">
+                            <span class="mood-label">Humeur:</span>
+                            <div class="mood-bar-container">
+                                <div id="moodBar" class="mood-bar"></div>
+                            </div>
+                            <span id="cleopatraMood" class="mood-value">50%</span>
+                        </div>
+                    </div>
+                    <div id="nextTaskTimer" class="next-task-timer">
+                        <span class="next-task-label">Prochaine mission:</span>
+                        <span id="nextTaskCountdown">--</span>
+                    </div>
+                    <div id="currentTask" class="hidden">
+                        <div class="task-header-row">
+                            <div class="task-header">Tâches de Cléopâtre:</div>
+                            <label class="toggle-switch" title="Envoi automatique des ressources">
+                                <input type="checkbox" id="autoSendGlobal">
+                                <span class="slider"></span>
+                                <span class="switch-label">Auto</span>
+                            </label>
+                        </div>
+                        <div id="taskDescription"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panneau d'actions (à droite) -->
+            <div id="actionPanel">
+            <div class="panel-tabs">
+                <button class="tab-btn active" data-tab="buildings">Bâtiments</button>
+                <button class="tab-btn" data-tab="tasks">Tâches</button>
+                <button class="tab-btn" data-tab="resources">Ressources</button>
+            </div>
+
+            <!-- Onglet Bâtiments -->
+            <div id="buildingsTab" class="tab-content active">
+                <div id="buildingsList"></div>
+            </div>
+
+            <!-- Onglet Tâches -->
+            <div id="tasksTab" class="tab-content">
+                <div id="tasksList"></div>
+            </div>
+
+            <!-- Onglet Ressources -->
+            <div id="resourcesTab" class="tab-content">
+                <div class="resource-section">
+                    <h4>Ressources stockées</h4>
+                    <div id="resourcesStock">
+                        <div class="resource-item">
+                            <span class="resource-icon">🪵</span>
+                            <span class="resource-name">Bois</span>
+                            <span id="woodStock" class="resource-value">0</span>
+                        </div>
+                        <div class="resource-item">
+                            <span class="resource-icon">🪨</span>
+                            <span class="resource-name">Pierre</span>
+                            <span id="stoneStock" class="resource-value">0</span>
+                        </div>
+                        <div class="resource-item">
+                            <span class="resource-icon">🏜️</span>
+                            <span class="resource-name">Sable</span>
+                            <span id="sandStock" class="resource-value">0</span>
+                        </div>
+                        <div class="resource-item">
+                            <span class="resource-icon">🟤</span>
+                            <span class="resource-name">Terre</span>
+                            <span id="dirtStock" class="resource-value">0</span>
+                        </div>
+                        <div class="resource-item">
+                            <span class="resource-icon">🧱</span>
+                            <span class="resource-name">Argile</span>
+                            <span id="clayStock" class="resource-value">0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="resource-actions">
+                    <h4>Envoyer chercher des ressources</h4>
+                    <div id="gatherButtons"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panneau latéral d'info -->
+        <div id="sidePanel" class="hidden">
+            <div id="sidePanelContent"></div>
+            <button class="close-btn" data-action="closeSidePanel">✕</button>
+        </div>
+    </div>
+    </div>
+
+    <!-- Écran Guide -->
+    <div id="guideScreen" class="screen">
+        <div id="guideHeader">
+            <h1>Guide du Jeu</h1>
+            <button class="close-btn" data-action="closeGuide">✕</button>
+        </div>
+        <div id="guideContent"></div>
+    </div>
+
+    <!-- Écran Game Over -->
+    <div id="gameOverScreen" class="screen">
+        <div class="gameover-content">
+            <div id="gameOverSprite" class="end-screen-sprite"></div>
+            <h1 id="gameOverTitle">GAME OVER</h1>
+            <p id="gameOverMessage"></p>
+            <button data-action="showMenu">Retour au Menu</button>
+        </div>
+    </div>
+
+    <!-- Écran Victoire -->
+    <div id="victoryScreen" class="screen">
+        <div class="victory-content">
+            <div id="victorySprite" class="end-screen-sprite"></div>
+            <h1>🎉 VICTOIRE ! 🎉</h1>
+            <p>Félicitations ! Votre village compte maintenant 10 000 habitants !</p>
+            <p>Cléopâtre est fière de vous et vous couvre d'or et de gloire.</p>
+            <div id="victoryStats"></div>
+            <button data-action="showMenu">Retour au Menu</button>
+        </div>
+    </div>
+
+    <!-- Notifications -->
+    <div id="notifications"></div>
+
+    <!-- Tooltip -->
+    <div id="tooltip" class="hidden"></div>
+
+    <!-- Modal de confirmation -->
+    <div id="confirmModal" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="confirmTitle">Confirmation</h3>
+            <p id="confirmMessage"></p>
+            <div class="modal-buttons">
+                <button id="confirmYes">Oui</button>
+                <button id="confirmNo">Non</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>
