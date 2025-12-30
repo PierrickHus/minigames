@@ -79,4 +79,16 @@ const RATION_CONFIG = {
     warningThreshold: 15 // Avertissement quand il reste 15 secondes
 };
 
-export { RESOURCES, CONSUMABLES, RATION_CONFIG };
+// Configuration de la croissance naturelle de population
+const POPULATION_GROWTH_CONFIG = {
+    baseGrowthRate: 0.5,        // Habitants par minute de base
+    growthInterval: 30,          // Vérification toutes les 30 secondes
+    minFoodReserve: 10,          // Minimum de nourriture pour croître
+    minWaterReserve: 5,          // Minimum d'eau pour croître
+    foodPerNewHabitant: 2,       // Nourriture consommée par nouvel habitant
+    waterPerNewHabitant: 1,      // Eau consommée par nouvel habitant
+    maxGrowthPerTick: 50,        // Maximum d'habitants gagnés par tick
+    housingMultiplier: 0.1       // Bonus de croissance par maison (10%)
+};
+
+export { RESOURCES, CONSUMABLES, RATION_CONFIG, POPULATION_GROWTH_CONFIG };

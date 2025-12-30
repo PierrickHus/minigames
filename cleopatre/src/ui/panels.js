@@ -2,13 +2,21 @@
 // GESTION DES PANNEAUX D'INTERFACE
 // ==========================================
 
-import { BUILDINGS, RESOURCES } from '../data/index.js';
+import { BUILDINGS, RESOURCES, TIER_NAMES, BUILDING_TIER_UNLOCK } from '../data/index.js';
 
 /**
- * Formate un temps en secondes en format lisible (ex: 1m26s, 45s)
+ * Formate un temps en secondes en format lisible (ex: 1h30m, 1m26s, 45s)
  */
 function formatTime(seconds) {
     const s = Math.ceil(seconds);
+    if (s >= 3600) {
+        const hours = Math.floor(s / 3600);
+        const mins = Math.floor((s % 3600) / 60);
+        if (mins > 0) {
+            return `${hours}h${mins}m`;
+        }
+        return `${hours}h`;
+    }
     if (s >= 60) {
         const mins = Math.floor(s / 60);
         const secs = s % 60;
@@ -22,8 +30,10 @@ class PanelManager {
         this.game = game;
         this.activeTab = 'buildings';
         this.gatherMultiplier = 1; // Multiplicateur actuel pour la collecte
+        this.buildMultiplier = 1; // Multiplicateur actuel pour la construction
         this.setupTabs();
         this.setupMultiplierSelector();
+        this.setupBuildMultiplierSelector();
         this.initGatherButtons();
     }
 
@@ -125,6 +135,101 @@ class PanelManager {
     }
 
     /**
+     * Configure le sélecteur de multiplicateur pour les bâtiments
+     */
+    setupBuildMultiplierSelector() {
+        const container = document.getElementById('buildingsList');
+        if (!container) return;
+
+        // Vérifier si le sélecteur existe déjà
+        const existingSelector = document.getElementById('buildMultiplierSelector');
+        if (existingSelector) {
+            existingSelector.querySelectorAll('.mult-btn').forEach(btn => {
+                btn.onclick = () => this.setBuildMultiplier(btn.dataset.mult === 'max' ? 'max' : parseInt(btn.dataset.mult));
+            });
+            return;
+        }
+
+        // Créer le sélecteur de multiplicateur
+        const selector = document.createElement('div');
+        selector.className = 'multiplier-selector';
+        selector.id = 'buildMultiplierSelector';
+
+        const multipliers = [1, 5, 10, 'max'];
+        multipliers.forEach(mult => {
+            const btn = document.createElement('button');
+            btn.className = `mult-btn ${mult === 1 ? 'active' : ''}`;
+            btn.dataset.mult = mult;
+            btn.textContent = mult === 'max' ? 'Max' : `x${mult}`;
+            btn.addEventListener('click', () => this.setBuildMultiplier(mult));
+            selector.appendChild(btn);
+        });
+
+        container.parentNode.insertBefore(selector, container);
+    }
+
+    /**
+     * Change le multiplicateur de construction
+     */
+    setBuildMultiplier(mult) {
+        this.buildMultiplier = mult;
+
+        // Mettre à jour les boutons actifs (uniquement ceux du sélecteur de construction)
+        const selector = document.getElementById('buildMultiplierSelector');
+        if (selector) {
+            selector.querySelectorAll('.mult-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.mult === String(mult));
+            });
+        }
+
+        // Rafraîchir la liste des bâtiments
+        this.updateBuildingsList();
+    }
+
+    /**
+     * Calcule le nombre réel de bâtiments à construire
+     */
+    getActualBuildCount(building) {
+        const state = this.game.state;
+        const builtCount = this.game.getBuildingCount(building.id);
+        const pendingCount = state.constructions.filter(c => c.buildingId === building.id).length;
+        const remainingSlots = building.maxCount - builtCount - pendingCount;
+
+        // Calculer combien on peut construire avec les ressources
+        let maxByMoney = Math.floor(state.money / building.cost.money);
+        let maxByWorkers = state.availablePeasants;
+        let maxByResources = Infinity;
+
+        // Vérifier chaque ressource
+        if (building.cost.wood) {
+            maxByResources = Math.min(maxByResources, Math.floor(state.resources.wood / building.cost.wood));
+        }
+        if (building.cost.stone) {
+            maxByResources = Math.min(maxByResources, Math.floor(state.resources.stone / building.cost.stone));
+        }
+        if (building.cost.sand) {
+            maxByResources = Math.min(maxByResources, Math.floor(state.resources.sand / building.cost.sand));
+        }
+        if (building.cost.dirt) {
+            maxByResources = Math.min(maxByResources, Math.floor(state.resources.dirt / building.cost.dirt));
+        }
+        if (building.cost.clay) {
+            maxByResources = Math.min(maxByResources, Math.floor(state.resources.clay / building.cost.clay));
+        }
+        if (building.cost.water) {
+            maxByResources = Math.min(maxByResources, Math.floor(state.water / building.cost.water));
+        }
+
+        const maxPossible = Math.min(remainingSlots, maxByMoney, maxByWorkers, maxByResources);
+
+        if (this.buildMultiplier === 'max') {
+            return Math.max(0, maxPossible);
+        }
+
+        return Math.max(0, Math.min(this.buildMultiplier, maxPossible));
+    }
+
+    /**
      * Initialise les boutons de collecte de ressources (appelé une seule fois)
      */
     initGatherButtons() {
@@ -182,6 +287,24 @@ class PanelManager {
     }
 
     /**
+     * Obtient les informations de déblocage d'un tier
+     */
+    getTierUnlockInfo(tier) {
+        const unlockConfig = BUILDING_TIER_UNLOCK[tier];
+        if (!unlockConfig) return { unlocked: true, timeRemaining: 0 };
+
+        const gameTime = this.game.state.gameTime || 0;
+        const unlocked = gameTime >= unlockConfig.time;
+        const timeRemaining = Math.max(0, unlockConfig.time - gameTime);
+
+        return {
+            unlocked,
+            timeRemaining,
+            config: unlockConfig
+        };
+    }
+
+    /**
      * Initialise la liste des bâtiments (appelé une seule fois)
      */
     initBuildingsList() {
@@ -190,57 +313,114 @@ class PanelManager {
 
         container.innerHTML = '';
 
+        // Trier les bâtiments par tier
+        const buildingsByTier = {};
         Object.values(BUILDINGS).forEach(building => {
-            const item = document.createElement('div');
-            item.className = 'building-item';
-            item.dataset.buildingId = building.id;
+            const tier = building.tier || 1;
+            if (!buildingsByTier[tier]) {
+                buildingsByTier[tier] = [];
+            }
+            buildingsByTier[tier].push(building);
+        });
 
-            item.innerHTML = `
-                <div class="building-header">
-                    <span class="building-name">${building.name} (<span class="count">0</span>/${building.maxCount})</span>
-                    <span class="building-icon">${building.icon}</span>
-                </div>
-                <div class="building-desc">${building.description}</div>
-                <div class="building-time">⏱️ ${formatTime(building.buildTime)}</div>
-                <div class="building-cost"></div>
-                <div class="max-reached" style="color: #ff6b6b; margin-top: 5px; display: none;">Maximum atteint</div>
-            `;
+        // Afficher par tier
+        [1, 2, 3].forEach(tier => {
+            if (!buildingsByTier[tier] || buildingsByTier[tier].length === 0) return;
 
-            // Event listener permanent
-            item.addEventListener('click', () => {
-                if (this.game.canBuild(building.id)) {
-                    this.game.startBuilding(building.id);
-                } else {
-                    // Déterminer la cause exacte du blocage
-                    const state = this.game.state;
-                    const builtCount = this.game.getBuildingCount(building.id);
-                    const pendingCount = state.constructions.filter(c => c.buildingId === building.id).length;
+            const unlockInfo = this.getTierUnlockInfo(tier);
+            const unlockConfig = BUILDING_TIER_UNLOCK[tier];
 
-                    if (builtCount + pendingCount >= building.maxCount) {
-                        this.game.notifications.error("Maximum atteint !");
-                    } else if (state.availablePeasants < 1) {
-                        this.game.notifications.error("Pas d'ouvriers disponibles !");
-                    } else if (state.money < building.cost.money) {
-                        this.game.notifications.error("Pas assez d'argent !");
-                    } else if (building.cost.wood && state.resources.wood < building.cost.wood) {
-                        this.game.notifications.error("Pas assez de bois !");
-                    } else if (building.cost.stone && state.resources.stone < building.cost.stone) {
-                        this.game.notifications.error("Pas assez de pierre !");
-                    } else if (building.cost.sand && state.resources.sand < building.cost.sand) {
-                        this.game.notifications.error("Pas assez de sable !");
-                    } else if (building.cost.dirt && state.resources.dirt < building.cost.dirt) {
-                        this.game.notifications.error("Pas assez de terre !");
-                    } else if (building.cost.clay && state.resources.clay < building.cost.clay) {
-                        this.game.notifications.error("Pas assez d'argile !");
-                    } else if (building.cost.water && state.water < building.cost.water) {
-                        this.game.notifications.error("Pas assez d'eau !");
-                    } else {
-                        this.game.notifications.error("Construction impossible !");
+            // Header de tier
+            const tierHeader = document.createElement('div');
+            tierHeader.className = 'tier-header';
+            tierHeader.dataset.tier = tier;
+
+            if (unlockInfo.unlocked) {
+                tierHeader.innerHTML = `<span class="tier-icon">${unlockConfig.icon}</span> ${TIER_NAMES[tier]}`;
+            } else {
+                tierHeader.classList.add('locked');
+                tierHeader.innerHTML = `
+                    <span class="tier-icon">🔒</span>
+                    <span class="tier-name">${TIER_NAMES[tier]}</span>
+                    <span class="tier-unlock-time">Débloque dans ${formatTime(unlockInfo.timeRemaining)}</span>
+                `;
+            }
+            container.appendChild(tierHeader);
+
+            // Container pour les bâtiments du tier
+            const tierContainer = document.createElement('div');
+            tierContainer.className = 'tier-buildings';
+            tierContainer.dataset.tier = tier;
+            if (!unlockInfo.unlocked) {
+                tierContainer.classList.add('locked');
+            }
+
+            // Bâtiments du tier
+            buildingsByTier[tier].forEach(building => {
+                const item = document.createElement('div');
+                item.className = 'building-item';
+                item.dataset.buildingId = building.id;
+                item.dataset.tier = tier;
+
+                item.innerHTML = `
+                    <div class="building-header">
+                        <span class="building-name">${building.name} (<span class="count">0</span>/${building.maxCount})</span>
+                        <span class="building-icon">${building.icon}</span>
+                    </div>
+                    <div class="building-desc">${building.description}</div>
+                    <div class="building-time">⏱️ ${formatTime(building.buildTime)}</div>
+                    <div class="building-cost"></div>
+                    <div class="max-reached" style="color: #ff6b6b; margin-top: 5px; display: none;">Maximum atteint</div>
+                `;
+
+                // Event listener permanent
+                item.addEventListener('click', () => {
+                    // Vérifier si le tier est débloqué
+                    const currentUnlockInfo = this.getTierUnlockInfo(tier);
+                    if (!currentUnlockInfo.unlocked) {
+                        this.game.notifications.error(`Tier verrouillé ! Débloque dans ${formatTime(currentUnlockInfo.timeRemaining)}`);
+                        return;
                     }
-                }
+
+                    const count = this.getActualBuildCount(building);
+                    if (count > 0) {
+                        for (let i = 0; i < count; i++) {
+                            this.game.startBuilding(building.id);
+                        }
+                    } else {
+                        // Déterminer la cause exacte du blocage
+                        const state = this.game.state;
+                        const builtCount = this.game.getBuildingCount(building.id);
+                        const pendingCount = state.constructions.filter(c => c.buildingId === building.id).length;
+
+                        if (builtCount + pendingCount >= building.maxCount) {
+                            this.game.notifications.error("Maximum atteint !");
+                        } else if (state.availablePeasants < 1) {
+                            this.game.notifications.error("Pas d'ouvriers disponibles !");
+                        } else if (state.money < building.cost.money) {
+                            this.game.notifications.error("Pas assez d'argent !");
+                        } else if (building.cost.wood && state.resources.wood < building.cost.wood) {
+                            this.game.notifications.error("Pas assez de bois !");
+                        } else if (building.cost.stone && state.resources.stone < building.cost.stone) {
+                            this.game.notifications.error("Pas assez de pierre !");
+                        } else if (building.cost.sand && state.resources.sand < building.cost.sand) {
+                            this.game.notifications.error("Pas assez de sable !");
+                        } else if (building.cost.dirt && state.resources.dirt < building.cost.dirt) {
+                            this.game.notifications.error("Pas assez de terre !");
+                        } else if (building.cost.clay && state.resources.clay < building.cost.clay) {
+                            this.game.notifications.error("Pas assez d'argile !");
+                        } else if (building.cost.water && state.water < building.cost.water) {
+                            this.game.notifications.error("Pas assez d'eau !");
+                        } else {
+                            this.game.notifications.error("Construction impossible !");
+                        }
+                    }
+                });
+
+                tierContainer.appendChild(item);
             });
 
-            container.appendChild(item);
+            container.appendChild(tierContainer);
         });
     }
 
@@ -256,11 +436,42 @@ class PanelManager {
             this.initBuildingsList();
         }
 
+        // Compteur de bâtiments visibles par tier (pour gérer les headers)
+        const visibleByTier = { 1: 0, 2: 0, 3: 0 };
+
+        // Mettre à jour le statut des tiers
+        [1, 2, 3].forEach(tier => {
+            const unlockInfo = this.getTierUnlockInfo(tier);
+            const unlockConfig = BUILDING_TIER_UNLOCK[tier];
+            const tierHeader = container.querySelector(`.tier-header[data-tier="${tier}"]`);
+            const tierContainer = container.querySelector(`.tier-buildings[data-tier="${tier}"]`);
+
+            if (tierHeader) {
+                if (unlockInfo.unlocked) {
+                    tierHeader.classList.remove('locked');
+                    tierHeader.innerHTML = `<span class="tier-icon">${unlockConfig.icon}</span> ${TIER_NAMES[tier]}`;
+                } else {
+                    tierHeader.classList.add('locked');
+                    tierHeader.innerHTML = `
+                        <span class="tier-icon">🔒</span>
+                        <span class="tier-name">${TIER_NAMES[tier]}</span>
+                        <span class="tier-unlock-time">Débloque dans ${formatTime(unlockInfo.timeRemaining)}</span>
+                    `;
+                }
+            }
+
+            if (tierContainer) {
+                tierContainer.classList.toggle('locked', !unlockInfo.unlocked);
+            }
+        });
+
         // Mettre à jour chaque élément
         Object.values(BUILDINGS).forEach(building => {
             const item = container.querySelector(`[data-building-id="${building.id}"]`);
             if (!item) return;
 
+            const tier = building.tier || 1;
+            const unlockInfo = this.getTierUnlockInfo(tier);
             const canBuild = this.game.canBuild(building.id);
             const count = this.game.getBuildingCount(building.id);
             const maxReached = count >= building.maxCount;
@@ -268,10 +479,28 @@ class PanelManager {
             // Vérifier si ce bâtiment est en construction
             const constructions = this.game.state.constructions.filter(c => c.buildingId === building.id);
             const isBuilding = constructions.length > 0;
+            const pendingCount = constructions.length;
+
+            // Vérifier si le max est atteint avec les constructions en cours
+            const totalWithPending = count + pendingCount;
+            const maxReachedWithPending = totalWithPending >= building.maxCount;
+
+            // Cacher si max atteint définitivement (constructions terminées)
+            const shouldHide = maxReached && !isBuilding;
+            item.style.display = shouldHide ? 'none' : '';
+
+            // Compter les visibles par tier
+            if (!shouldHide) {
+                visibleByTier[tier]++;
+            }
 
             // Mettre à jour la classe disabled et building
-            item.classList.toggle('disabled', !canBuild || maxReached);
+            // Désactivé si tier verrouillé OU si on ne peut pas construire
+            item.classList.toggle('disabled', !unlockInfo.unlocked || !canBuild || maxReached);
+            item.classList.toggle('tier-locked', !unlockInfo.unlocked);
             item.classList.toggle('building', isBuilding);
+            // Contour vert si au max avec constructions en cours (attente)
+            item.classList.toggle('building-max', maxReachedWithPending && isBuilding && !maxReached);
 
             // Mettre à jour le compteur
             const countSpan = item.querySelector('.count');
@@ -298,34 +527,46 @@ class PanelManager {
             // Mettre à jour les coûts
             const costsDiv = item.querySelector('.building-cost');
             if (costsDiv) {
+                // Calculer le multiplicateur effectif pour ce bâtiment
+                const buildCount = this.getActualBuildCount(building);
+                const mult = buildCount > 0 ? buildCount : 1;
+                const showMult = this.buildMultiplier !== 1 && mult > 1;
+
                 const costs = [];
                 if (building.cost.money) {
-                    const hasEnough = this.game.state.money >= building.cost.money;
-                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">💰${building.cost.money}</span>`);
+                    const totalCost = building.cost.money * mult;
+                    const hasEnough = this.game.state.money >= totalCost;
+                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">💰${totalCost}${showMult ? ` (x${mult})` : ''}</span>`);
                 }
                 if (building.cost.wood) {
-                    const hasEnough = this.game.state.resources.wood >= building.cost.wood;
-                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🪵${building.cost.wood}</span>`);
+                    const totalCost = building.cost.wood * mult;
+                    const hasEnough = this.game.state.resources.wood >= totalCost;
+                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🪵${totalCost}</span>`);
                 }
                 if (building.cost.stone) {
-                    const hasEnough = this.game.state.resources.stone >= building.cost.stone;
-                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🪨${building.cost.stone}</span>`);
+                    const totalCost = building.cost.stone * mult;
+                    const hasEnough = this.game.state.resources.stone >= totalCost;
+                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🪨${totalCost}</span>`);
                 }
                 if (building.cost.sand) {
-                    const hasEnough = this.game.state.resources.sand >= building.cost.sand;
-                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🏜️${building.cost.sand}</span>`);
+                    const totalCost = building.cost.sand * mult;
+                    const hasEnough = this.game.state.resources.sand >= totalCost;
+                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🏜️${totalCost}</span>`);
                 }
                 if (building.cost.dirt) {
-                    const hasEnough = this.game.state.resources.dirt >= building.cost.dirt;
-                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🟤${building.cost.dirt}</span>`);
+                    const totalCost = building.cost.dirt * mult;
+                    const hasEnough = this.game.state.resources.dirt >= totalCost;
+                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🟤${totalCost}</span>`);
                 }
                 if (building.cost.clay) {
-                    const hasEnough = this.game.state.resources.clay >= building.cost.clay;
-                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🧱${building.cost.clay}</span>`);
+                    const totalCost = building.cost.clay * mult;
+                    const hasEnough = this.game.state.resources.clay >= totalCost;
+                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🧱${totalCost}</span>`);
                 }
                 if (building.cost.water) {
-                    const hasEnough = this.game.state.water >= building.cost.water;
-                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">💧${building.cost.water}</span>`);
+                    const totalCost = building.cost.water * mult;
+                    const hasEnough = this.game.state.water >= totalCost;
+                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">💧${totalCost}</span>`);
                 }
                 costsDiv.innerHTML = costs.join(' ');
             }
@@ -334,6 +575,21 @@ class PanelManager {
             const maxDiv = item.querySelector('.max-reached');
             if (maxDiv) {
                 maxDiv.style.display = maxReached ? 'block' : 'none';
+            }
+        });
+
+        // Gérer l'affichage des headers et containers selon la visibilité
+        [1, 2, 3].forEach(tier => {
+            const tierHeader = container.querySelector(`.tier-header[data-tier="${tier}"]`);
+            const tierContainer = container.querySelector(`.tier-buildings[data-tier="${tier}"]`);
+            const unlockInfo = this.getTierUnlockInfo(tier);
+
+            // Afficher le header et le container même si locked (pour voir le timer)
+            // Mais cacher si tous les bâtiments sont max et le tier est unlock
+            if (tierHeader && tierContainer) {
+                const shouldShow = !unlockInfo.unlocked || visibleByTier[tier] > 0;
+                tierHeader.style.display = shouldShow ? '' : 'none';
+                tierContainer.style.display = shouldShow ? '' : 'none';
             }
         });
     }
@@ -424,7 +680,7 @@ class PanelManager {
                             <div class="construction-progress-bar" style="width: ${progress}%"></div>
                         </div>
                         <div style="color: #4ade80; margin-top: 5px;">
-                            ${progress}% - ${Math.ceil((construction.totalTime - construction.elapsed))}s restantes
+                            ${progress}% - ${formatTime(construction.totalTime - construction.elapsed)} restantes
                         </div>
                     </div>
                 `;
@@ -442,7 +698,7 @@ class PanelManager {
                             <div class="construction-progress-bar" style="width: ${progress}%"></div>
                         </div>
                         <div style="color: #4ade80; margin-top: 5px;">
-                            ${progress}% - ${Math.ceil((task.totalTime - task.elapsed))}s restantes
+                            ${progress}% - ${formatTime(task.totalTime - task.elapsed)} restantes
                         </div>
                     </div>
                 `;

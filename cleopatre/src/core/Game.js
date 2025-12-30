@@ -7,7 +7,7 @@ import NotificationManager from '../ui/notifications.js';
 import PanelManager from '../ui/panels.js';
 import VillageRenderer from '../systems/village-renderer.js';
 import CleopatraSystem from '../systems/cleopatra.js';
-import { BUILDINGS, RESOURCES, CONSUMABLES, RATION_CONFIG, GUIDE_CONTENT } from '../data/index.js';
+import { BUILDINGS, RESOURCES, CONSUMABLES, RATION_CONFIG, POPULATION_GROWTH_CONFIG, GUIDE_CONTENT } from '../data/index.js';
 
 class Game {
     constructor() {
@@ -74,6 +74,9 @@ class Game {
             // Timer des rations
             rationTimer: RATION_CONFIG.interval,
             rationWarningShown: false,
+
+            // Timer de croissance naturelle
+            growthTimer: POPULATION_GROWTH_CONFIG.growthInterval,
 
             // Humeur de Cléopâtre (0-100)
             cleopatraMood: 50,
@@ -158,8 +161,11 @@ class Game {
             // Restaurer les bâtiments sur la grille
             this.startGame();
 
-            // Restaurer la grille du village
-            if (data.grid) {
+            // Restaurer l'état du village (nouveau système avec formes)
+            if (data.villageState) {
+                this.villageRenderer.importState(data.villageState);
+            } else if (data.grid) {
+                // Compatibilité avec l'ancien format
                 this.villageRenderer.grid = data.grid;
             }
 
@@ -209,7 +215,8 @@ class Game {
 
         const saveData = {
             state: this.state,
-            grid: this.villageRenderer ? this.villageRenderer.grid : null,
+            // Nouveau système avec formes et positions
+            villageState: this.villageRenderer ? this.villageRenderer.exportState() : null,
             // Sauvegarder les tâches de Cléopâtre avec durée ISO
             cleopatraTasks: tasksToSave,
             savedAt: Date.now()
@@ -316,6 +323,7 @@ class Game {
         // Mettre à jour les systèmes
         this.updateProduction(dt);
         this.updateConsumption(dt);
+        this.updatePopulationGrowth(dt);
         this.updateConstructions(dt);
         this.updateGathering(dt);
 
@@ -344,22 +352,46 @@ class Game {
      * Met à jour la production des bâtiments
      */
     updateProduction(dt) {
+        // === NOURRITURE ===
         // Production des champs
         const fields = this.state.buildings['field'] || 0;
-        this.state.food += fields * (5 / 60) * dt; // 5 par minute
+        this.state.food += fields * (5 / 60) * dt;
 
         // Production des boulangeries
         const bakeries = this.state.buildings['bakery'] || 0;
         this.state.food += bakeries * (15 / 60) * dt;
 
+        // Production des fermes
+        const farms = this.state.buildings['farm'] || 0;
+        this.state.food += farms * (10 / 60) * dt;
+
+        // Production des jardins
+        const gardens = this.state.buildings['gardens'] || 0;
+        this.state.food += gardens * (5 / 60) * dt;
+
+        // === EAU ===
         // Production des puits
         const wells = this.state.buildings['well'] || 0;
         this.state.water += wells * (10 / 60) * dt;
 
+        // Production des citernes
+        const cisterns = this.state.buildings['cistern'] || 0;
+        this.state.water += cisterns * (20 / 60) * dt;
+
+        // === ARGENT ===
         // Production des marchés
         const markets = this.state.buildings['market'] || 0;
         this.state.money += markets * (20 / 60) * dt;
 
+        // Production des ports
+        const harbors = this.state.buildings['harbor'] || 0;
+        this.state.money += harbors * (30 / 60) * dt;
+
+        // Production des colisées
+        const coliseums = this.state.buildings['coliseum'] || 0;
+        this.state.money += coliseums * (25 / 60) * dt;
+
+        // === RESSOURCES ===
         // Production des carrières
         const quarries = this.state.buildings['quarry'] || 0;
         this.state.resources.stone += quarries * (3 / 60) * dt;
@@ -367,6 +399,11 @@ class Game {
         // Production des scieries
         const lumbermills = this.state.buildings['lumbermill'] || 0;
         this.state.resources.wood += lumbermills * (3 / 60) * dt;
+
+        // Production des ateliers
+        const workshops = this.state.buildings['workshop'] || 0;
+        this.state.resources.wood += workshops * (2 / 60) * dt;
+        this.state.resources.stone += workshops * (2 / 60) * dt;
     }
 
     /**
@@ -430,6 +467,62 @@ class Game {
         }
         if (waterTaken < waterNeeded) {
             this.notifications.error(`Pas assez d'eau ! (${Math.floor(waterNeeded - waterTaken)} 💧 manquant)`);
+        }
+    }
+
+    /**
+     * Met à jour la croissance naturelle de la population
+     */
+    updatePopulationGrowth(dt) {
+        // Décrémenter le timer
+        this.state.growthTimer -= dt;
+
+        if (this.state.growthTimer <= 0) {
+            this.state.growthTimer = POPULATION_GROWTH_CONFIG.growthInterval;
+
+            // Vérifier les réserves minimales
+            if (this.state.food < POPULATION_GROWTH_CONFIG.minFoodReserve ||
+                this.state.water < POPULATION_GROWTH_CONFIG.minWaterReserve) {
+                return; // Pas assez de réserves pour croître
+            }
+
+            // Calculer le taux de croissance
+            const houses = this.state.buildings['house'] || 0;
+            const villas = this.state.buildings['villa'] || 0;
+            const inns = this.state.buildings['inn'] || 0;
+            const baths = this.state.buildings['baths'] || 0;
+            const gardens = this.state.buildings['gardens'] || 0;
+
+            // Bonus de logement (plus de maisons = plus de croissance)
+            const housingBonus = 1 + (houses * 0.1) + (villas * 0.2) + (inns * 0.05) + (baths * 0.15) + (gardens * 0.25);
+
+            // Taux de croissance par tick (basé sur l'intervalle de 30 secondes)
+            const baseGrowth = POPULATION_GROWTH_CONFIG.baseGrowthRate * (POPULATION_GROWTH_CONFIG.growthInterval / 60);
+            let growth = Math.floor(baseGrowth * housingBonus * this.state.population / 100);
+
+            // Minimum 1 habitant si conditions remplies, maximum selon config
+            growth = Math.max(1, Math.min(growth, POPULATION_GROWTH_CONFIG.maxGrowthPerTick));
+
+            // Vérifier si on a assez de ressources pour les nouveaux habitants
+            const foodNeeded = growth * POPULATION_GROWTH_CONFIG.foodPerNewHabitant;
+            const waterNeeded = growth * POPULATION_GROWTH_CONFIG.waterPerNewHabitant;
+
+            // Ajuster la croissance selon les ressources disponibles
+            const maxByFood = Math.floor((this.state.food - POPULATION_GROWTH_CONFIG.minFoodReserve) / POPULATION_GROWTH_CONFIG.foodPerNewHabitant);
+            const maxByWater = Math.floor((this.state.water - POPULATION_GROWTH_CONFIG.minWaterReserve) / POPULATION_GROWTH_CONFIG.waterPerNewHabitant);
+            growth = Math.min(growth, maxByFood, maxByWater);
+
+            if (growth > 0) {
+                // Consommer les ressources
+                this.state.food -= growth * POPULATION_GROWTH_CONFIG.foodPerNewHabitant;
+                this.state.water -= growth * POPULATION_GROWTH_CONFIG.waterPerNewHabitant;
+
+                // Augmenter la population
+                this.state.population += growth;
+
+                // Notification
+                this.notifications.info(`Croissance naturelle: +${growth} 👥 habitants`);
+            }
         }
     }
 
@@ -804,28 +897,79 @@ class Game {
 
     /**
      * Affiche les infos d'un bâtiment
+     * @param {number|string|object} buildingRef - uid (number), buildingId (string), ou objet avec .id
      */
-    showBuildingInfo(buildingData, x, y) {
-        const building = BUILDINGS[buildingData.id];
+    showBuildingInfo(buildingRef) {
         const panel = document.getElementById('sidePanel');
         const content = document.getElementById('sidePanelContent');
+        if (!panel || !content) return;
 
-        if (panel && content && building) {
-            content.innerHTML = `
-                <h3>${building.icon} ${building.name}</h3>
-                <p>${building.description}</p>
-                <hr style="border-color: #555; margin: 15px 0;">
-                <p><strong>Effets:</strong></p>
-                <ul style="list-style: none; padding: 0;">
-                    ${building.effects.population ? `<li>👥 +${building.effects.population} habitants</li>` : ''}
-                    ${building.effects.peasants ? `<li>🧑‍🌾 +${building.effects.peasants} paysans</li>` : ''}
-                    ${building.effects.foodPerMinute ? `<li>🍞 +${building.effects.foodPerMinute}/min</li>` : ''}
-                    ${building.effects.waterPerMinute ? `<li>💧 +${building.effects.waterPerMinute}/min</li>` : ''}
-                    ${building.effects.moneyPerMinute ? `<li>💰 +${building.effects.moneyPerMinute}/min</li>` : ''}
-                </ul>
-            `;
-            panel.classList.remove('hidden');
+        let placedBuilding = null;
+        let building = null;
+
+        // Déterminer le type de référence
+        if (typeof buildingRef === 'number') {
+            // C'est un uid - récupérer l'instance depuis villageRenderer
+            placedBuilding = this.villageRenderer?.getBuildingByUid(buildingRef);
+            if (placedBuilding) {
+                building = BUILDINGS[placedBuilding.buildingId];
+            }
+        } else if (typeof buildingRef === 'string') {
+            // C'est un buildingId direct
+            building = BUILDINGS[buildingRef];
+        } else if (buildingRef && buildingRef.id) {
+            // C'est un objet avec .id
+            building = BUILDINGS[buildingRef.id];
         }
+
+        if (!building) return;
+
+        // Construire le contenu du panneau
+        const instanceInfo = placedBuilding ? `
+            <div style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 5px;">
+                <p style="margin: 0; font-size: 0.9rem; color: #888;">
+                    📍 Position: (${placedBuilding.x}, ${placedBuilding.y})<br>
+                    🔧 Niveau: ${placedBuilding.level}<br>
+                    ⚡ Efficacité: ${Math.round(placedBuilding.efficiency * 100)}%
+                    ${placedBuilding.constructing ? '<br>🏗️ <span style="color: #ffa500;">En construction</span>' : ''}
+                </p>
+            </div>
+        ` : '';
+
+        const effectsHtml = [];
+        const e = building.effects;
+
+        // Population et paysans
+        if (e.population) effectsHtml.push(`<li>👥 +${e.population} habitants</li>`);
+        if (e.peasants) effectsHtml.push(`<li>🧑‍🌾 +${e.peasants} paysans</li>`);
+
+        // Production par minute
+        if (e.foodPerMinute) effectsHtml.push(`<li>🍞 +${e.foodPerMinute} nourriture/min</li>`);
+        if (e.waterPerMinute) effectsHtml.push(`<li>💧 +${e.waterPerMinute} eau/min</li>`);
+        if (e.moneyPerMinute) effectsHtml.push(`<li>💰 +${e.moneyPerMinute} or/min</li>`);
+        if (e.woodPerMinute) effectsHtml.push(`<li>🪵 +${e.woodPerMinute} bois/min</li>`);
+        if (e.stonePerMinute) effectsHtml.push(`<li>🪨 +${e.stonePerMinute} pierre/min</li>`);
+
+        // Stockage
+        if (e.foodStorage) effectsHtml.push(`<li>📦 +${e.foodStorage} stockage nourriture</li>`);
+
+        // Bonus spéciaux
+        if (e.enableMessages) effectsHtml.push(`<li>🕊️ Permet d'envoyer des messages</li>`);
+        if (e.growthBonus) effectsHtml.push(`<li>📈 Bonus de croissance</li>`);
+        if (e.protection) effectsHtml.push(`<li>🛡️ Protection du village</li>`);
+        if (e.cleopatraBonus) effectsHtml.push(`<li>👸 Plaît à Cléopâtre</li>`);
+
+        content.innerHTML = `
+            <h3>${building.icon} ${placedBuilding?.customName || building.name}</h3>
+            <p>${building.description}</p>
+            ${instanceInfo}
+            <hr style="border-color: #555; margin: 15px 0;">
+            <p><strong>Effets:</strong></p>
+            <ul style="list-style: none; padding: 0;">
+                ${effectsHtml.join('')}
+            </ul>
+        `;
+        panel.classList.remove('hidden');
     }
 
     /**

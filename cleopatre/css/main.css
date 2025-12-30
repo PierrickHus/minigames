@@ -560,7 +560,8 @@ body {
 }
 
 .tab-content.active {
-    display: block;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Liste des Bâtiments */
@@ -621,6 +622,12 @@ body {
 .building-item.building {
     border-color: #ffd700;
     background: rgba(255, 215, 0, 0.1);
+}
+
+.building-item.building-max {
+    border-color: #4ade80;
+    background: rgba(74, 222, 128, 0.15);
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.3);
 }
 
 .building-item .building-cost {
@@ -754,9 +761,15 @@ body {
     display: flex;
     gap: 5px;
     margin-bottom: 10px;
-    padding: 5px;
-    background: rgba(0,0,0,0.3);
+    padding: 8px;
+    background: rgba(20, 20, 30, 0.95);
     border-radius: 5px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .mult-btn {
@@ -1524,4 +1537,129 @@ body {
     image-rendering: pixelated;
     image-rendering: -webkit-optimize-contrast;
     image-rendering: crisp-edges;
+}
+
+/* Headers de tier pour la liste des bâtiments */
+.tier-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 15px;
+    margin: 15px 0 10px 0;
+    background: linear-gradient(90deg, rgba(255, 215, 0, 0.2) 0%, rgba(255, 215, 0, 0.05) 100%);
+    border-left: 4px solid #ffd700;
+    border-radius: 0 8px 8px 0;
+    color: #ffd700;
+    font-weight: bold;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.tier-header:first-child {
+    margin-top: 0;
+}
+
+.tier-header .tier-icon {
+    font-size: 1.3rem;
+}
+
+.tier-header[data-tier="1"] {
+    border-color: #4ade80;
+    background: linear-gradient(90deg, rgba(74, 222, 128, 0.2) 0%, rgba(74, 222, 128, 0.05) 100%);
+    color: #4ade80;
+}
+
+.tier-header[data-tier="2"] {
+    border-color: #60a5fa;
+    background: linear-gradient(90deg, rgba(96, 165, 250, 0.2) 0%, rgba(96, 165, 250, 0.05) 100%);
+    color: #60a5fa;
+}
+
+.tier-header[data-tier="3"] {
+    border-color: #ffd700;
+    background: linear-gradient(90deg, rgba(255, 215, 0, 0.2) 0%, rgba(255, 215, 0, 0.05) 100%);
+    color: #ffd700;
+}
+
+/* Tiers verrouillés */
+.tier-header.locked {
+    border-color: #666;
+    background: linear-gradient(90deg, rgba(80, 80, 80, 0.3) 0%, rgba(50, 50, 50, 0.1) 100%);
+    color: #888;
+    cursor: not-allowed;
+}
+
+.tier-header.locked .tier-icon {
+    color: #ff6b6b;
+}
+
+.tier-header.locked .tier-name {
+    flex: 1;
+    color: #aaa;
+}
+
+.tier-unlock-time {
+    font-size: 0.85rem;
+    font-weight: normal;
+    color: #ffaa00;
+    background: rgba(255, 170, 0, 0.15);
+    padding: 3px 10px;
+    border-radius: 12px;
+    margin-left: auto;
+    animation: pulse-unlock 2s ease-in-out infinite;
+}
+
+@keyframes pulse-unlock {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Container des bâtiments verrouillés */
+.tier-buildings {
+    display: flex;
+    flex-direction: column;
+}
+
+.tier-buildings.locked {
+    position: relative;
+}
+
+.tier-buildings.locked::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(20, 20, 30, 0.5);
+    z-index: 5;
+    pointer-events: none;
+    border-radius: 8px;
+}
+
+.tier-buildings.locked .building-item {
+    filter: grayscale(60%) brightness(0.7);
+    pointer-events: none;
+}
+
+/* Bâtiments individuels verrouillés */
+.building-item.tier-locked {
+    opacity: 0.6;
+    filter: grayscale(50%);
+    cursor: not-allowed;
+    border-color: #444;
+}
+
+.building-item.tier-locked:hover {
+    border-color: #666;
+    background: rgba(60,60,80,0.5);
+}
+
+.building-item.tier-locked .building-name {
+    color: #888;
+}
+
+.building-item.tier-locked .building-icon {
+    filter: grayscale(100%);
 }

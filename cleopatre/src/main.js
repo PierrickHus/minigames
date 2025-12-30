@@ -255,7 +255,7 @@ function setupEventHandlers(game) {
                 : {};
 
             // Accéder aux bâtiments via l'import
-            import('../data/buildings.js').then(module => {
+            import('./data/buildings.js').then(module => {
                 const BUILDINGS = module.default;
                 const building = BUILDINGS[buildingId];
 
@@ -274,13 +274,27 @@ function setupEventHandlers(game) {
                     return;
                 }
 
+                let builtCount = 0;
                 for (let i = 0; i < actualCount; i++) {
-                    // Ajouter le bâtiment
+                    // D'abord essayer de placer sur la grille
+                    let placed = null;
+                    if (game.villageRenderer) {
+                        placed = game.villageRenderer.placeBuilding(buildingId);
+                        if (!placed) {
+                            console.log(`Pas de place pour ${building.name} sur la grille`);
+                            continue; // Passer au suivant
+                        }
+                        // Marquer comme terminé immédiatement (utiliser UID pour les formes complexes)
+                        game.villageRenderer.finishBuilding(placed.uid);
+                    }
+
+                    // Ajouter le bâtiment au compteur
                     if (!game.state.buildings[buildingId]) {
                         game.state.buildings[buildingId] = 0;
                     }
                     game.state.buildings[buildingId]++;
                     game.state.buildingsBuilt++;
+                    builtCount++;
 
                     // Appliquer les effets
                     if (building.effects.population) {
@@ -292,7 +306,16 @@ function setupEventHandlers(game) {
                     }
                 }
 
-                game.notifications.success(`+${actualCount} ${building.icon} ${building.name} (triche)`);
+                if (builtCount > 0) {
+                    game.notifications.success(`+${builtCount} ${building.icon} ${building.name} (triche)`);
+                } else {
+                    game.notifications.error(`Pas de place pour ${building.name} !`);
+                }
+
+                // Rafraîchir l'interface
+                if (game.panelManager) {
+                    game.panelManager.refresh();
+                }
             });
         },
 
@@ -314,14 +337,224 @@ function setupEventHandlers(game) {
 
         // Lister les bâtiments disponibles
         buildings: () => {
-            import('../data/buildings.js').then(module => {
+            import('./data/buildings.js').then(module => {
                 const BUILDINGS = module.default;
                 console.log('=== BÂTIMENTS DISPONIBLES ===');
                 Object.values(BUILDINGS).forEach(b => {
                     const count = game.state.buildings[b.id] || 0;
-                    console.log(`${b.icon} ${b.id}: ${b.name} (${count}/${b.maxCount})`);
+                    console.log(`${b.icon} ${b.id}: ${b.name} (${count}/${b.maxCount}) [Tier ${b.tier || 1}]`);
                 });
             });
+        },
+
+        // Lister les tiers et leur statut
+        tiers: () => {
+            import('./data/tasks.js').then(module => {
+                const { BUILDING_TIER_UNLOCK } = module;
+                const gameTime = game.state.gameTime || 0;
+                const formatTime = (s) => {
+                    if (s >= 3600) return `${Math.floor(s/3600)}h${Math.floor((s%3600)/60)}m`;
+                    if (s >= 60) return `${Math.floor(s/60)}m${Math.ceil(s%60)}s`;
+                    return `${Math.ceil(s)}s`;
+                };
+
+                console.log('=== TIERS DE BÂTIMENTS ===');
+                console.log(`Temps de jeu: ${formatTime(gameTime)}`);
+                console.log('');
+
+                [1, 2, 3].forEach(tier => {
+                    const config = BUILDING_TIER_UNLOCK[tier];
+                    const unlocked = gameTime >= config.time;
+                    const timeRemaining = Math.max(0, config.time - gameTime);
+                    const status = unlocked ? '✅ DÉBLOQUÉ' : `🔒 dans ${formatTime(timeRemaining)}`;
+                    console.log(`${config.icon} Tier ${tier}: ${config.name} - ${status}`);
+                    console.log(`   Débloqué à: ${formatTime(config.time)}`);
+                });
+
+                console.log('\nCommandes:');
+                console.log('  cheat.unlockTier(n)    - Débloquer le tier n');
+                console.log('  cheat.lockTier(n)      - Verrouiller le tier n');
+                console.log('  cheat.unlockAllTiers() - Débloquer tous les tiers');
+            });
+        },
+
+        // Débloquer un tier spécifique
+        unlockTier: (tier) => {
+            if (tier < 1 || tier > 3) {
+                console.log('Tier invalide. Utilisez 1, 2 ou 3.');
+                return;
+            }
+
+            import('./data/tasks.js').then(module => {
+                const { BUILDING_TIER_UNLOCK } = module;
+                const config = BUILDING_TIER_UNLOCK[tier];
+                const requiredTime = config.time;
+
+                if (game.state.gameTime >= requiredTime) {
+                    console.log(`Tier ${tier} déjà débloqué !`);
+                    return;
+                }
+
+                // Mettre le temps de jeu au minimum requis pour ce tier
+                game.state.gameTime = requiredTime;
+                game.notifications.success(`${config.icon} Tier ${tier} débloqué !`);
+                console.log(`Tier ${tier} (${config.name}) débloqué !`);
+                console.log(`Temps de jeu avancé à ${Math.floor(requiredTime / 60)}m${Math.floor(requiredTime % 60)}s`);
+            });
+        },
+
+        // Verrouiller un tier spécifique
+        lockTier: (tier) => {
+            if (tier < 2 || tier > 3) {
+                console.log('Seuls les tiers 2 et 3 peuvent être verrouillés (tier 1 toujours disponible).');
+                return;
+            }
+
+            import('./data/tasks.js').then(module => {
+                const { BUILDING_TIER_UNLOCK } = module;
+                const prevTierConfig = BUILDING_TIER_UNLOCK[tier - 1];
+                const targetTime = prevTierConfig.time + 1; // Juste après le tier précédent
+
+                if (game.state.gameTime < BUILDING_TIER_UNLOCK[tier].time) {
+                    console.log(`Tier ${tier} déjà verrouillé !`);
+                    return;
+                }
+
+                game.state.gameTime = targetTime;
+                game.notifications.warning(`🔒 Tier ${tier} verrouillé !`);
+                console.log(`Tier ${tier} verrouillé !`);
+                console.log(`Temps de jeu reculé à ${Math.floor(targetTime / 60)}m${Math.floor(targetTime % 60)}s`);
+            });
+        },
+
+        // Débloquer tous les tiers
+        unlockAllTiers: () => {
+            import('./data/tasks.js').then(module => {
+                const { BUILDING_TIER_UNLOCK } = module;
+                const tier3Time = BUILDING_TIER_UNLOCK[3].time;
+
+                game.state.gameTime = tier3Time;
+                game.notifications.success('👑 Tous les tiers débloqués !');
+                console.log('Tous les tiers de bâtiments débloqués !');
+                console.log(`Temps de jeu avancé à ${Math.floor(tier3Time / 60)}m${Math.floor(tier3Time % 60)}s`);
+            });
+        },
+
+        // Lister les bâtiments par tier
+        tierBuildings: (tier) => {
+            if (!tier || tier < 1 || tier > 3) {
+                console.log('Usage: cheat.tierBuildings(1), cheat.tierBuildings(2), ou cheat.tierBuildings(3)');
+                return;
+            }
+
+            import('./data/buildings.js').then(module => {
+                const BUILDINGS = module.default;
+                const buildings = Object.values(BUILDINGS).filter(b => (b.tier || 1) === tier);
+
+                console.log(`=== BÂTIMENTS TIER ${tier} ===`);
+                buildings.forEach(b => {
+                    const count = game.state.buildings[b.id] || 0;
+                    console.log(`${b.icon} ${b.id}: ${b.name} (${count}/${b.maxCount})`);
+                });
+                console.log(`Total: ${buildings.length} bâtiments`);
+            });
+        },
+
+        // Construire un bâtiment aléatoire instantanément
+        randomBuild: (count = 1) => {
+            import('./data/buildings.js').then(buildingsModule => {
+                import('./data/tasks.js').then(tasksModule => {
+                    const BUILDINGS = buildingsModule.default;
+                    const { BUILDING_TIER_UNLOCK } = tasksModule;
+                    const gameTime = game.state.gameTime || 0;
+
+                    // Filtrer les bâtiments disponibles (tier débloqué et pas au max)
+                    const availableBuildings = Object.values(BUILDINGS).filter(b => {
+                        const tier = b.tier || 1;
+                        const tierConfig = BUILDING_TIER_UNLOCK[tier];
+                        const tierUnlocked = gameTime >= tierConfig.time;
+                        const currentCount = game.state.buildings[b.id] || 0;
+                        const notAtMax = currentCount < b.maxCount;
+                        return tierUnlocked && notAtMax;
+                    });
+
+                    if (availableBuildings.length === 0) {
+                        console.log('Aucun bâtiment disponible à construire !');
+                        return;
+                    }
+
+                    let built = 0;
+                    for (let i = 0; i < count; i++) {
+                        // Recalculer les disponibles à chaque itération
+                        const stillAvailable = availableBuildings.filter(b => {
+                            const currentCount = game.state.buildings[b.id] || 0;
+                            return currentCount < b.maxCount;
+                        });
+
+                        if (stillAvailable.length === 0) break;
+
+                        // Choisir un bâtiment aléatoire
+                        const building = stillAvailable[Math.floor(Math.random() * stillAvailable.length)];
+
+                        // D'abord essayer de placer sur la grille
+                        let placed = null;
+                        if (game.villageRenderer) {
+                            placed = game.villageRenderer.placeBuilding(building.id);
+                            if (!placed) {
+                                console.log(`Pas de place pour ${building.name} sur la grille`);
+                                // Retirer ce bâtiment des disponibles pour cette session
+                                const idx = availableBuildings.findIndex(b => b.id === building.id);
+                                if (idx !== -1) availableBuildings.splice(idx, 1);
+                                continue; // Passer au suivant
+                            }
+                            // Marquer comme terminé immédiatement (utiliser UID pour les formes complexes)
+                            game.villageRenderer.finishBuilding(placed.uid);
+                        }
+
+                        // Construire instantanément
+                        if (!game.state.buildings[building.id]) {
+                            game.state.buildings[building.id] = 0;
+                        }
+                        game.state.buildings[building.id]++;
+                        game.state.buildingsBuilt++;
+
+                        // Appliquer les effets
+                        if (building.effects.population) {
+                            game.state.population += building.effects.population;
+                        }
+                        if (building.effects.peasants) {
+                            game.state.totalPeasants += building.effects.peasants;
+                            game.state.availablePeasants += building.effects.peasants;
+                        }
+
+                        built++;
+                        console.log(`${building.icon} ${building.name} construit !`);
+                    }
+
+                    if (built > 0) {
+                        game.notifications.success(`+${built} bâtiment(s) aléatoire(s) (triche)`);
+                        // Rafraîchir l'interface
+                        if (game.panelManager) {
+                            game.panelManager.refresh();
+                        }
+                    }
+                });
+            });
+        },
+
+        // Avancer le temps de jeu
+        time: (seconds) => {
+            if (typeof seconds !== 'number' || seconds <= 0) {
+                console.log('Usage: cheat.time(300) - Avance le temps de 300 secondes (5 minutes)');
+                console.log(`Temps actuel: ${Math.floor(game.state.gameTime / 60)}m${Math.floor(game.state.gameTime % 60)}s`);
+                return;
+            }
+
+            game.state.gameTime += seconds;
+            const totalTime = game.state.gameTime;
+            game.notifications.info(`⏰ +${Math.floor(seconds / 60)}m${Math.floor(seconds % 60)}s`);
+            console.log(`Temps avancé de ${seconds}s`);
+            console.log(`Nouveau temps: ${Math.floor(totalTime / 60)}m${Math.floor(totalTime % 60)}s`);
         },
 
         // Afficher l'aide
@@ -355,6 +588,17 @@ cheat.peasants(n)     - Ajouter n paysans (défaut: 10)
 cheat.buildings()     - Lister les bâtiments disponibles
 cheat.build(id, n)    - Construire n bâtiments instantanément
                         Ex: cheat.build('house', 5)
+cheat.randomBuild(n)  - Construire n bâtiments aléatoires (défaut: 1)
+                        Ex: cheat.randomBuild(10)
+
+=== TIERS DE BÂTIMENTS ===
+cheat.tiers()         - Lister les tiers et leur statut
+cheat.unlockTier(n)   - Débloquer le tier n (1, 2, ou 3)
+cheat.lockTier(n)     - Verrouiller le tier n (2 ou 3)
+cheat.unlockAllTiers()- Débloquer tous les tiers
+cheat.tierBuildings(n)- Lister les bâtiments du tier n
+cheat.time(s)         - Avancer le temps de jeu de s secondes
+                        Ex: cheat.time(300) avance de 5 minutes
 
 === ANIMATIONS CLÉOPÂTRE ===
 cheat.anims()         - Lister les animations disponibles
