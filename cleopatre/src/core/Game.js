@@ -37,8 +37,18 @@ class Game {
         this.autoSaveInterval = null;
         this.autoSaveDelay = 120; // 2 minutes en secondes
 
+        // Musique
+        this.musicTracks = [];
+        this.menuTracks = [];
+        this.currentTrackIndex = 0;
+        this.musicPlaying = false;
+        this.menuMusicPlaying = false;
+
         // Vérifier les sauvegardes
         this.checkSaveGame();
+
+        // Démarrer la musique de menu
+        this.startMenuMusic();
     }
 
     /**
@@ -159,6 +169,117 @@ class Game {
 
         // Message de bienvenue
         this.notifications.success("Bienvenue dans votre village !");
+
+        // Arrêter la musique de menu et démarrer la musique de jeu
+        this.stopMenuMusic();
+        this.startGameMusic();
+    }
+
+    /**
+     * Initialise et démarre la musique de menu
+     */
+    startMenuMusic() {
+        if (this.menuMusicPlaying) return;
+
+        // Créer les éléments audio pour les deux thèmes de menu
+        this.menuTracks = [
+            new Audio('./assets/menu1.mp3'),
+            new Audio('./assets/menu2.mp3')
+        ];
+
+        // Configurer chaque piste
+        this.menuTracks.forEach(track => {
+            track.volume = 0.3;
+            track.addEventListener('ended', () => this.playNextMenuTrack());
+        });
+
+        // Démarrer la première piste
+        this.currentMenuTrackIndex = 0;
+        this.menuMusicPlaying = true;
+        this.menuTracks[0].play().catch(e => {
+            console.log('Lecture audio menu bloquée, en attente d\'interaction utilisateur');
+            const startOnInteraction = () => {
+                if (this.menuMusicPlaying) {
+                    this.menuTracks[0].play();
+                }
+                document.removeEventListener('click', startOnInteraction);
+            };
+            document.addEventListener('click', startOnInteraction);
+        });
+    }
+
+    /**
+     * Joue la piste de menu suivante
+     */
+    playNextMenuTrack() {
+        if (!this.menuMusicPlaying) return;
+        this.currentMenuTrackIndex = (this.currentMenuTrackIndex + 1) % this.menuTracks.length;
+        this.menuTracks[this.currentMenuTrackIndex].play();
+    }
+
+    /**
+     * Arrête la musique de menu
+     */
+    stopMenuMusic() {
+        if (!this.menuMusicPlaying) return;
+
+        this.menuTracks.forEach(track => {
+            track.pause();
+            track.currentTime = 0;
+        });
+        this.menuMusicPlaying = false;
+    }
+
+    /**
+     * Initialise et démarre la musique de jeu
+     */
+    startGameMusic() {
+        if (this.musicPlaying) return;
+
+        // Créer les éléments audio pour les deux thèmes
+        this.musicTracks = [
+            new Audio('./assets/theme1.mp3'),
+            new Audio('./assets/theme2.mp3')
+        ];
+
+        // Configurer chaque piste
+        this.musicTracks.forEach(track => {
+            track.volume = 0.3;
+            track.addEventListener('ended', () => this.playNextTrack());
+        });
+
+        // Démarrer la première piste
+        this.currentTrackIndex = 0;
+        this.musicPlaying = true;
+        this.musicTracks[0].play().catch(e => {
+            console.log('Lecture audio bloquée, en attente d\'interaction utilisateur');
+            const startOnInteraction = () => {
+                this.musicTracks[0].play();
+                document.removeEventListener('click', startOnInteraction);
+            };
+            document.addEventListener('click', startOnInteraction);
+        });
+    }
+
+    /**
+     * Joue la piste suivante
+     */
+    playNextTrack() {
+        this.currentTrackIndex = (this.currentTrackIndex + 1) % this.musicTracks.length;
+        this.musicTracks[this.currentTrackIndex].play();
+    }
+
+    /**
+     * Arrête la musique de jeu
+     */
+    stopMusic() {
+        if (!this.musicPlaying) return;
+
+        this.musicTracks.forEach(track => {
+            track.pause();
+            track.currentTime = 0;
+        });
+        this.musicPlaying = false;
     }
 
     /**
