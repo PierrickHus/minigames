@@ -59,7 +59,14 @@
                 <span id="goalDisplay">Objectif: 10 000 habitants</span>
             </div>
             <div class="actions">
-                <button data-action="saveGame">Sauvegarder</button>
+                <div class="save-group">
+                    <button data-action="saveGame">Sauvegarder</button>
+                    <label class="autosave-switch" title="Sauvegarde automatique toutes les 2 minutes">
+                        <input type="checkbox" id="autoSaveToggle">
+                        <span class="autosave-slider"></span>
+                        <span class="autosave-label">Auto</span>
+                    </label>
+                </div>
                 <button data-action="showMenu">Menu</button>
             </div>
         </div>
@@ -112,6 +119,7 @@
                 <button class="tab-btn active" data-tab="buildings">Bâtiments</button>
                 <button class="tab-btn" data-tab="tasks">Tâches</button>
                 <button class="tab-btn" data-tab="resources">Ressources</button>
+                <button class="tab-btn" data-tab="stats">Stats</button>
             </div>
 
             <!-- Onglet Bâtiments -->
@@ -160,6 +168,21 @@
                     <h4>Envoyer chercher des ressources</h4>
                     <div id="gatherButtons"></div>
                 </div>
+            </div>
+
+            <!-- Onglet Statistiques (résumé) -->
+            <div id="statsTab" class="tab-content">
+                <div class="stats-section">
+                    <h4>Alertes</h4>
+                    <div id="statsAlerts"></div>
+                </div>
+                <div class="stats-section">
+                    <h4>Aperçu rapide</h4>
+                    <div id="statsProduction"></div>
+                </div>
+                <button id="openStatsMenu" class="open-stats-btn">
+                    📊 Voir les statistiques détaillées
+                </button>
             </div>
         </div>
 
@@ -214,8 +237,76 @@
             <h3 id="confirmTitle">Confirmation</h3>
             <p id="confirmMessage"></p>
             <div class="modal-buttons">
-                <button id="confirmYes">Oui</button>
-                <button id="confirmNo">Non</button>
+                <button type="button" id="confirmYes">Oui</button>
+                <button type="button" id="confirmNo">Non</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Méga Menu Statistiques -->
+    <div id="statsOverlay" class="stats-overlay hidden">
+        <div class="stats-mega-menu">
+            <div class="stats-header">
+                <h2>📊 Statistiques du Village</h2>
+                <button type="button" class="close-btn" id="closeStatsMenu">✕</button>
+            </div>
+
+            <div class="stats-content">
+                <!-- Colonne gauche: Graphiques -->
+                <div class="stats-column stats-graphs">
+                    <div class="stats-card">
+                        <h3>Évolution des ressources</h3>
+                        <div class="graph-tabs">
+                            <button type="button" class="graph-tab active" data-resource="money">💰 Or</button>
+                            <button type="button" class="graph-tab" data-resource="food">🍞 Nourriture</button>
+                            <button type="button" class="graph-tab" data-resource="water">💧 Eau</button>
+                            <button type="button" class="graph-tab" data-resource="population">👥 Population</button>
+                        </div>
+                        <div class="graph-zoom">
+                            <span class="zoom-label">Période:</span>
+                            <button type="button" class="zoom-btn" data-zoom="60">1min</button>
+                            <button type="button" class="zoom-btn active" data-zoom="300">5min</button>
+                            <button type="button" class="zoom-btn" data-zoom="600">10min</button>
+                            <button type="button" class="zoom-btn" data-zoom="1800">30min</button>
+                            <button type="button" class="zoom-btn" data-zoom="3600">1h</button>
+                        </div>
+                        <div class="graph-container">
+                            <canvas id="resourceGraph"></canvas>
+                        </div>
+                        <div class="graph-legend" id="graphLegend"></div>
+                    </div>
+
+                    <div class="stats-card">
+                        <h3>Répartition des bâtiments</h3>
+                        <div class="graph-container graph-small">
+                            <canvas id="buildingsGraph"></canvas>
+                        </div>
+                        <div id="buildingsLegend" class="buildings-legend"></div>
+                    </div>
+                </div>
+
+                <!-- Colonne droite: Données -->
+                <div class="stats-column stats-data">
+                    <div class="stats-card">
+                        <h3>Production actuelle</h3>
+                        <div id="megaStatsProduction"></div>
+                    </div>
+
+                    <div class="stats-card">
+                        <h3>Production théorique (bâtiments)</h3>
+                        <div id="megaStatsTheoretical"></div>
+                    </div>
+
+                    <div class="stats-card">
+                        <h3>Alertes & Prévisions</h3>
+                        <div id="megaStatsAlerts"></div>
+                    </div>
+
+                    <div class="stats-card">
+                        <h3>Statistiques générales</h3>
+                        <div id="megaStatsGeneral"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

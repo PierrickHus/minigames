@@ -7,7 +7,9 @@ import NotificationManager from '../ui/notifications.js';
 import PanelManager from '../ui/panels.js';
 import VillageRenderer from '../systems/village-renderer.js';
 import CleopatraSystem from '../systems/cleopatra.js';
-import { BUILDINGS, RESOURCES, CONSUMABLES, RATION_CONFIG, POPULATION_GROWTH_CONFIG, GUIDE_CONTENT } from '../data/index.js';
+import StatisticsSystem from '../systems/statistics.js';
+import StatsMenu from '../ui/stats-menu.js';
+import { BUILDINGS, RESOURCES, CONSUMABLES, RATION_CONFIG, POPULATION_GROWTH_CONFIG } from '../data/index.js';
 
 class Game {
     constructor() {
@@ -22,11 +24,18 @@ class Game {
         this.villageRenderer = null;
         this.cleopatra = null;
         this.panels = null;
+        this.statistics = null;
+        this.statsMenu = null;
 
         // Boucle de jeu
         this.lastTime = 0;
         this.gameLoop = null;
         this.isRunning = false;
+
+        // Sauvegarde automatique
+        this.autoSaveEnabled = false;
+        this.autoSaveInterval = null;
+        this.autoSaveDelay = 120; // 2 minutes en secondes
 
         // Vérifier les sauvegardes
         this.checkSaveGame();
@@ -131,6 +140,14 @@ class Game {
         this.villageRenderer = new VillageRenderer(this);
         this.cleopatra = new CleopatraSystem(this);
         this.panels = new PanelManager(this);
+        this.statistics = new StatisticsSystem(this);
+        this.statsMenu = new StatsMenu(this);
+
+        // Initialiser les tooltips des ressources
+        this.initResourceTooltips();
+
+        // Initialiser le switch de sauvegarde automatique
+        this.initAutoSave();
 
         // Initialiser l'affichage de l'humeur
         this.cleopatra.updateMoodDisplay();
@@ -195,6 +212,21 @@ class Game {
                 }
             }
 
+            // Restaurer l'historique des statistiques pour les graphiques
+            if (this.statsMenu && data.statsHistory) {
+                this.statsMenu.graphHistory = data.statsHistory;
+            }
+
+            // Restaurer les multiplicateurs des panneaux
+            if (this.panels && data.multipliers) {
+                if (data.multipliers.build !== undefined) {
+                    this.panels.setBuildMultiplier(data.multipliers.build);
+                }
+                if (data.multipliers.gather !== undefined) {
+                    this.panels.setMultiplier(data.multipliers.gather);
+                }
+            }
+
             this.notifications.success("Partie chargée !");
         } catch (e) {
             this.notifications.error("Erreur lors du chargement");
@@ -219,6 +251,13 @@ class Game {
             villageState: this.villageRenderer ? this.villageRenderer.exportState() : null,
             // Sauvegarder les tâches de Cléopâtre avec durée ISO
             cleopatraTasks: tasksToSave,
+            // Sauvegarder l'historique des statistiques pour les graphiques
+            statsHistory: this.statsMenu ? this.statsMenu.graphHistory : null,
+            // Sauvegarder les multiplicateurs des panneaux
+            multipliers: this.panels ? {
+                build: this.panels.buildMultiplier,
+                gather: this.panels.gatherMultiplier
+            } : null,
             savedAt: Date.now()
         };
 
@@ -270,39 +309,163 @@ class Game {
     }
 
     /**
-     * Rend le contenu du guide
+     * Rend le contenu du guide (charge le fichier GUIDE.md)
      */
-    renderGuide() {
+    async renderGuide() {
         const container = document.getElementById('guideContent');
         if (!container) return;
 
-        // Parser le markdown simple
-        let html = GUIDE_CONTENT
-            .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-            .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-            .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        try {
+            // Charger le fichier GUIDE.md
+            const response = await fetch('./GUIDE.md');
+            if (!response.ok) {
+                throw new Error('Impossible de charger le guide');
+            }
+            const markdown = await response.text();
+
+            // Parser le markdown
+            let html = this.parseMarkdown(markdown);
+            container.innerHTML = html;
+        } catch (error) {
+            console.error('Erreur lors du chargement du guide:', error);
+            container.innerHTML = '<p>Erreur lors du chargement du guide. Veuillez réessayer.</p>';
+        }
+    }
+
+    /**
+     * Parse le markdown en HTML
+     */
+    parseMarkdown(markdown) {
+        const lines = markdown.split('\n');
+        let html = '';
+        let inTable = false;
+        let inList = false;
+        let inParagraph = false;
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+
+            // Ignorer les lignes de séparation de tableau (|---|---|)
+            if (/^\|[\s\-:|]+$/.test(line) && line.includes('--')) {
+                continue;
+            }
+
+            // Tableaux
+            if (line.startsWith('|') && line.endsWith('|')) {
+                if (inParagraph) {
+                    html += '</p>';
+                    inParagraph = false;
+                }
+                if (inList) {
+                    html += '</ul>';
+                    inList = false;
+                }
+
+                const cells = line.split('|').filter(c => c.trim());
+
+                if (!inTable) {
+                    // Début du tableau - c'est l'en-tête
+                    html += '<table><thead><tr>';
+                    html += cells.map(c => `<th>${this.parseInline(c.trim())}</th>`).join('');
+                    html += '</tr></thead><tbody>';
+                    inTable = true;
+                } else {
+                    // Ligne de données
+                    html += '<tr>';
+                    html += cells.map(c => `<td>${this.parseInline(c.trim())}</td>`).join('');
+                    html += '</tr>';
+                }
+                continue;
+            } else if (inTable) {
+                html += '</tbody></table>';
+                inTable = false;
+            }
+
+            // Titres
+            if (line.startsWith('#### ')) {
+                if (inParagraph) { html += '</p>'; inParagraph = false; }
+                if (inList) { html += '</ul>'; inList = false; }
+                html += `<h4>${this.parseInline(line.slice(5))}</h4>`;
+                continue;
+            }
+            if (line.startsWith('### ')) {
+                if (inParagraph) { html += '</p>'; inParagraph = false; }
+                if (inList) { html += '</ul>'; inList = false; }
+                html += `<h3>${this.parseInline(line.slice(4))}</h3>`;
+                continue;
+            }
+            if (line.startsWith('## ')) {
+                if (inParagraph) { html += '</p>'; inParagraph = false; }
+                if (inList) { html += '</ul>'; inList = false; }
+                html += `<h2>${this.parseInline(line.slice(3))}</h2>`;
+                continue;
+            }
+            if (line.startsWith('# ')) {
+                if (inParagraph) { html += '</p>'; inParagraph = false; }
+                if (inList) { html += '</ul>'; inList = false; }
+                html += `<h1>${this.parseInline(line.slice(2))}</h1>`;
+                continue;
+            }
+
+            // Ligne horizontale
+            if (line === '---') {
+                if (inParagraph) { html += '</p>'; inParagraph = false; }
+                if (inList) { html += '</ul>'; inList = false; }
+                html += '<hr>';
+                continue;
+            }
+
+            // Listes
+            if (line.match(/^(\d+\.|-)\ /)) {
+                if (inParagraph) { html += '</p>'; inParagraph = false; }
+                if (!inList) {
+                    html += '<ul>';
+                    inList = true;
+                }
+                const content = line.replace(/^(\d+\.|-)\s+/, '');
+                html += `<li>${this.parseInline(content)}</li>`;
+                continue;
+            } else if (inList && line.trim() === '') {
+                html += '</ul>';
+                inList = false;
+            }
+
+            // Ligne vide
+            if (line.trim() === '') {
+                if (inParagraph) {
+                    html += '</p>';
+                    inParagraph = false;
+                }
+                continue;
+            }
+
+            // Paragraphe
+            if (!inParagraph) {
+                html += '<p>';
+                inParagraph = true;
+            } else {
+                html += '<br>';
+            }
+            html += this.parseInline(line);
+        }
+
+        // Fermer les éléments ouverts
+        if (inTable) html += '</tbody></table>';
+        if (inList) html += '</ul>';
+        if (inParagraph) html += '</p>';
+
+        return html;
+    }
+
+    /**
+     * Parse les éléments inline (gras, italique, etc.)
+     */
+    parseInline(text) {
+        return text
             .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.+?)\*/g, '<em>$1</em>')
-            .replace(/^- (.+)$/gm, '<li>$1</li>')
-            .replace(/^---$/gm, '<hr>')
-            .replace(/\n\n/g, '</p><p>')
-            .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
-            .replace(/<\/ul>\s*<ul>/g, '');
-
-        // Tables simples
-        html = html.replace(/\|(.+)\|/g, (match) => {
-            const cells = match.split('|').filter(c => c.trim());
-            if (cells[0].includes('---')) return '';
-            const isHeader = !html.substring(0, html.indexOf(match)).includes('<table>') ||
-                html.substring(html.lastIndexOf('<table>'), html.indexOf(match)).includes('</table>');
-
-            if (isHeader) {
-                return '<table><tr>' + cells.map(c => `<th>${c.trim()}</th>`).join('') + '</tr>';
-            }
-            return '<tr>' + cells.map(c => `<td>${c.trim()}</td>`).join('') + '</tr>';
-        });
-
-        container.innerHTML = `<p>${html}</p>`;
+            .replace(/`(.+?)`/g, '<code>$1</code>')
+            .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>');
     }
 
     /**
@@ -330,6 +493,16 @@ class Game {
         // Mettre à jour Cléopâtre
         if (this.cleopatra) {
             this.cleopatra.update(dt);
+        }
+
+        // Mettre à jour les statistiques
+        if (this.statistics) {
+            this.statistics.update(dt);
+        }
+
+        // Mettre à jour le menu stats si ouvert
+        if (this.statsMenu) {
+            this.statsMenu.update();
         }
 
         // Mettre à jour le rendu
@@ -979,6 +1152,135 @@ class Game {
         const panel = document.getElementById('sidePanel');
         if (panel) {
             panel.classList.add('hidden');
+        }
+    }
+
+    /**
+     * Initialise les tooltips sur les ressources de la barre supérieure
+     */
+    initResourceTooltips() {
+        const resourceElements = {
+            money: document.getElementById('moneyDisplay'),
+            food: document.getElementById('foodDisplay'),
+            water: document.getElementById('waterDisplay'),
+            population: document.getElementById('populationDisplay')
+        };
+
+        const tooltip = document.getElementById('tooltip');
+
+        for (const [key, element] of Object.entries(resourceElements)) {
+            if (!element) continue;
+
+            element.addEventListener('mouseenter', (e) => {
+                this.showResourceTooltip(key, e);
+            });
+
+            element.addEventListener('mousemove', (e) => {
+                if (tooltip && !tooltip.classList.contains('hidden')) {
+                    tooltip.style.left = (e.clientX + 15) + 'px';
+                    tooltip.style.top = (e.clientY + 10) + 'px';
+                }
+            });
+
+            element.addEventListener('mouseleave', () => {
+                if (tooltip) {
+                    tooltip.classList.add('hidden');
+                }
+            });
+        }
+    }
+
+    /**
+     * Affiche le tooltip d'une ressource avec les statistiques
+     */
+    showResourceTooltip(resourceKey, event) {
+        const tooltip = document.getElementById('tooltip');
+        if (!tooltip || !this.statistics) return;
+
+        const info = this.statistics.getTooltipInfo(resourceKey);
+        const names = {
+            money: 'Or',
+            food: 'Nourriture',
+            water: 'Eau',
+            population: 'Population'
+        };
+
+        let html = `<strong>${names[resourceKey] || resourceKey}</strong><br>`;
+        html += `<span style="color: ${info.rate > 0 ? '#4ade80' : info.rate < 0 ? '#ff6b6b' : '#aaa'}">${info.rateText}</span>`;
+
+        if (info.depletionText) {
+            html += `<br><span style="color: #ffaa00">${info.depletionText}</span>`;
+        }
+
+        if (info.alertLevel !== 'normal') {
+            const alertColor = info.alertLevel === 'critical' ? '#ff6b6b' : '#ffaa00';
+            const alertText = info.alertLevel === 'critical' ? 'Niveau critique !' : 'Niveau bas';
+            html += `<br><span style="color: ${alertColor}; font-weight: bold;">${alertText}</span>`;
+        }
+
+        tooltip.innerHTML = html;
+        tooltip.classList.remove('hidden');
+        tooltip.style.left = (event.clientX + 15) + 'px';
+        tooltip.style.top = (event.clientY + 10) + 'px';
+    }
+
+    /**
+     * Initialise le système de sauvegarde automatique
+     */
+    initAutoSave() {
+        const toggle = document.getElementById('autoSaveToggle');
+        if (!toggle) return;
+
+        // Restaurer l'état depuis localStorage
+        const savedState = localStorage.getItem('cleopatra_autosave_enabled');
+        if (savedState === 'true') {
+            toggle.checked = true;
+            this.enableAutoSave();
+        }
+
+        // Écouter les changements
+        toggle.addEventListener('change', () => {
+            if (toggle.checked) {
+                this.enableAutoSave();
+                this.notifications.info("Sauvegarde automatique activée (toutes les 2 min)");
+            } else {
+                this.disableAutoSave();
+                this.notifications.info("Sauvegarde automatique désactivée");
+            }
+            // Sauvegarder la préférence
+            localStorage.setItem('cleopatra_autosave_enabled', toggle.checked.toString());
+        });
+    }
+
+    /**
+     * Active la sauvegarde automatique
+     */
+    enableAutoSave() {
+        this.autoSaveEnabled = true;
+
+        // Nettoyer l'ancien intervalle si existant
+        if (this.autoSaveInterval) {
+            clearInterval(this.autoSaveInterval);
+        }
+
+        // Créer un nouvel intervalle (2 minutes)
+        this.autoSaveInterval = setInterval(() => {
+            if (this.isRunning) {
+                this.saveGame();
+                this.notifications.info("Sauvegarde automatique effectuée");
+            }
+        }, this.autoSaveDelay * 1000);
+    }
+
+    /**
+     * Désactive la sauvegarde automatique
+     */
+    disableAutoSave() {
+        this.autoSaveEnabled = false;
+
+        if (this.autoSaveInterval) {
+            clearInterval(this.autoSaveInterval);
+            this.autoSaveInterval = null;
         }
     }
 

@@ -284,6 +284,7 @@ class PanelManager {
         this.updateTasksList();
         this.updateResourcesDisplay();
         this.updateGatherButtons();
+        this.updateStatsDisplay();
     }
 
     /**
@@ -735,6 +736,119 @@ class PanelManager {
         document.getElementById('sandStock').textContent = Math.floor(state.resources.sand);
         document.getElementById('dirtStock').textContent = Math.floor(state.resources.dirt);
         document.getElementById('clayStock').textContent = Math.floor(state.resources.clay);
+    }
+
+    /**
+     * Met à jour l'affichage des statistiques
+     */
+    updateStatsDisplay() {
+        const stats = this.game.statistics;
+        if (!stats) return;
+
+        const productionContainer = document.getElementById('statsProduction');
+        const alertsContainer = document.getElementById('statsAlerts');
+        const theoreticalContainer = document.getElementById('statsTheoretical');
+
+        if (productionContainer) {
+            const allStats = stats.getAllStats();
+            const resourceNames = {
+                money: { name: 'Or', icon: '💰' },
+                food: { name: 'Nourriture', icon: '🍞' },
+                water: { name: 'Eau', icon: '💧' },
+                population: { name: 'Population', icon: '👥' },
+                wood: { name: 'Bois', icon: '🪵' },
+                stone: { name: 'Pierre', icon: '🪨' },
+                sand: { name: 'Sable', icon: '🏜️' },
+                dirt: { name: 'Terre', icon: '🟤' },
+                clay: { name: 'Argile', icon: '🧱' }
+            };
+
+            let html = '';
+            for (const [key, stat] of Object.entries(allStats)) {
+                const res = resourceNames[key];
+                if (!res) continue;
+
+                const rateColor = stat.rate > 0 ? '#4ade80' : stat.rate < 0 ? '#ff6b6b' : '#aaa';
+                const alertClass = stat.alertLevel === 'critical' ? 'stat-critical' : stat.alertLevel === 'warning' ? 'stat-warning' : '';
+
+                html += `
+                    <div class="stat-item ${alertClass}">
+                        <span class="stat-icon">${res.icon}</span>
+                        <span class="stat-name">${res.name}</span>
+                        <span class="stat-value">${Math.floor(stat.current)}</span>
+                        <span class="stat-rate" style="color: ${rateColor}">${stat.rateText}</span>
+                    </div>
+                `;
+            }
+            productionContainer.innerHTML = html;
+        }
+
+        if (alertsContainer) {
+            const allStats = stats.getAllStats();
+            const alerts = [];
+
+            for (const [key, stat] of Object.entries(allStats)) {
+                if (stat.alertLevel !== 'normal') {
+                    const names = {
+                        money: 'Or', food: 'Nourriture', water: 'Eau',
+                        population: 'Population', wood: 'Bois', stone: 'Pierre',
+                        sand: 'Sable', dirt: 'Terre', clay: 'Argile'
+                    };
+                    alerts.push({
+                        key,
+                        name: names[key],
+                        level: stat.alertLevel,
+                        depletionText: stat.depletionText
+                    });
+                }
+            }
+
+            if (alerts.length === 0) {
+                alertsContainer.innerHTML = '<div class="no-alerts">Aucune alerte</div>';
+            } else {
+                let html = '';
+                alerts.forEach(alert => {
+                    const color = alert.level === 'critical' ? '#ff6b6b' : '#ffaa00';
+                    const icon = alert.level === 'critical' ? '⚠️' : '⚡';
+                    html += `
+                        <div class="alert-item" style="border-left-color: ${color}">
+                            <span class="alert-icon">${icon}</span>
+                            <span class="alert-name">${alert.name}</span>
+                            <span class="alert-level" style="color: ${color}">${alert.level === 'critical' ? 'Critique' : 'Attention'}</span>
+                            ${alert.depletionText ? `<span class="alert-depletion">${alert.depletionText}</span>` : ''}
+                        </div>
+                    `;
+                });
+                alertsContainer.innerHTML = html;
+            }
+        }
+
+        if (theoreticalContainer) {
+            const theoretical = stats.getTheoreticalProduction();
+            const items = [
+                { icon: '🍞', name: 'Nourriture', value: theoretical.food },
+                { icon: '💧', name: 'Eau', value: theoretical.water },
+                { icon: '💰', name: 'Or', value: theoretical.money },
+                { icon: '🪵', name: 'Bois', value: theoretical.wood },
+                { icon: '🪨', name: 'Pierre', value: theoretical.stone }
+            ].filter(i => i.value !== 0);
+
+            if (items.length === 0) {
+                theoreticalContainer.innerHTML = '<div class="no-production">Aucune production automatique</div>';
+            } else {
+                let html = '';
+                items.forEach(item => {
+                    html += `
+                        <div class="theoretical-item">
+                            <span class="theoretical-icon">${item.icon}</span>
+                            <span class="theoretical-name">${item.name}</span>
+                            <span class="theoretical-value" style="color: #4ade80">+${item.value.toFixed(1)}/min</span>
+                        </div>
+                    `;
+                });
+                theoreticalContainer.innerHTML = html;
+            }
+        }
     }
 
     /**
