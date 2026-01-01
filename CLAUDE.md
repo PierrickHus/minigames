@@ -109,3 +109,64 @@ Les commentaires ne doivent PAS :
 - Répéter ce que le code fait déjà clairement
 - Décrire des changements de valeur évidents
 - Paraphraser le nom des variables/fonctions
+
+## Principes SOLID et Clean Code
+
+**IMPORTANT : Toujours respecter les principes SOLID et de Clean Code.**
+
+### Principes SOLID :
+
+1. **S - Single Responsibility Principle (SRP)**
+   - Une classe/fonction ne doit avoir qu'une seule raison de changer
+   - Séparer les responsabilités en modules distincts
+
+2. **O - Open/Closed Principle (OCP)**
+   - Ouvert à l'extension, fermé à la modification
+   - Utiliser l'héritage et la composition plutôt que modifier le code existant
+
+3. **L - Liskov Substitution Principle (LSP)**
+   - Les sous-classes doivent pouvoir remplacer leurs classes parentes
+
+4. **I - Interface Segregation Principle (ISP)**
+   - Préférer plusieurs petites interfaces à une seule grosse
+
+5. **D - Dependency Inversion Principle (DIP)**
+   - Dépendre des abstractions, pas des implémentations concrètes
+
+### Clean Code :
+
+1. **Nommage explicite**
+   - Noms de variables/fonctions descriptifs et significatifs
+   - Éviter les abréviations obscures
+
+2. **Fonctions courtes**
+   - Une fonction = une tâche
+   - Maximum ~20 lignes par fonction (idéalement)
+   - Extraire les sous-fonctions pour la lisibilité
+
+3. **DRY (Don't Repeat Yourself)**
+   - Éviter la duplication de code
+   - Extraire le code commun en fonctions/classes réutilisables
+
+4. **KISS (Keep It Simple, Stupid)**
+   - Préférer les solutions simples
+   - Éviter la sur-ingénierie
+
+5. **Éviter les magic numbers**
+   - Utiliser des constantes nommées
+   - Centraliser les valeurs de configuration
+
+### Exemple :
+```javascript
+// MAUVAIS - magic number, nom obscur
+function calc(x) {
+    return x * 1.15;
+}
+
+// BON - constante nommée, nom explicite
+const COST_SCALING_FACTOR = 1.15;
+
+function calculateScaledCost(baseCost) {
+    return baseCost * COST_SCALING_FACTOR;
+}
+```
