@@ -955,6 +955,7 @@ class PanelManager {
     /**
      * Met à jour la barre de ressources en bas de l'écran
      * Affiche le stock, le coût de collecte et la progression des collectes en cours
+     * Optimisé pour ne modifier le DOM que si les valeurs ont changé
      */
     updateResourcesBar() {
         const state = this.game.state;
@@ -975,34 +976,39 @@ class PanelManager {
             const gatherings = state.gatheringTasks.filter(t => t.resourceId === resource.id);
             const isGathering = gatherings.length > 0;
 
-            // Mettre à jour les classes CSS
-            item.classList.toggle('disabled', !canGather);
-            item.classList.toggle('gathering', isGathering);
+            // Mettre à jour les classes CSS seulement si nécessaire
+            if (item.classList.contains('disabled') !== !canGather) {
+                item.classList.toggle('disabled', !canGather);
+            }
+            if (item.classList.contains('gathering') !== isGathering) {
+                item.classList.toggle('gathering', isGathering);
+            }
 
             // Mettre à jour le stock affiché
             const stockEl = item.querySelector(`#${resource.id}StockBar`);
             if (stockEl) {
-                stockEl.textContent = Math.floor(state.resources[resource.id]);
+                const newStock = String(Math.floor(state.resources[resource.id]));
+                if (stockEl.textContent !== newStock) {
+                    stockEl.textContent = newStock;
+                }
             }
 
             // Mettre à jour les ressources en cours de récupération
             const pendingEl = item.querySelector(`#${resource.id}PendingBar`);
             if (pendingEl) {
                 const pendingAmount = gatherings.length * resource.gatherAmount;
-                if (pendingAmount > 0) {
-                    pendingEl.textContent = ` +${pendingAmount}`;
-                } else {
-                    pendingEl.textContent = '';
+                const newPending = pendingAmount > 0 ? ` +${pendingAmount}` : '';
+                if (pendingEl.textContent !== newPending) {
+                    pendingEl.textContent = newPending;
                 }
             }
 
             // Mettre à jour le rendement affiché
             const yieldEl = item.querySelector('.resource-bar-yield');
             if (yieldEl) {
-                if (workerCount > 1) {
-                    yieldEl.textContent = `+${totalGather} (x${workerCount})`;
-                } else {
-                    yieldEl.textContent = `+${resource.gatherAmount}`;
+                const newYield = workerCount > 1 ? `+${totalGather} (x${workerCount})` : `+${resource.gatherAmount}`;
+                if (yieldEl.textContent !== newYield) {
+                    yieldEl.textContent = newYield;
                 }
             }
 
@@ -1010,29 +1016,46 @@ class PanelManager {
             const costEl = item.querySelector('.cost-value');
             if (costEl) {
                 const displayCost = workerCount > 0 ? totalCost : resource.gatherCost;
-                costEl.textContent = `💰${displayCost}`;
-                costEl.classList.toggle('insufficient', state.money < displayCost);
+                const newCost = `💰${displayCost}`;
+                if (costEl.textContent !== newCost) {
+                    costEl.textContent = newCost;
+                }
+                const isInsufficient = state.money < displayCost;
+                if (costEl.classList.contains('insufficient') !== isInsufficient) {
+                    costEl.classList.toggle('insufficient', isInsufficient);
+                }
             }
 
             // Mettre à jour la barre de progression de collecte
             const progressContainer = item.querySelector('.resource-bar-progress');
             if (progressContainer) {
+                const isHidden = progressContainer.classList.contains('hidden');
                 if (isGathering) {
-                    progressContainer.classList.remove('hidden');
+                    if (isHidden) {
+                        progressContainer.classList.remove('hidden');
+                    }
                     const task = gatherings[0];
                     const progress = (task.elapsed / task.totalTime) * 100;
                     const progressFill = progressContainer.querySelector('.progress-fill');
                     const progressText = progressContainer.querySelector('.progress-text');
                     if (progressFill) {
-                        progressFill.style.width = `${progress}%`;
+                        const newWidth = `${progress}%`;
+                        if (progressFill.style.width !== newWidth) {
+                            progressFill.style.width = newWidth;
+                        }
                     }
                     if (progressText) {
                         const remaining = task.totalTime - task.elapsed;
                         const suffix = gatherings.length > 1 ? ` +${gatherings.length - 1}` : '';
-                        progressText.textContent = `${Math.floor(progress)}% - ${formatTime(remaining)}${suffix}`;
+                        const newText = `${Math.floor(progress)}% - ${formatTime(remaining)}${suffix}`;
+                        if (progressText.textContent !== newText) {
+                            progressText.textContent = newText;
+                        }
                     }
                 } else {
-                    progressContainer.classList.add('hidden');
+                    if (!isHidden) {
+                        progressContainer.classList.add('hidden');
+                    }
                 }
             }
         });
@@ -1041,11 +1064,14 @@ class PanelManager {
         const birdsItem = container.querySelector('[data-resource="birds"]');
         if (birdsItem) {
             const aviaries = this.game.getBuildingCount('aviary');
-            const maxBirds = aviaries * 1; // 1 oiseau par volière
+            const maxBirds = aviaries * 1;
             const currentBirds = state.birds;
             const birdsStockEl = birdsItem.querySelector('#birdsStockBar');
             if (birdsStockEl) {
-                birdsStockEl.textContent = `${Math.floor(currentBirds)}/${maxBirds}`;
+                const newBirdsStock = `${Math.floor(currentBirds)}/${maxBirds}`;
+                if (birdsStockEl.textContent !== newBirdsStock) {
+                    birdsStockEl.textContent = newBirdsStock;
+                }
             }
 
             // Calculer le temps de production et la progression
@@ -1054,36 +1080,46 @@ class PanelManager {
             const progressFill = birdsItem.querySelector('#birdProgressFill');
 
             if (aviaries > 0) {
-                const secondsPerBird = 180 / aviaries; // 3min = 180s pour 1 volière
+                const secondsPerBird = 180 / aviaries;
 
                 // Afficher le temps exact (minutes et secondes)
                 if (costTimeEl) {
                     const mins = Math.floor(secondsPerBird / 60);
                     const secs = Math.floor(secondsPerBird % 60);
+                    let newTimeText;
                     if (mins > 0 && secs > 0) {
-                        costTimeEl.textContent = `${mins}m${secs}s/🕊️`;
+                        newTimeText = `${mins}m${secs}s/🕊️`;
                     } else if (mins > 0) {
-                        costTimeEl.textContent = `${mins}min/🕊️`;
+                        newTimeText = `${mins}min/🕊️`;
                     } else {
-                        costTimeEl.textContent = `${secs}s/🕊️`;
+                        newTimeText = `${secs}s/🕊️`;
+                    }
+                    if (costTimeEl.textContent !== newTimeText) {
+                        costTimeEl.textContent = newTimeText;
                     }
                 }
 
                 // Calculer la progression vers le prochain oiseau
                 // La partie décimale de currentBirds représente la progression
                 if (progressFill) {
+                    let newWidth;
                     if (currentBirds >= maxBirds) {
-                        // Stock plein, pas de progression
-                        progressFill.style.width = '0%';
+                        newWidth = '0%';
                     } else {
                         const progress = (currentBirds % 1) * 100;
-                        progressFill.style.width = `${progress}%`;
+                        newWidth = `${progress}%`;
+                    }
+                    if (progressFill.style.width !== newWidth) {
+                        progressFill.style.width = newWidth;
                     }
                 }
             }
 
             // Masquer si aucune volière construite
-            birdsItem.style.display = aviaries > 0 ? '' : 'none';
+            const shouldDisplay = aviaries > 0 ? '' : 'none';
+            if (birdsItem.style.display !== shouldDisplay) {
+                birdsItem.style.display = shouldDisplay;
+            }
         }
     }
 

@@ -1049,26 +1049,62 @@ class Game {
 
     /**
      * Met à jour l'interface utilisateur (barre de ressources, panneaux)
+     * Optimisé pour ne modifier le DOM que si les valeurs ont changé
      */
     updateUI() {
-        document.getElementById('moneyDisplay').textContent = `💰 ${Math.floor(this.state.money)}`;
-        document.getElementById('foodDisplay').textContent = `🍞 ${Math.floor(this.state.food)}`;
-        document.getElementById('waterDisplay').textContent = `💧 ${Math.floor(this.state.water)}`;
-        document.getElementById('populationDisplay').textContent = `👥 ${Math.floor(this.state.population)}`;
-        document.getElementById('peasantsDisplay').textContent = `🧑‍🌾 ${this.state.availablePeasants}/${this.state.totalPeasants}`;
+        // Cache des éléments DOM pour éviter les querySelectorById répétés
+        if (!this._uiElements) {
+            this._uiElements = {
+                money: document.getElementById('moneyDisplay'),
+                food: document.getElementById('foodDisplay'),
+                water: document.getElementById('waterDisplay'),
+                population: document.getElementById('populationDisplay'),
+                peasants: document.getElementById('peasantsDisplay'),
+                rationTimer: document.getElementById('rationTimerDisplay')
+            };
+        }
+
+        const els = this._uiElements;
+
+        // Mettre à jour seulement si la valeur a changé
+        const newMoney = `💰 ${Math.floor(this.state.money)}`;
+        if (els.money && els.money.textContent !== newMoney) {
+            els.money.textContent = newMoney;
+        }
+
+        const newFood = `🍞 ${Math.floor(this.state.food)}`;
+        if (els.food && els.food.textContent !== newFood) {
+            els.food.textContent = newFood;
+        }
+
+        const newWater = `💧 ${Math.floor(this.state.water)}`;
+        if (els.water && els.water.textContent !== newWater) {
+            els.water.textContent = newWater;
+        }
+
+        const newPopulation = `👥 ${Math.floor(this.state.population)}`;
+        if (els.population && els.population.textContent !== newPopulation) {
+            els.population.textContent = newPopulation;
+        }
+
+        const newPeasants = `🧑‍🌾 ${this.state.availablePeasants}/${this.state.totalPeasants}`;
+        if (els.peasants && els.peasants.textContent !== newPeasants) {
+            els.peasants.textContent = newPeasants;
+        }
 
         // Timer des rations
-        const rationTimerEl = document.getElementById('rationTimerDisplay');
-        if (rationTimerEl) {
+        if (els.rationTimer) {
             const timer = Math.max(0, this.state.rationTimer);
             const minutes = Math.floor(timer / 60);
             const seconds = Math.floor(timer % 60);
-            rationTimerEl.textContent = `🍽️ ${minutes}:${seconds.toString().padStart(2, '0')}`;
+            const newRationTimer = `🍽️ ${minutes}:${seconds.toString().padStart(2, '0')}`;
+            if (els.rationTimer.textContent !== newRationTimer) {
+                els.rationTimer.textContent = newRationTimer;
+            }
 
-            if (timer <= RATION_CONFIG.warningThreshold) {
-                rationTimerEl.classList.add('warning');
-            } else {
-                rationTimerEl.classList.remove('warning');
+            const shouldWarn = timer <= RATION_CONFIG.warningThreshold;
+            if (els.rationTimer.classList.contains('warning') !== shouldWarn) {
+                els.rationTimer.classList.toggle('warning', shouldWarn);
             }
         }
 

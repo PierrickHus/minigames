@@ -780,18 +780,25 @@ class CleopatraSystem {
 
             // Couleur du timer selon l'urgence
             let timerColor = '#4ade80'; // Vert par défaut
+            let shouldBeUrgent = false;
             if (task.timeRemaining < 30) {
                 timerColor = '#ff6b6b'; // Rouge - critique
-                element.classList.add('urgent');
+                shouldBeUrgent = true;
             } else if (task.timeRemaining < 60) {
                 timerColor = '#ffaa00'; // Orange - attention
-                element.classList.remove('urgent');
-            } else {
-                element.classList.remove('urgent');
             }
 
-            timerEl.textContent = `⏱️ ${timeStr}`;
-            timerEl.style.color = timerColor;
+            if (element.classList.contains('urgent') !== shouldBeUrgent) {
+                element.classList.toggle('urgent', shouldBeUrgent);
+            }
+
+            const newTimerText = `⏱️ ${timeStr}`;
+            if (timerEl.textContent !== newTimerText) {
+                timerEl.textContent = newTimerText;
+            }
+            if (timerEl.style.color !== timerColor) {
+                timerEl.style.color = timerColor;
+            }
         }
 
         // Mettre à jour l'indicateur de progression
@@ -806,33 +813,47 @@ class CleopatraSystem {
                         + (task.initialState.pendingCount || 0)
                         + (task.initialState.reservedByOtherTasks || 0);
                     const targetCount = initialTotal + task.targetCount;
-                    progressEl.textContent = `${currentCount + currentPending}/${targetCount}`;
+                    const newProgressText = `${currentCount + currentPending}/${targetCount}`;
+                    if (progressEl.textContent !== newProgressText) {
+                        progressEl.textContent = newProgressText;
+                    }
                     break;
                 }
                 case 'gather': {
                     // Afficher le stock actuel
                     const currentAmount = Math.floor(this.game.state.resources[task.targetResource] || 0);
-                    progressEl.textContent = `${currentAmount} en stock`;
+                    const newStockText = `${currentAmount} en stock`;
+                    if (progressEl.textContent !== newStockText) {
+                        progressEl.textContent = newStockText;
+                    }
 
                     // Afficher/masquer le bouton d'envoi selon la disponibilité
                     const sendBtn = element.querySelector('.send-btn-small');
                     if (sendBtn) {
                         const canSend = currentAmount >= task.targetCount && !task.resourcesSent;
-                        sendBtn.style.display = canSend ? 'inline-block' : 'none';
+                        const newDisplay = canSend ? 'inline-block' : 'none';
+                        if (sendBtn.style.display !== newDisplay) {
+                            sendBtn.style.display = newDisplay;
+                        }
                     }
                     break;
                 }
                 case 'feed': {
                     // Afficher nourriture actuelle / objectif
                     const currentFood = Math.floor(this.game.state.food);
-                    progressEl.textContent = `${currentFood}/${task.targetCount}`;
+                    const newFeedText = `${currentFood}/${task.targetCount}`;
+                    if (progressEl.textContent !== newFeedText) {
+                        progressEl.textContent = newFeedText;
+                    }
                     break;
                 }
                 case 'message': {
                     // Afficher le statut de la tâche
+                    let newText;
+                    let newColor;
                     if (task.messageCompleted) {
-                        progressEl.textContent = '✓ Envoyé';
-                        progressEl.style.color = '#4ade80';
+                        newText = '✓ Envoyé';
+                        newColor = '#4ade80';
                     } else {
                         // Vérifier si on peut envoyer
                         const hasBirds = this.game.state.birds >= 1;
@@ -840,15 +861,21 @@ class CleopatraSystem {
                         const hasMoney = this.game.state.money >= cost;
 
                         if (hasBirds && hasMoney) {
-                            progressEl.textContent = `💰${cost}`;
-                            progressEl.style.color = '#ffd700';
+                            newText = `💰${cost}`;
+                            newColor = '#ffd700';
                         } else if (!hasBirds) {
-                            progressEl.textContent = 'Pas d\'oiseau';
-                            progressEl.style.color = '#ff6b6b';
+                            newText = 'Pas d\'oiseau';
+                            newColor = '#ff6b6b';
                         } else {
-                            progressEl.textContent = `💰${cost} (manque)`;
-                            progressEl.style.color = '#ff6b6b';
+                            newText = `💰${cost} (manque)`;
+                            newColor = '#ff6b6b';
                         }
+                    }
+                    if (progressEl.textContent !== newText) {
+                        progressEl.textContent = newText;
+                    }
+                    if (progressEl.style.color !== newColor) {
+                        progressEl.style.color = newColor;
                     }
 
                     // Afficher/masquer le bouton d'envoi
@@ -858,7 +885,10 @@ class CleopatraSystem {
                         const cost = this.game.getMessageCost();
                         const hasMoney = this.game.state.money >= cost;
                         const canSend = hasBirds && hasMoney && !task.messageCompleted;
-                        sendBtn.style.display = canSend ? 'inline-block' : 'none';
+                        const newDisplay = canSend ? 'inline-block' : 'none';
+                        if (sendBtn.style.display !== newDisplay) {
+                            sendBtn.style.display = newDisplay;
+                        }
                     }
                     break;
                 }
@@ -937,13 +967,16 @@ class CleopatraSystem {
         const nextTaskTimer = document.getElementById('nextTaskTimer');
         if (nextTaskTimer) {
             if (this.activeTasks.length >= this.maxActiveTasks) {
-                nextTaskTimer.style.display = 'none';
+                if (nextTaskTimer.style.display !== 'none') {
+                    nextTaskTimer.style.display = 'none';
+                }
             }
         }
     }
 
     /**
      * Met à jour l'affichage du timer de prochaine mission
+     * Optimisé pour ne modifier le DOM que si les valeurs ont changé
      * @param {number} timeRemaining - Secondes restantes avant la prochaine mission
      */
     updateNextTaskTimer(timeRemaining) {
@@ -953,21 +986,32 @@ class CleopatraSystem {
         if (!nextTaskTimer || !countdown) return;
 
         // Afficher le timer
-        nextTaskTimer.style.display = 'flex';
+        if (nextTaskTimer.style.display !== 'flex') {
+            nextTaskTimer.style.display = 'flex';
+        }
 
+        let newText;
+        let newColor;
         if (timeRemaining <= 0) {
-            countdown.textContent = 'Imminent...';
-            countdown.style.color = '#ffd700';
+            newText = 'Imminent...';
+            newColor = '#ffd700';
         } else {
             const seconds = Math.ceil(timeRemaining);
             if (seconds >= 60) {
                 const mins = Math.floor(seconds / 60);
                 const secs = seconds % 60;
-                countdown.textContent = secs > 0 ? `${mins}m${secs}s` : `${mins}m`;
+                newText = secs > 0 ? `${mins}m${secs}s` : `${mins}m`;
             } else {
-                countdown.textContent = `${seconds}s`;
+                newText = `${seconds}s`;
             }
-            countdown.style.color = '#4ade80';
+            newColor = '#4ade80';
+        }
+
+        if (countdown.textContent !== newText) {
+            countdown.textContent = newText;
+        }
+        if (countdown.style.color !== newColor) {
+            countdown.style.color = newColor;
         }
     }
 
@@ -1090,6 +1134,7 @@ class CleopatraSystem {
     /**
      * Met à jour l'affichage visuel de l'humeur (pourcentage et barre de progression)
      * La couleur de la barre change selon le niveau: vert > 50%, orange 20-50%, rouge < 20%
+     * Optimisé pour ne modifier le DOM que si les valeurs ont changé
      */
     updateMoodDisplay() {
         const mood = this.game.state.cleopatraMood;
@@ -1097,19 +1142,29 @@ class CleopatraSystem {
         const moodBar = document.getElementById('moodBar');
 
         if (moodElement) {
-            moodElement.textContent = `${mood}%`;
+            const newMoodText = `${mood}%`;
+            if (moodElement.textContent !== newMoodText) {
+                moodElement.textContent = newMoodText;
+            }
         }
 
         if (moodBar) {
-            moodBar.style.width = `${mood}%`;
+            const newWidth = `${mood}%`;
+            if (moodBar.style.width !== newWidth) {
+                moodBar.style.width = newWidth;
+            }
 
             // Couleur selon l'humeur
+            let newBackground;
             if (mood <= 20) {
-                moodBar.style.background = 'linear-gradient(90deg, #ff4444, #ff6b6b)'; // Rouge critique
+                newBackground = 'linear-gradient(90deg, #ff4444, #ff6b6b)'; // Rouge critique
             } else if (mood <= 50) {
-                moodBar.style.background = 'linear-gradient(90deg, #ffaa00, #ffd700)'; // Orange attention
+                newBackground = 'linear-gradient(90deg, #ffaa00, #ffd700)'; // Orange attention
             } else {
-                moodBar.style.background = 'linear-gradient(90deg, #4ade80, #22c55e)'; // Vert OK
+                newBackground = 'linear-gradient(90deg, #4ade80, #22c55e)'; // Vert OK
+            }
+            if (moodBar.style.background !== newBackground) {
+                moodBar.style.background = newBackground;
             }
         }
     }
