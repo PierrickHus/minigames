@@ -1286,6 +1286,12 @@ class Game {
         this.state.money -= cost;
         this.state.messagesSentToCaesar = (this.state.messagesSentToCaesar || 0) + 1;
 
+        // Marquer la première tâche de message active comme complétée
+        const messageTask = this.cleopatra?.activeTasks.find(t => t.type === 'message' && !t.messageCompleted);
+        if (messageTask) {
+            messageTask.messageCompleted = true;
+        }
+
         this.notifications.success(`Un oiseau s'envole vers Rome... 🕊️ (-${cost} 💰)`);
         return true;
     }
@@ -1306,8 +1312,9 @@ class Game {
         // Vérifier si on a une volière
         if (!this.hasBuilding('aviary')) return;
 
-        // Vérifier si on a une mission de message active
-        if (!this.hasActiveMessageTask()) return;
+        // Vérifier si on a une mission de message active (non complétée)
+        const uncompletedTask = this.cleopatra?.activeTasks.find(t => t.type === 'message' && !t.messageCompleted);
+        if (!uncompletedTask) return;
 
         // Vérifier si on a des oiseaux
         if (this.state.birds < 1) return;
@@ -1321,6 +1328,9 @@ class Game {
         this.state.money -= cost;
         this.state.messagesSentToCaesar = (this.state.messagesSentToCaesar || 0) + 1;
         this.lastAutoMessageTime = now;
+
+        // Marquer cette tâche spécifique comme complétée
+        uncompletedTask.messageCompleted = true;
 
         this.notifications.success(`Un oiseau s'envole vers Rome... 🕊️ (-${cost} 💰)`);
     }
@@ -1382,12 +1392,12 @@ class Game {
     }
 
     /**
-     * Vérifie si une tâche de message à César est active
-     * @returns {boolean} true si une mission message est en cours
+     * Vérifie si une tâche de message à César est active et non complétée
+     * @returns {boolean} true si une mission message est en cours et pas encore complétée
      */
     hasActiveMessageTask() {
         if (!this.cleopatra) return false;
-        return this.cleopatra.activeTasks.some(task => task.type === 'message');
+        return this.cleopatra.activeTasks.some(task => task.type === 'message' && !task.messageCompleted);
     }
 
     /**

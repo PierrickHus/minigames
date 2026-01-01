@@ -433,11 +433,9 @@ class CleopatraSystem {
                 return this.game.state.food >= task.targetCount;
 
             case 'message':
-                // Vérifier si le nombre requis de messages a été envoyé
-                const messagesSent = this.game.state.messagesSentToCaesar || 0;
-                const messagesSentDuringTask = messagesSent - (task.initialState?.messagesSent || 0);
-                const requiredMessages = task.target || 1;
-                return messagesSentDuringTask >= requiredMessages;
+                // Vérifier si cette tâche spécifique a été marquée comme complétée
+                // Chaque tâche de message doit être validée individuellement (pas globalement)
+                return task.messageCompleted === true;
 
             default:
                 return false;
@@ -666,18 +664,22 @@ class CleopatraSystem {
     initAutoSendSwitch() {
         const autoSwitch = document.getElementById('autoSendGlobal');
         if (autoSwitch) {
-            // Synchroniser avec l'état actuel du jeu
+            // Forcer le checkbox à l'état du jeu (pas l'inverse)
+            // Cela corrige le bug où le navigateur restaurait une valeur via autocomplete
             autoSwitch.checked = this.game.state.autoSendResources;
 
-            // Attacher l'événement de changement
-            autoSwitch.onchange = (e) => {
-                this.game.state.autoSendResources = e.target.checked;
-                if (e.target.checked) {
-                    this.game.notifications.info("Envoi automatique activé");
-                } else {
-                    this.game.notifications.info("Envoi automatique désactivé");
-                }
-            };
+            // N'attacher l'événement qu'une seule fois
+            if (!autoSwitch._eventAttached) {
+                autoSwitch._eventAttached = true;
+                autoSwitch.addEventListener('change', (e) => {
+                    this.game.state.autoSendResources = e.target.checked;
+                    if (e.target.checked) {
+                        this.game.notifications.info("Envoi automatique activé");
+                    } else {
+                        this.game.notifications.info("Envoi automatique désactivé");
+                    }
+                });
+            }
         }
     }
 
@@ -742,6 +744,18 @@ class CleopatraSystem {
             btn.onclick = (e) => {
                 e.stopPropagation();
                 if (this.sendResourcesForTask(task.id)) {
+                    btn.style.display = 'none';
+                }
+            };
+        }
+
+        // Pour les tâches de message, ajouter le bouton d'envoi
+        if (task.type === 'message' && sendContainer) {
+            sendContainer.innerHTML = `<button class="send-btn-small send-message-btn-cleo" style="display:none;">🕊️ Envoyer</button>`;
+            const btn = sendContainer.querySelector('.send-message-btn-cleo');
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                if (this.game.sendMessageToCaesar()) {
                     btn.style.display = 'none';
                 }
             };
@@ -815,9 +829,37 @@ class CleopatraSystem {
                     break;
                 }
                 case 'message': {
-                    // Afficher si le message a été envoyé
-                    const hasSent = (this.game.state.messagesSentToCaesar || 0) > task.initialState.messagesSent;
-                    progressEl.textContent = hasSent ? '✓' : '✗';
+                    // Afficher le statut de la tâche
+                    if (task.messageCompleted) {
+                        progressEl.textContent = '✓ Envoyé';
+                        progressEl.style.color = '#4ade80';
+                    } else {
+                        // Vérifier si on peut envoyer
+                        const hasBirds = this.game.state.birds >= 1;
+                        const cost = this.game.getMessageCost();
+                        const hasMoney = this.game.state.money >= cost;
+
+                        if (hasBirds && hasMoney) {
+                            progressEl.textContent = `💰${cost}`;
+                            progressEl.style.color = '#ffd700';
+                        } else if (!hasBirds) {
+                            progressEl.textContent = 'Pas d\'oiseau';
+                            progressEl.style.color = '#ff6b6b';
+                        } else {
+                            progressEl.textContent = `💰${cost} (manque)`;
+                            progressEl.style.color = '#ff6b6b';
+                        }
+                    }
+
+                    // Afficher/masquer le bouton d'envoi
+                    const sendBtn = element.querySelector('.send-message-btn-cleo');
+                    if (sendBtn) {
+                        const hasBirds = this.game.state.birds >= 1;
+                        const cost = this.game.getMessageCost();
+                        const hasMoney = this.game.state.money >= cost;
+                        const canSend = hasBirds && hasMoney && !task.messageCompleted;
+                        sendBtn.style.display = canSend ? 'inline-block' : 'none';
+                    }
                     break;
                 }
             }

@@ -328,10 +328,25 @@ class PanelManager {
      * Appelé lors des changements d'onglet ou des mises à jour de l'état du jeu
      */
     refresh() {
-        this.updateBuildingsList();
-        this.updateTasksList();
+        // La barre de ressources doit toujours être mise à jour (visible en permanence)
         this.updateResourcesBar();
-        this.updateStatsDisplay();
+
+        // Mettre à jour l'onglet actif (séparé pour ne pas bloquer la barre de ressources)
+        try {
+            switch (this.activeTab) {
+                case 'buildings':
+                    this.updateBuildingsList();
+                    break;
+                case 'tasks':
+                    this.updateTasksList();
+                    break;
+                case 'stats':
+                    this.updateStatsDisplay();
+                    break;
+            }
+        } catch (e) {
+            console.error('[PanelManager] Erreur dans refresh:', e);
+        }
     }
 
     /**
@@ -823,75 +838,80 @@ class PanelManager {
             const aviaryCount = this.game.getBuildingCount('aviary');
             const maxBirds = aviaryCount * 1;
             const currentBirds = Math.floor(this.game.state.birds);
-            const messagesSent = this.game.state.messagesSentToCaesar || 0;
 
-            // Conditions pour activer le bouton: volière + mission active + oiseaux + argent
-            const canSend = hasAviary && hasMessageTask && hasBirds && hasEnoughMoney;
+            // Trouver la première tâche de message NON complétée
+            const uncompletedMessageTask = this.game.cleopatra?.activeTasks.find(
+                t => t.type === 'message' && !t.messageCompleted
+            );
+
+            // Conditions pour activer le bouton: volière + mission NON complétée + oiseaux + argent
+            const canSend = hasAviary && uncompletedMessageTask && hasBirds && hasEnoughMoney;
 
             // Masquer complètement si pas de volière
             sendMessageItem.style.display = hasAviary ? '' : 'none';
 
-            // Mettre à jour la description selon l'état
+            // Calculer les nouvelles valeurs à afficher
+            let newDescText = '';
+            if (!hasMessageTask) {
+                newDescText = '⏳ En attente d\'une mission de message de Cléopâtre';
+            } else if (uncompletedMessageTask) {
+                newDescText = '📜 Mission: envoyer un message à César';
+            } else {
+                newDescText = '✓ Messages envoyés, en attente de validation';
+            }
+
+            let newSentCount = '';
+            if (hasMessageTask && uncompletedMessageTask) {
+                newSentCount = ' (0/1 envoyé)';
+            } else if (hasMessageTask && !uncompletedMessageTask) {
+                newSentCount = ' (✓ complété)';
+            }
+
+            let newBtnText = '';
+            if (!uncompletedMessageTask && hasMessageTask) {
+                newBtnText = 'Complété ✓';
+            } else if (!hasBirds) {
+                newBtnText = 'Pas d\'oiseau';
+            } else if (!hasEnoughMoney) {
+                newBtnText = 'Pas assez 💰';
+            } else if (!hasMessageTask) {
+                newBtnText = 'Pas de mission';
+            } else {
+                newBtnText = 'Envoyer 🕊️';
+            }
+
+            const newBirdsCount = `${currentBirds}/${maxBirds}`;
+            const newCostText = `💰${messageCost}`;
+
+            // Mettre à jour UNIQUEMENT si les valeurs ont changé
             const descDiv = sendMessageItem.querySelector('.task-desc');
-            if (descDiv) {
-                if (!hasMessageTask) {
-                    descDiv.textContent = '⏳ En attente d\'une mission de message de Cléopâtre';
-                } else {
-                    // Afficher les infos de la mission active
-                    const task = this.game.cleopatraManager?.getCurrentTask();
-                    if (task && task.type === 'message') {
-                        const sentDuringTask = messagesSent - (task.initialState?.messagesSent || 0);
-                        const targetCount = task.target || 1;
-                        const remaining = targetCount - sentDuringTask;
-                        descDiv.textContent = `📜 Mission: envoyer ${remaining} message(s) à César`;
-                    } else {
-                        descDiv.textContent = 'Envoyer un message à César via un oiseau messager';
-                    }
-                }
+            if (descDiv && descDiv.textContent !== newDescText) {
+                descDiv.textContent = newDescText;
             }
 
-            // Mettre à jour le stock d'oiseaux
             const birdsCountEl = sendMessageItem.querySelector('.message-birds-count');
-            if (birdsCountEl) {
-                birdsCountEl.textContent = `${currentBirds}/${maxBirds}`;
+            if (birdsCountEl && birdsCountEl.textContent !== newBirdsCount) {
+                birdsCountEl.textContent = newBirdsCount;
             }
 
-            // Mettre à jour le compteur de messages envoyés
             const sentCountEl = sendMessageItem.querySelector('.message-sent-count');
-            if (sentCountEl) {
-                if (hasMessageTask) {
-                    const task = this.game.cleopatraManager?.getCurrentTask();
-                    if (task && task.type === 'message') {
-                        const sentDuringTask = messagesSent - (task.initialState?.messagesSent || 0);
-                        const targetCount = task.target || 1;
-                        sentCountEl.textContent = ` (${sentDuringTask}/${targetCount} envoyés)`;
-                    } else {
-                        sentCountEl.textContent = '';
-                    }
-                } else {
-                    sentCountEl.textContent = '';
-                }
+            if (sentCountEl && sentCountEl.textContent !== newSentCount) {
+                sentCountEl.textContent = newSentCount;
             }
 
-            // Mettre à jour le coût affiché
             const costValueEl = sendMessageItem.querySelector('.message-cost .cost-value');
             if (costValueEl) {
-                costValueEl.textContent = `💰${messageCost}`;
+                if (costValueEl.textContent !== newCostText) {
+                    costValueEl.textContent = newCostText;
+                }
                 costValueEl.classList.toggle('insufficient', !hasEnoughMoney);
             }
 
-            // Mettre à jour le bouton d'envoi
             const sendBtn = sendMessageItem.querySelector('.send-message-btn');
             if (sendBtn) {
                 sendBtn.disabled = !canSend;
-                if (!hasBirds) {
-                    sendBtn.textContent = 'Pas d\'oiseau';
-                } else if (!hasEnoughMoney) {
-                    sendBtn.textContent = 'Pas assez 💰';
-                } else if (!hasMessageTask) {
-                    sendBtn.textContent = 'Pas de mission';
-                } else {
-                    sendBtn.textContent = 'Envoyer 🕊️';
+                if (sendBtn.textContent !== newBtnText) {
+                    sendBtn.textContent = newBtnText;
                 }
             }
 
@@ -904,22 +924,29 @@ class PanelManager {
             // Afficher les infos de mission si disponible
             const missionInfoDiv = sendMessageItem.querySelector('.task-mission-info');
             if (missionInfoDiv) {
-                if (hasMessageTask) {
-                    const task = this.game.cleopatraManager?.getCurrentTask();
-                    if (task && task.type === 'message') {
-                        const sentDuringTask = messagesSent - (task.initialState?.messagesSent || 0);
-                        const targetCount = task.target || 1;
-                        const timeLeft = task.timeLimit - (this.game.state.gameTime - task.startTime);
+                if (hasMessageTask && uncompletedMessageTask) {
+                    // Calculer le temps restant
+                    const timeLeft = uncompletedMessageTask.timeRemaining;
+                    const newTimeText = formatTime(timeLeft);
+
+                    // Ne mettre à jour que si nécessaire
+                    const timeSpan = missionInfoDiv.querySelector('.mission-time');
+                    if (missionInfoDiv.style.display !== 'flex') {
                         missionInfoDiv.innerHTML = `
-                            <span class="mission-progress">📨 ${sentDuringTask}/${targetCount}</span>
-                            <span class="mission-time">⏱️ ${formatTime(timeLeft)}</span>
+                            <span class="mission-progress">📨 0/1</span>
+                            <span class="mission-time">⏱️ ${newTimeText}</span>
                         `;
                         missionInfoDiv.style.display = 'flex';
-                    } else {
-                        missionInfoDiv.style.display = 'none';
+                    } else if (timeSpan) {
+                        const expectedTimeText = `⏱️ ${newTimeText}`;
+                        if (timeSpan.textContent !== expectedTimeText) {
+                            timeSpan.textContent = expectedTimeText;
+                        }
                     }
                 } else {
-                    missionInfoDiv.style.display = 'none';
+                    if (missionInfoDiv.style.display !== 'none') {
+                        missionInfoDiv.style.display = 'none';
+                    }
                 }
             }
         }

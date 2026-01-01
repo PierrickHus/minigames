@@ -1,0 +1,111 @@
+# Règles de développement pour Claude
+
+## Performance DOM
+
+**IMPORTANT : Ne JAMAIS rafraîchir le DOM à chaque frame.**
+
+Toujours utiliser une approche de mise à jour conditionnelle :
+- Calculer d'abord les nouvelles valeurs
+- Comparer avec les valeurs actuelles du DOM
+- Ne mettre à jour que si les valeurs ont changé
+
+### Exemple correct :
+```javascript
+// Calculer la nouvelle valeur
+const newValue = calculateValue();
+
+// Mettre à jour UNIQUEMENT si la valeur a changé
+if (element.textContent !== newValue) {
+    element.textContent = newValue;
+}
+```
+
+### Exemple incorrect :
+```javascript
+// NE PAS faire ça - met à jour le DOM à chaque frame
+element.textContent = calculateValue();
+element.innerHTML = `<span>${value}</span>`;
+```
+
+### Pour les éléments avec innerHTML :
+- Éviter de reconstruire le HTML à chaque frame
+- Créer les éléments une fois, puis mettre à jour leurs propriétés individuellement
+- Utiliser des références aux sous-éléments plutôt que de reconstruire tout le contenu
+
+### Pour les styles :
+```javascript
+// Correct
+if (element.style.display !== 'none') {
+    element.style.display = 'none';
+}
+
+// Incorrect
+element.style.display = 'none'; // À chaque frame
+```
+
+## Documentation du code
+
+**IMPORTANT : Toujours documenter les classes, méthodes et parties sensibles/complexes du code.**
+
+### Classes et méthodes :
+- Utiliser JSDoc pour documenter toutes les classes et leurs méthodes
+- Décrire le rôle de la classe/méthode
+- Documenter les paramètres avec `@param` et leur type
+- Documenter la valeur de retour avec `@returns`
+
+### Exemple :
+```javascript
+/**
+ * Gestionnaire des panneaux d'interface utilisateur
+ * Gère l'affichage et l'interaction avec les différents panneaux du jeu
+ */
+class PanelManager {
+    /**
+     * Met à jour la barre de ressources en bas de l'écran
+     * Affiche le stock, le coût de collecte et la progression des collectes en cours
+     * @param {boolean} forceUpdate - Force la mise à jour même si les valeurs n'ont pas changé
+     * @returns {void}
+     */
+    updateResourcesBar(forceUpdate = false) {
+        // ...
+    }
+}
+```
+
+### Code sensible/complexe :
+- Ajouter des commentaires explicatifs pour les algorithmes complexes
+- Expliquer le "pourquoi" et pas seulement le "quoi"
+- Documenter les cas limites et les comportements non évidents
+- Indiquer les dépendances entre systèmes
+
+### Commentaires inutiles à éviter :
+**NE JAMAIS ajouter de commentaires qui décrivent l'évidence ou les changements d'état.**
+
+```javascript
+// MAUVAIS - commentaires inutiles
+let health = 100; // Initialisation de la santé
+health = 80; // Diminution de la valeur
+count++; // Incrémentation du compteur
+const name = "Jean"; // Définition du nom
+
+// BON - pas de commentaire pour du code évident
+let health = 100;
+health = 80;
+count++;
+const name = "Jean";
+
+// BON - commentaire utile expliquant le "pourquoi"
+// Réduire la santé de 20% car le joueur a été touché par un projectile empoisonné
+health = 80;
+```
+
+Les commentaires doivent expliquer :
+- Le **pourquoi** (intention, contexte business)
+- Les **cas limites** non évidents
+- Les **workarounds** ou hacks temporaires
+- Les **dépendances** entre systèmes
+
+Les commentaires ne doivent PAS :
+- Répéter ce que le code fait déjà clairement
+- Décrire des changements de valeur évidents
+- Paraphraser le nom des variables/fonctions

@@ -1768,6 +1768,20 @@ body {
     box-shadow: 0 2px 6px rgba(74, 222, 128, 0.5);
 }
 
+/* Bouton d'envoi de message à César dans la liste des tâches Cléopâtre */
+.send-message-btn-cleo {
+    background: linear-gradient(135deg, #60a5fa, #3b82f6) !important;
+    color: #fff !important;
+    font-weight: bold;
+    padding: 5px 10px !important;
+    font-size: 0.8rem !important;
+}
+
+.send-message-btn-cleo:hover {
+    background: linear-gradient(135deg, #93c5fd, #60a5fa) !important;
+    box-shadow: 0 2px 8px rgba(96, 165, 250, 0.6);
+}
+
 /* Animation de complétion de tâche */
 .task-item-cleo.completed {
     border-color: #4ade80 !important;
@@ -2751,13 +2765,19 @@ body {
     background: rgba(0, 0, 0, 0.5);
     border-radius: 0 0 6px 6px;
     overflow: hidden;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+}
+
+.resource-bar-progress.hidden {
+    opacity: 0;
+    pointer-events: none;
 }
 
 .resource-bar-progress .progress-fill {
     height: 100%;
     background: linear-gradient(90deg, #4ade80, #22c55e);
     width: 0%;
-    transition: width 0.3s ease;
 }
 
 .resource-bar-progress .progress-text {
