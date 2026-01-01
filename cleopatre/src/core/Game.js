@@ -504,7 +504,7 @@ class Game {
                     this.panels.setBuildMultiplier(data.multipliers.build);
                 }
                 if (data.multipliers.gather !== undefined) {
-                    this.panels.setMultiplier(data.multipliers.gather);
+                    this.panels.setGatherMultiplier(data.multipliers.gather);
                 }
             }
 
@@ -778,6 +778,9 @@ class Game {
             this.villageRenderer.render();
         }
 
+        // Envoi automatique de messages à César si conditions réunies
+        this.autoSendMessages();
+
         this.updateUI();
         this.checkVictory();
 
@@ -832,9 +835,11 @@ class Game {
         this.state.resources.stone += workshops * (2 / 60) * dt;
 
         // Production d'oiseaux (volières)
+        // 3 volières = 1 oiseau/min, donc 1 volière = 1 oiseau/3min = 1/180 par seconde
+        // Capacité: 1 oiseau par volière
         const aviaries = this.state.buildings['aviary'] || 0;
-        this.state.birds += aviaries * (1 / 30) * dt;
-        const maxBirds = aviaries * 5;
+        this.state.birds += aviaries * (1 / 180) * dt;
+        const maxBirds = aviaries * 1;
         if (this.state.birds > maxBirds) {
             this.state.birds = maxBirds;
         }
@@ -1283,6 +1288,41 @@ class Game {
 
         this.notifications.success(`Un oiseau s'envole vers Rome... 🕊️ (-${cost} 💰)`);
         return true;
+    }
+
+    /**
+     * Envoie automatiquement des messages à César si les conditions sont réunies
+     * Conditions: mode auto activé, volière construite, mission active, oiseau disponible, assez d'or
+     * Délai minimum de 1 seconde entre chaque envoi
+     */
+    autoSendMessages() {
+        // Vérifier si le mode auto est activé
+        if (!this.state.autoSendResources) return;
+
+        // Vérifier le délai depuis le dernier envoi (1 seconde minimum)
+        const now = this.state.gameTime;
+        if (this.lastAutoMessageTime && (now - this.lastAutoMessageTime) < 1) return;
+
+        // Vérifier si on a une volière
+        if (!this.hasBuilding('aviary')) return;
+
+        // Vérifier si on a une mission de message active
+        if (!this.hasActiveMessageTask()) return;
+
+        // Vérifier si on a des oiseaux
+        if (this.state.birds < 1) return;
+
+        // Vérifier si on a assez d'argent
+        const cost = this.getMessageCost();
+        if (this.state.money < cost) return;
+
+        // Envoyer le message
+        this.state.birds--;
+        this.state.money -= cost;
+        this.state.messagesSentToCaesar = (this.state.messagesSentToCaesar || 0) + 1;
+        this.lastAutoMessageTime = now;
+
+        this.notifications.success(`Un oiseau s'envole vers Rome... 🕊️ (-${cost} 💰)`);
     }
 
     /**

@@ -845,6 +845,104 @@ body {
     font-size: 0.9rem;
 }
 
+/* Tâche d'envoi de message - style similaire à la barre de ressources */
+.task-item[data-task-id="sendMessage"] {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.task-item .task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.task-item .task-message-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    flex-wrap: wrap;
+}
+
+.task-item .message-stock {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 1rem;
+}
+
+.task-item .message-icon {
+    font-size: 1.2rem;
+}
+
+.task-item .message-birds-count {
+    color: #4ade80;
+    font-weight: bold;
+}
+
+.task-item .message-sent-count {
+    color: #aaa;
+    font-size: 0.85rem;
+}
+
+.task-item .message-cost {
+    color: #ffd700;
+    font-weight: bold;
+}
+
+.task-item .message-cost .cost-value.insufficient {
+    color: #ff6b6b;
+}
+
+.task-item .send-message-btn {
+    padding: 8px 16px;
+    background: linear-gradient(180deg, #4a7c4e 0%, #2d5a30 100%);
+    border: 2px solid #6b9e6f;
+    border-radius: 6px;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: auto;
+}
+
+.task-item .send-message-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #5a9c5e 0%, #3d7a40 100%);
+    border-color: #8ebe8f;
+    transform: scale(1.02);
+}
+
+.task-item .send-message-btn:disabled {
+    background: linear-gradient(180deg, #4a4a4a 0%, #2d2d2d 100%);
+    border-color: #555;
+    color: #888;
+    cursor: not-allowed;
+}
+
+.task-item .task-mission-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    background: rgba(255, 215, 0, 0.1);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.task-item .mission-progress {
+    color: #4ade80;
+    font-weight: bold;
+}
+
+.task-item .mission-time {
+    color: #ffd700;
+}
+
 /* Section Ressources */
 .resource-section {
     margin-bottom: 20px;
@@ -2439,7 +2537,7 @@ body {
     background: linear-gradient(180deg, rgba(45,45,68,0.95) 0%, rgba(26,26,46,0.98) 100%);
     border-top: 3px solid #8b7355;
     z-index: 200;
-    padding: 10px 15px;
+    padding: 8px 10px;
     -webkit-backdrop-filter: blur(5px);
     backdrop-filter: blur(5px);
 }
@@ -2447,7 +2545,7 @@ body {
 .resources-bar-content {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 10px;
     max-width: 100%;
     overflow-x: auto;
 }
@@ -2456,33 +2554,33 @@ body {
 .resources-multiplier {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
+    gap: 6px;
+    padding: 6px 10px;
     background: rgba(0, 0, 0, 0.3);
-    border-radius: 8px;
+    border-radius: 6px;
     border: 1px solid #555;
     flex-shrink: 0;
 }
 
 .resources-multiplier .mult-label {
     color: #aaa;
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     white-space: nowrap;
 }
 
 .resources-multiplier .mult-buttons {
     display: flex;
-    gap: 4px;
+    gap: 3px;
 }
 
 .resources-multiplier .mult-btn {
-    padding: 5px 10px;
+    padding: 4px 8px;
     background: rgba(60, 60, 80, 0.8);
     color: #aaa;
     border: 1px solid #555;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     font-weight: bold;
     transition: all 0.2s ease;
 }
@@ -2501,10 +2599,10 @@ body {
 /* Liste des ressources */
 .resources-list {
     display: flex;
-    gap: 10px;
+    gap: 6px;
     flex: 1;
     overflow-x: auto;
-    padding: 5px 0;
+    padding: 3px 0;
 }
 
 /* Scrollbar stylisée pour la barre de ressources */
@@ -2530,20 +2628,34 @@ body {
 .resource-bar-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
+    gap: 6px;
+    padding: 6px 10px;
     background: linear-gradient(180deg, #3a3a5a 0%, #2a2a4a 100%);
     border: 2px solid #555;
-    border-radius: 8px;
-    min-width: 200px;
+    border-radius: 6px;
     flex-shrink: 0;
     transition: all 0.2s ease;
     position: relative;
 }
 
-.resource-bar-item:hover {
+.resource-bar-item.clickable {
+    cursor: pointer;
+}
+
+.resource-bar-item.clickable:hover {
     border-color: #ffd700;
     background: linear-gradient(180deg, #4a4a6a 0%, #3a3a5a 100%);
+    transform: scale(1.02);
+    z-index: 10;
+}
+
+.resource-bar-item.clickable:active {
+    transform: scale(0.98);
+}
+
+/* Espace pour le premier élément quand il est en hover */
+.resources-list .resource-bar-item:first-child {
+    margin-left: 3px;
 }
 
 .resource-bar-item.gathering {
@@ -2553,16 +2665,12 @@ body {
 
 .resource-bar-item.disabled {
     opacity: 0.5;
-}
-
-.resource-bar-item.disabled .gather-btn {
     cursor: not-allowed;
-    opacity: 0.6;
 }
 
 /* Icône de ressource */
 .resource-bar-icon {
-    font-size: 1.8rem;
+    font-size: 1.3rem;
     flex-shrink: 0;
 }
 
@@ -2570,90 +2678,67 @@ body {
 .resource-bar-info {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    min-width: 70px;
+    gap: 1px;
+    flex: 1;
+    min-width: 0;
 }
 
 .resource-bar-name {
     color: #fff;
     font-weight: bold;
-    font-size: 0.9rem;
+    font-size: 0.75rem;
 }
 
 .resource-bar-stock {
-    color: #ffd700;
-    font-size: 0.85rem;
-}
-
-.resource-bar-stock span {
-    font-weight: bold;
-}
-
-/* Infos de collecte */
-.resource-bar-gather {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    text-align: center;
-    padding: 0 10px;
-    border-left: 1px solid #444;
-    border-right: 1px solid #444;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+}
+
+.resource-bar-stock > span:first-child {
+    color: #ffd700;
+    font-weight: bold;
 }
 
 .resource-bar-yield {
     color: #4ade80;
     font-weight: bold;
-    font-size: 0.9rem;
+    font-size: 0.7rem;
+    white-space: nowrap;
 }
 
-.resource-bar-time {
-    color: #aaa;
-    font-size: 0.75rem;
-}
-
-/* Action (bouton) */
-.resource-bar-action {
-    flex-shrink: 0;
-}
-
-.gather-btn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    padding: 8px 15px;
-    background: linear-gradient(180deg, #4a6a3a 0%, #3a5a2a 100%);
-    color: #fff;
-    border: 2px solid #4ade80;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    min-width: 70px;
-}
-
-.gather-btn:hover:not(:disabled) {
-    background: linear-gradient(180deg, #5a7a4a 0%, #4a6a3a 100%);
-    transform: scale(1.05);
-    box-shadow: 0 0 10px rgba(74, 222, 128, 0.4);
-}
-
-.gather-btn:active:not(:disabled) {
-    transform: scale(0.98);
-}
-
-.gather-btn-cost {
-    font-size: 0.85rem;
+.resource-bar-pending {
+    color: #60a5fa;
+    font-size: 0.7rem;
     font-weight: bold;
 }
 
-.gather-btn-cost.insufficient {
-    color: #ff6b6b;
+/* Coût et temps */
+.resource-bar-cost {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding-left: 6px;
+    border-left: 1px solid #444;
+    flex-shrink: 0;
 }
 
-.gather-btn-label {
+.cost-value {
     font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-weight: bold;
+    color: #ffd700;
+    white-space: nowrap;
+}
+
+.cost-time {
+    font-size: 0.6rem;
+    color: #aaa;
+}
+
+.cost-value.insufficient {
+    color: #ff6b6b;
 }
 
 /* Barre de progression */
@@ -2688,20 +2773,18 @@ body {
 .bird-bar-item {
     background: linear-gradient(180deg, #3a4a5a 0%, #2a3a4a 100%);
     border-color: #60a5fa;
-    min-width: 160px;
 }
 
 .bird-bar-item:hover {
-    border-color: #60a5fa;
+    border-color: #93c5fd;
 }
 
-.bird-bar-item .resource-bar-gather {
+.bird-bar-item .resource-bar-cost {
     border-color: #3a4a5a;
 }
 
-.bird-bar-item .resource-bar-yield {
+.bird-bar-item .cost-value {
     color: #60a5fa;
-    font-size: 0.8rem;
 }
 
 .bird-info {
@@ -2709,6 +2792,33 @@ body {
     font-size: 0.85rem;
     font-style: italic;
     padding: 8px;
+}
+
+/* Barre de progression des oiseaux */
+.bird-progress-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 0 0 4px 4px;
+    overflow: hidden;
+}
+
+.bird-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #60a5fa 0%, #93c5fd 50%, #60a5fa 100%);
+    background-size: 200% 100%;
+    animation: birdProgressShine 2s linear infinite;
+    transition: width 0.3s ease;
+    border-radius: 0 0 4px 4px;
+}
+
+@keyframes birdProgressShine {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 
 /* Responsive méga menu */

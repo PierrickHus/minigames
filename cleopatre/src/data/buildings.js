@@ -177,7 +177,7 @@ const BUILDINGS = {
         name: 'Volière',
         icon: '🕊️',
         tier: 1,
-        description: 'Produit 1 oiseau/30s (max 5). Nécessaire pour les messages à César.',
+        description: 'Produit 1 🕊️/3min (max 1). Nécessaire pour les messages à César.',
         cost: {
             money: 150,
             wood: 20,

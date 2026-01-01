@@ -117,40 +117,38 @@ class PanelManager {
             });
         }
 
-        // Configuration des boutons de collecte pour chaque ressource
+        // Configuration des blocs de collecte cliquables pour chaque ressource
         const resourcesList = document.getElementById('resourcesBarList');
         if (resourcesList) {
-            resourcesList.querySelectorAll('.resource-bar-item').forEach(item => {
+            resourcesList.querySelectorAll('.resource-bar-item.clickable').forEach(item => {
                 const resourceId = item.dataset.resource;
                 // Les oiseaux ne sont pas collectables manuellement
                 if (resourceId === 'birds') return;
 
-                const gatherBtn = item.querySelector('.gather-btn');
-                if (gatherBtn) {
-                    gatherBtn.addEventListener('click', () => {
-                        const resource = RESOURCES[resourceId];
-                        if (!resource) return;
+                // Clic sur le bloc entier déclenche la collecte
+                item.addEventListener('click', () => {
+                    const resource = RESOURCES[resourceId];
+                    if (!resource) return;
 
-                        // Calculer le nombre d'ouvriers à envoyer selon le multiplicateur
-                        const count = this.getActualWorkerCount(resource);
-                        if (count > 0) {
-                            // Lancer autant de collectes que possible
-                            for (let i = 0; i < count; i++) {
-                                this.game.gatherResource(resourceId);
-                            }
-                        } else {
-                            // Afficher un message d'erreur explicatif
-                            const state = this.game.state;
-                            if (state.availablePeasants < 1) {
-                                this.game.notifications.error("Pas d'ouvriers disponibles !");
-                            } else if (state.money < resource.gatherCost) {
-                                this.game.notifications.error("Pas assez d'argent !");
-                            } else {
-                                this.game.notifications.error("Action impossible !");
-                            }
+                    // Calculer le nombre d'ouvriers à envoyer selon le multiplicateur
+                    const count = this.getActualWorkerCount(resource);
+                    if (count > 0) {
+                        // Lancer autant de collectes que possible
+                        for (let i = 0; i < count; i++) {
+                            this.game.gatherResource(resourceId);
                         }
-                    });
-                }
+                    } else {
+                        // Afficher un message d'erreur explicatif
+                        const state = this.game.state;
+                        if (state.availablePeasants < 1) {
+                            this.game.notifications.error("Pas d'ouvriers disponibles !");
+                        } else if (state.money < resource.gatherCost) {
+                            this.game.notifications.error("Pas assez d'argent !");
+                        } else {
+                            this.game.notifications.error("Action impossible !");
+                        }
+                    }
+                });
             });
         }
     }
@@ -694,21 +692,58 @@ class PanelManager {
             const item = document.createElement('div');
             item.className = 'task-item static-task';
             item.dataset.taskId = task.id;
-            item.innerHTML = `
-                <div class="task-name">${task.name}</div>
-                <div class="task-desc">${task.desc}</div>
-                <div class="task-cost">${task.cost}</div>
-                <div class="task-locked" style="display: none;">🔒 Nécessite une volière</div>
-            `;
 
-            // Attacher l'événement click si la tâche a une action
-            if (task.action) {
-                item.addEventListener('click', () => {
-                    // Vérifier dynamiquement si cliquable
-                    if (!item.classList.contains('disabled')) {
-                        task.action();
-                    }
-                });
+            // Structure spéciale pour la tâche d'envoi de message
+            if (task.id === 'sendMessage') {
+                item.innerHTML = `
+                    <div class="task-header">
+                        <div class="task-name">${task.name}</div>
+                        <div class="task-locked" style="display: none;">🔒 Nécessite une volière</div>
+                    </div>
+                    <div class="task-desc">${task.desc}</div>
+                    <div class="task-message-info">
+                        <div class="message-stock">
+                            <span class="message-icon">🕊️</span>
+                            <span class="message-birds-count">0/0</span>
+                            <span class="message-sent-count"></span>
+                        </div>
+                        <div class="message-cost">
+                            <span class="cost-value">💰50</span>
+                        </div>
+                        <button type="button" class="send-message-btn" disabled>
+                            Envoyer 🕊️
+                        </button>
+                    </div>
+                    <div class="task-mission-info" style="display: none;"></div>
+                `;
+
+                // Attacher l'événement au bouton
+                const btn = item.querySelector('.send-message-btn');
+                if (btn) {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (!btn.disabled) {
+                            task.action();
+                        }
+                    });
+                }
+            } else {
+                item.innerHTML = `
+                    <div class="task-name">${task.name}</div>
+                    <div class="task-desc">${task.desc}</div>
+                    <div class="task-cost">${task.cost}</div>
+                    <div class="task-locked" style="display: none;">🔒 Nécessite une volière</div>
+                `;
+
+                // Attacher l'événement click si la tâche a une action
+                if (task.action) {
+                    item.addEventListener('click', () => {
+                        // Vérifier dynamiquement si cliquable
+                        if (!item.classList.contains('disabled')) {
+                            task.action();
+                        }
+                    });
+                }
             }
 
             container.appendChild(item);
@@ -785,35 +820,78 @@ class PanelManager {
             const hasBirds = this.game.state.birds >= 1;
             const messageCost = this.game.getMessageCost();
             const hasEnoughMoney = this.game.state.money >= messageCost;
+            const aviaryCount = this.game.getBuildingCount('aviary');
+            const maxBirds = aviaryCount * 1;
+            const currentBirds = Math.floor(this.game.state.birds);
+            const messagesSent = this.game.state.messagesSentToCaesar || 0;
 
-            // Conditions pour activer: volière + mission active + oiseaux + argent
-            const isDisabled = !hasAviary || !hasMessageTask || !hasBirds || !hasEnoughMoney;
+            // Conditions pour activer le bouton: volière + mission active + oiseaux + argent
+            const canSend = hasAviary && hasMessageTask && hasBirds && hasEnoughMoney;
 
-            sendMessageItem.classList.toggle('disabled', isDisabled);
-            sendMessageItem.classList.toggle('clickable', !isDisabled);
+            // Masquer complètement si pas de volière
+            sendMessageItem.style.display = hasAviary ? '' : 'none';
 
             // Mettre à jour la description selon l'état
             const descDiv = sendMessageItem.querySelector('.task-desc');
             if (descDiv) {
-                if (!hasAviary) {
-                    descDiv.textContent = '🔒 Nécessite une volière';
-                } else if (!hasMessageTask) {
-                    descDiv.textContent = '⏳ En attente d\'une mission de message';
-                } else if (!hasBirds) {
-                    descDiv.textContent = `🕊️ Aucun oiseau (${Math.floor(this.game.state.birds)}/${this.game.getBuildingCount('aviary') * 5})`;
+                if (!hasMessageTask) {
+                    descDiv.textContent = '⏳ En attente d\'une mission de message de Cléopâtre';
                 } else {
-                    descDiv.textContent = `🕊️ ${Math.floor(this.game.state.birds)} oiseau(x) disponible(s)`;
+                    // Afficher les infos de la mission active
+                    const task = this.game.cleopatraManager?.getCurrentTask();
+                    if (task && task.type === 'message') {
+                        const sentDuringTask = messagesSent - (task.initialState?.messagesSent || 0);
+                        const targetCount = task.target || 1;
+                        const remaining = targetCount - sentDuringTask;
+                        descDiv.textContent = `📜 Mission: envoyer ${remaining} message(s) à César`;
+                    } else {
+                        descDiv.textContent = 'Envoyer un message à César via un oiseau messager';
+                    }
+                }
+            }
+
+            // Mettre à jour le stock d'oiseaux
+            const birdsCountEl = sendMessageItem.querySelector('.message-birds-count');
+            if (birdsCountEl) {
+                birdsCountEl.textContent = `${currentBirds}/${maxBirds}`;
+            }
+
+            // Mettre à jour le compteur de messages envoyés
+            const sentCountEl = sendMessageItem.querySelector('.message-sent-count');
+            if (sentCountEl) {
+                if (hasMessageTask) {
+                    const task = this.game.cleopatraManager?.getCurrentTask();
+                    if (task && task.type === 'message') {
+                        const sentDuringTask = messagesSent - (task.initialState?.messagesSent || 0);
+                        const targetCount = task.target || 1;
+                        sentCountEl.textContent = ` (${sentDuringTask}/${targetCount} envoyés)`;
+                    } else {
+                        sentCountEl.textContent = '';
+                    }
+                } else {
+                    sentCountEl.textContent = '';
                 }
             }
 
             // Mettre à jour le coût affiché
-            const costDiv = sendMessageItem.querySelector('.task-cost');
-            if (costDiv) {
-                if (hasAviary) {
-                    const costClass = hasEnoughMoney ? '' : 'insufficient';
-                    costDiv.innerHTML = `<span class="${costClass}">💰${messageCost}</span> 🕊️1`;
+            const costValueEl = sendMessageItem.querySelector('.message-cost .cost-value');
+            if (costValueEl) {
+                costValueEl.textContent = `💰${messageCost}`;
+                costValueEl.classList.toggle('insufficient', !hasEnoughMoney);
+            }
+
+            // Mettre à jour le bouton d'envoi
+            const sendBtn = sendMessageItem.querySelector('.send-message-btn');
+            if (sendBtn) {
+                sendBtn.disabled = !canSend;
+                if (!hasBirds) {
+                    sendBtn.textContent = 'Pas d\'oiseau';
+                } else if (!hasEnoughMoney) {
+                    sendBtn.textContent = 'Pas assez 💰';
+                } else if (!hasMessageTask) {
+                    sendBtn.textContent = 'Pas de mission';
                 } else {
-                    costDiv.textContent = '💰??';
+                    sendBtn.textContent = 'Envoyer 🕊️';
                 }
             }
 
@@ -821,6 +899,28 @@ class PanelManager {
             const lockedDiv = sendMessageItem.querySelector('.task-locked');
             if (lockedDiv) {
                 lockedDiv.style.display = !hasAviary ? 'block' : 'none';
+            }
+
+            // Afficher les infos de mission si disponible
+            const missionInfoDiv = sendMessageItem.querySelector('.task-mission-info');
+            if (missionInfoDiv) {
+                if (hasMessageTask) {
+                    const task = this.game.cleopatraManager?.getCurrentTask();
+                    if (task && task.type === 'message') {
+                        const sentDuringTask = messagesSent - (task.initialState?.messagesSent || 0);
+                        const targetCount = task.target || 1;
+                        const timeLeft = task.timeLimit - (this.game.state.gameTime - task.startTime);
+                        missionInfoDiv.innerHTML = `
+                            <span class="mission-progress">📨 ${sentDuringTask}/${targetCount}</span>
+                            <span class="mission-time">⏱️ ${formatTime(timeLeft)}</span>
+                        `;
+                        missionInfoDiv.style.display = 'flex';
+                    } else {
+                        missionInfoDiv.style.display = 'none';
+                    }
+                } else {
+                    missionInfoDiv.style.display = 'none';
+                }
             }
         }
     }
@@ -858,6 +958,17 @@ class PanelManager {
                 stockEl.textContent = Math.floor(state.resources[resource.id]);
             }
 
+            // Mettre à jour les ressources en cours de récupération
+            const pendingEl = item.querySelector(`#${resource.id}PendingBar`);
+            if (pendingEl) {
+                const pendingAmount = gatherings.length * resource.gatherAmount;
+                if (pendingAmount > 0) {
+                    pendingEl.textContent = ` +${pendingAmount}`;
+                } else {
+                    pendingEl.textContent = '';
+                }
+            }
+
             // Mettre à jour le rendement affiché
             const yieldEl = item.querySelector('.resource-bar-yield');
             if (yieldEl) {
@@ -868,8 +979,8 @@ class PanelManager {
                 }
             }
 
-            // Mettre à jour le coût du bouton de collecte
-            const costEl = item.querySelector('.gather-btn-cost');
+            // Mettre à jour le coût affiché
+            const costEl = item.querySelector('.cost-value');
             if (costEl) {
                 const displayCost = workerCount > 0 ? totalCost : resource.gatherCost;
                 costEl.textContent = `💰${displayCost}`;
@@ -903,10 +1014,45 @@ class PanelManager {
         const birdsItem = container.querySelector('[data-resource="birds"]');
         if (birdsItem) {
             const aviaries = this.game.getBuildingCount('aviary');
-            const maxBirds = aviaries * 5; // 5 oiseaux par volière
+            const maxBirds = aviaries * 1; // 1 oiseau par volière
+            const currentBirds = state.birds;
             const birdsStockEl = birdsItem.querySelector('#birdsStockBar');
             if (birdsStockEl) {
-                birdsStockEl.textContent = `${Math.floor(state.birds)}/${maxBirds}`;
+                birdsStockEl.textContent = `${Math.floor(currentBirds)}/${maxBirds}`;
+            }
+
+            // Calculer le temps de production et la progression
+            // 3 volières = 1 oiseau/min, donc avec N volières: 180/N secondes par oiseau
+            const costTimeEl = birdsItem.querySelector('.cost-time');
+            const progressFill = birdsItem.querySelector('#birdProgressFill');
+
+            if (aviaries > 0) {
+                const secondsPerBird = 180 / aviaries; // 3min = 180s pour 1 volière
+
+                // Afficher le temps exact (minutes et secondes)
+                if (costTimeEl) {
+                    const mins = Math.floor(secondsPerBird / 60);
+                    const secs = Math.floor(secondsPerBird % 60);
+                    if (mins > 0 && secs > 0) {
+                        costTimeEl.textContent = `${mins}m${secs}s/🕊️`;
+                    } else if (mins > 0) {
+                        costTimeEl.textContent = `${mins}min/🕊️`;
+                    } else {
+                        costTimeEl.textContent = `${secs}s/🕊️`;
+                    }
+                }
+
+                // Calculer la progression vers le prochain oiseau
+                // La partie décimale de currentBirds représente la progression
+                if (progressFill) {
+                    if (currentBirds >= maxBirds) {
+                        // Stock plein, pas de progression
+                        progressFill.style.width = '0%';
+                    } else {
+                        const progress = (currentBirds % 1) * 100;
+                        progressFill.style.width = `${progress}%`;
+                    }
+                }
             }
 
             // Masquer si aucune volière construite

@@ -433,9 +433,11 @@ class CleopatraSystem {
                 return this.game.state.food >= task.targetCount;
 
             case 'message':
-                // Vérifier si un nouveau message a été envoyé depuis le début de la tâche
+                // Vérifier si le nombre requis de messages a été envoyé
                 const messagesSent = this.game.state.messagesSentToCaesar || 0;
-                return messagesSent > task.initialState.messagesSent;
+                const messagesSentDuringTask = messagesSent - (task.initialState?.messagesSent || 0);
+                const requiredMessages = task.target || 1;
+                return messagesSentDuringTask >= requiredMessages;
 
             default:
                 return false;

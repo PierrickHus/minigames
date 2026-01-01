@@ -172,21 +172,19 @@
                 <!-- Liste des ressources -->
                 <div class="resources-list" id="resourcesBarList">
                     <!-- Bois -->
-                    <div class="resource-bar-item" data-resource="wood">
+                    <div class="resource-bar-item clickable" data-resource="wood">
                         <div class="resource-bar-icon">🪵</div>
                         <div class="resource-bar-info">
                             <div class="resource-bar-name">Bois</div>
-                            <div class="resource-bar-stock">Stock: <span id="woodStockBar">0</span></div>
+                            <div class="resource-bar-stock">
+                                <span id="woodStockBar">0</span>
+                                <span class="resource-bar-yield">+10</span>
+                                <span id="woodPendingBar" class="resource-bar-pending"></span>
+                            </div>
                         </div>
-                        <div class="resource-bar-gather">
-                            <div class="resource-bar-yield">+10</div>
-                            <div class="resource-bar-time">⏱️ 15s</div>
-                        </div>
-                        <div class="resource-bar-action">
-                            <button type="button" class="gather-btn">
-                                <span class="gather-btn-cost">💰5</span>
-                                <span class="gather-btn-label">Chercher</span>
-                            </button>
+                        <div class="resource-bar-cost">
+                            <span class="cost-value">💰5</span>
+                            <span class="cost-time">15s</span>
                         </div>
                         <div class="resource-bar-progress hidden">
                             <div class="progress-fill"></div>
@@ -195,21 +193,19 @@
                     </div>
 
                     <!-- Pierre -->
-                    <div class="resource-bar-item" data-resource="stone">
+                    <div class="resource-bar-item clickable" data-resource="stone">
                         <div class="resource-bar-icon">🪨</div>
                         <div class="resource-bar-info">
                             <div class="resource-bar-name">Pierre</div>
-                            <div class="resource-bar-stock">Stock: <span id="stoneStockBar">0</span></div>
+                            <div class="resource-bar-stock">
+                                <span id="stoneStockBar">0</span>
+                                <span class="resource-bar-yield">+8</span>
+                                <span id="stonePendingBar" class="resource-bar-pending"></span>
+                            </div>
                         </div>
-                        <div class="resource-bar-gather">
-                            <div class="resource-bar-yield">+8</div>
-                            <div class="resource-bar-time">⏱️ 20s</div>
-                        </div>
-                        <div class="resource-bar-action">
-                            <button type="button" class="gather-btn">
-                                <span class="gather-btn-cost">💰8</span>
-                                <span class="gather-btn-label">Chercher</span>
-                            </button>
+                        <div class="resource-bar-cost">
+                            <span class="cost-value">💰8</span>
+                            <span class="cost-time">20s</span>
                         </div>
                         <div class="resource-bar-progress hidden">
                             <div class="progress-fill"></div>
@@ -218,21 +214,19 @@
                     </div>
 
                     <!-- Sable -->
-                    <div class="resource-bar-item" data-resource="sand">
+                    <div class="resource-bar-item clickable" data-resource="sand">
                         <div class="resource-bar-icon">🏜️</div>
                         <div class="resource-bar-info">
                             <div class="resource-bar-name">Sable</div>
-                            <div class="resource-bar-stock">Stock: <span id="sandStockBar">0</span></div>
+                            <div class="resource-bar-stock">
+                                <span id="sandStockBar">0</span>
+                                <span class="resource-bar-yield">+15</span>
+                                <span id="sandPendingBar" class="resource-bar-pending"></span>
+                            </div>
                         </div>
-                        <div class="resource-bar-gather">
-                            <div class="resource-bar-yield">+15</div>
-                            <div class="resource-bar-time">⏱️ 10s</div>
-                        </div>
-                        <div class="resource-bar-action">
-                            <button type="button" class="gather-btn">
-                                <span class="gather-btn-cost">💰3</span>
-                                <span class="gather-btn-label">Chercher</span>
-                            </button>
+                        <div class="resource-bar-cost">
+                            <span class="cost-value">💰3</span>
+                            <span class="cost-time">10s</span>
                         </div>
                         <div class="resource-bar-progress hidden">
                             <div class="progress-fill"></div>
@@ -241,21 +235,19 @@
                     </div>
 
                     <!-- Terre -->
-                    <div class="resource-bar-item" data-resource="dirt">
+                    <div class="resource-bar-item clickable" data-resource="dirt">
                         <div class="resource-bar-icon">🟤</div>
                         <div class="resource-bar-info">
                             <div class="resource-bar-name">Terre</div>
-                            <div class="resource-bar-stock">Stock: <span id="dirtStockBar">0</span></div>
+                            <div class="resource-bar-stock">
+                                <span id="dirtStockBar">0</span>
+                                <span class="resource-bar-yield">+12</span>
+                                <span id="dirtPendingBar" class="resource-bar-pending"></span>
+                            </div>
                         </div>
-                        <div class="resource-bar-gather">
-                            <div class="resource-bar-yield">+12</div>
-                            <div class="resource-bar-time">⏱️ 12s</div>
-                        </div>
-                        <div class="resource-bar-action">
-                            <button type="button" class="gather-btn">
-                                <span class="gather-btn-cost">💰4</span>
-                                <span class="gather-btn-label">Chercher</span>
-                            </button>
+                        <div class="resource-bar-cost">
+                            <span class="cost-value">💰4</span>
+                            <span class="cost-time">12s</span>
                         </div>
                         <div class="resource-bar-progress hidden">
                             <div class="progress-fill"></div>
@@ -264,21 +256,19 @@
                     </div>
 
                     <!-- Argile -->
-                    <div class="resource-bar-item" data-resource="clay">
+                    <div class="resource-bar-item clickable" data-resource="clay">
                         <div class="resource-bar-icon">🧱</div>
                         <div class="resource-bar-info">
                             <div class="resource-bar-name">Argile</div>
-                            <div class="resource-bar-stock">Stock: <span id="clayStockBar">0</span></div>
+                            <div class="resource-bar-stock">
+                                <span id="clayStockBar">0</span>
+                                <span class="resource-bar-yield">+6</span>
+                                <span id="clayPendingBar" class="resource-bar-pending"></span>
+                            </div>
                         </div>
-                        <div class="resource-bar-gather">
-                            <div class="resource-bar-yield">+6</div>
-                            <div class="resource-bar-time">⏱️ 25s</div>
-                        </div>
-                        <div class="resource-bar-action">
-                            <button type="button" class="gather-btn">
-                                <span class="gather-btn-cost">💰10</span>
-                                <span class="gather-btn-label">Chercher</span>
-                            </button>
+                        <div class="resource-bar-cost">
+                            <span class="cost-value">💰10</span>
+                            <span class="cost-time">25s</span>
                         </div>
                         <div class="resource-bar-progress hidden">
                             <div class="progress-fill"></div>
@@ -293,12 +283,12 @@
                             <div class="resource-bar-name">Oiseaux</div>
                             <div class="resource-bar-stock"><span id="birdsStockBar">0/0</span></div>
                         </div>
-                        <div class="resource-bar-gather">
-                            <div class="resource-bar-yield">Volières</div>
-                            <div class="resource-bar-time">1/30s</div>
+                        <div class="resource-bar-cost bird-cost">
+                            <span class="cost-value">Auto</span>
+                            <span class="cost-time" id="birdProductionTime">3min/🕊️</span>
                         </div>
-                        <div class="resource-bar-action">
-                            <span class="bird-info">Auto</span>
+                        <div class="bird-progress-bar">
+                            <div class="bird-progress-fill" id="birdProgressFill"></div>
                         </div>
                     </div>
                 </div>

@@ -199,6 +199,26 @@ function setupEventHandlers(game) {
         },
 
         /**
+         * Ajoute des oiseaux messagers
+         * @param {number} amount - Nombre d'oiseaux à ajouter (défaut: 1)
+         */
+        birds: (amount = 1) => {
+            const maxBirds = game.state.buildings.aviary || 0;
+            if (maxBirds === 0) {
+                console.log("Aucune volière construite - construisez une volière d'abord");
+                return;
+            }
+            const currentBirds = Math.floor(game.state.birds || 0);
+            if (currentBirds >= maxBirds) {
+                console.log(`Stock d'oiseaux plein (${currentBirds}/${maxBirds})`);
+                return;
+            }
+            const actualAmount = Math.min(amount, maxBirds - currentBirds);
+            game.state.birds = currentBirds + actualAmount;
+            game.notifications.success(`+${actualAmount} 🕊️ (triche)`);
+        },
+
+        /**
          * Ajoute de la population
          * @param {number} amount - Population à ajouter (défaut: 1000)
          */
