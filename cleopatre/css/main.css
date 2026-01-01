@@ -11,6 +11,11 @@ body {
     overflow: hidden;
     width: 100vw;
     height: 100vh;
+    /* Empêcher la sélection de texte sur toute l'interface */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
 }
 
 /* Écrans */
