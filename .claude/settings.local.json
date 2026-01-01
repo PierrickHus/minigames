@@ -3,7 +3,8 @@
     "allow": [
       "Bash(dir /b \"f:\\\\Projets\\\\minigames\\\\frog\")",
       "Bash(dir:*)",
-      "Bash(node --check:*)"
+      "Bash(node --check:*)",
+      "Bash(find:*)"
     ]
   }
 }

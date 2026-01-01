@@ -17,3 +17,9 @@ export { CLEOPATRA_TASKS, CLEOPATRA_IDLE_MESSAGES, REWARD_MESSAGES, DIFFICULTY_C
 
 // Données des formes de bâtiments (shapes, zones de placement)
 export { BUILDING_SHAPES, PLACEMENT_ZONES } from './building-shapes.js';
+
+// Constantes globales du jeu
+export * from '../constants.js';
+
+// Fonctions utilitaires
+export * from '../utils/helpers.js';

@@ -7,7 +7,22 @@
 // L'humeur à 0% = Game Over (exécution par Cléopâtre)
 // ==========================================
 
-import { CLEOPATRA_TASKS, CLEOPATRA_IDLE_MESSAGES, REWARD_MESSAGES, DIFFICULTY_CONFIG, BUILDINGS, RESOURCES } from '../data/index.js';
+import {
+    CLEOPATRA_TASKS,
+    CLEOPATRA_IDLE_MESSAGES,
+    DIFFICULTY_CONFIG,
+    BUILDINGS,
+    RESOURCES,
+    UI_CONFIG,
+    TIMER_CONFIG,
+    UI_COLORS,
+    formatTime,
+    updateTextIfChanged,
+    updateStyleIfChanged,
+    toggleClassIfNeeded,
+    randomChoice,
+    clamp
+} from '../data/index.js';
 import CleopatraSprite from './cleopatra-sprite.js';
 
 /**
@@ -27,11 +42,11 @@ class CleopatraSystem {
         this.activeTasks = [];
 
         /** @type {number} Nombre maximum de tâches simultanées autorisées */
-        this.maxActiveTasks = 3;
+        this.maxActiveTasks = UI_CONFIG.maxActiveTasks;
 
         // Configuration des délais de tâches
         /** @type {number} Délai entre l'ajout de nouvelles tâches (en secondes) */
-        this.taskCooldown = 45;
+        this.taskCooldown = TIMER_CONFIG.taskCooldown;
         /** @type {number} Délai initial avant la première tâche (en secondes) */
         this.initialDelay = 10;
         /** @type {number} Timestamp du dernier ajout de tâche */
@@ -41,7 +56,7 @@ class CleopatraSystem {
         /** @type {string} Message actuellement affiché par Cléopâtre */
         this.currentMessage = "Bienvenue, chef de village. Je compte sur vous pour faire prospérer ce village.";
         /** @type {number} Intervalle entre les messages idle (en ms) */
-        this.idleMessageInterval = 20000;
+        this.idleMessageInterval = TIMER_CONFIG.idleMessageInterval * 1000;
         /** @type {number} Timestamp du dernier message idle */
         this.lastIdleMessageTime = Date.now();
 
@@ -613,10 +628,10 @@ class CleopatraSystem {
      * Appelé périodiquement quand aucune tâche n'est active
      */
     showIdleMessage() {
-        const message = CLEOPATRA_IDLE_MESSAGES[
-            Math.floor(Math.random() * CLEOPATRA_IDLE_MESSAGES.length)
-        ];
-        this.setMessage(message);
+        const message = randomChoice(CLEOPATRA_IDLE_MESSAGES);
+        if (message) {
+            this.setMessage(message);
+        }
     }
 
     /**
@@ -779,26 +794,18 @@ class CleopatraSystem {
             const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
             // Couleur du timer selon l'urgence
-            let timerColor = '#4ade80'; // Vert par défaut
+            let timerColor = UI_COLORS.success;
             let shouldBeUrgent = false;
             if (task.timeRemaining < 30) {
-                timerColor = '#ff6b6b'; // Rouge - critique
+                timerColor = UI_COLORS.error;
                 shouldBeUrgent = true;
             } else if (task.timeRemaining < 60) {
-                timerColor = '#ffaa00'; // Orange - attention
+                timerColor = UI_COLORS.warning;
             }
 
-            if (element.classList.contains('urgent') !== shouldBeUrgent) {
-                element.classList.toggle('urgent', shouldBeUrgent);
-            }
-
-            const newTimerText = `⏱️ ${timeStr}`;
-            if (timerEl.textContent !== newTimerText) {
-                timerEl.textContent = newTimerText;
-            }
-            if (timerEl.style.color !== timerColor) {
-                timerEl.style.color = timerColor;
-            }
+            toggleClassIfNeeded(element, 'urgent', shouldBeUrgent);
+            updateTextIfChanged(timerEl, `⏱️ ${timeStr}`);
+            updateStyleIfChanged(timerEl, 'color', timerColor);
         }
 
         // Mettre à jour l'indicateur de progression
@@ -806,89 +813,63 @@ class CleopatraSystem {
         if (progressEl) {
             switch (task.type) {
                 case 'build': {
-                    // Afficher construits+en cours / objectif
                     const currentCount = this.game.getBuildingCount(task.building);
                     const currentPending = this.game.state.constructions.filter(c => c.buildingId === task.building).length;
                     const initialTotal = task.initialState.buildingCount
                         + (task.initialState.pendingCount || 0)
                         + (task.initialState.reservedByOtherTasks || 0);
                     const targetCount = initialTotal + task.targetCount;
-                    const newProgressText = `${currentCount + currentPending}/${targetCount}`;
-                    if (progressEl.textContent !== newProgressText) {
-                        progressEl.textContent = newProgressText;
-                    }
+                    updateTextIfChanged(progressEl, `${currentCount + currentPending}/${targetCount}`);
                     break;
                 }
                 case 'gather': {
-                    // Afficher le stock actuel
                     const currentAmount = Math.floor(this.game.state.resources[task.targetResource] || 0);
-                    const newStockText = `${currentAmount} en stock`;
-                    if (progressEl.textContent !== newStockText) {
-                        progressEl.textContent = newStockText;
-                    }
+                    updateTextIfChanged(progressEl, `${currentAmount} en stock`);
 
-                    // Afficher/masquer le bouton d'envoi selon la disponibilité
                     const sendBtn = element.querySelector('.send-btn-small');
                     if (sendBtn) {
                         const canSend = currentAmount >= task.targetCount && !task.resourcesSent;
-                        const newDisplay = canSend ? 'inline-block' : 'none';
-                        if (sendBtn.style.display !== newDisplay) {
-                            sendBtn.style.display = newDisplay;
-                        }
+                        updateStyleIfChanged(sendBtn, 'display', canSend ? 'inline-block' : 'none');
                     }
                     break;
                 }
                 case 'feed': {
-                    // Afficher nourriture actuelle / objectif
                     const currentFood = Math.floor(this.game.state.food);
-                    const newFeedText = `${currentFood}/${task.targetCount}`;
-                    if (progressEl.textContent !== newFeedText) {
-                        progressEl.textContent = newFeedText;
-                    }
+                    updateTextIfChanged(progressEl, `${currentFood}/${task.targetCount}`);
                     break;
                 }
                 case 'message': {
-                    // Afficher le statut de la tâche
                     let newText;
                     let newColor;
                     if (task.messageCompleted) {
                         newText = '✓ Envoyé';
-                        newColor = '#4ade80';
+                        newColor = UI_COLORS.success;
                     } else {
-                        // Vérifier si on peut envoyer
                         const hasBirds = this.game.state.birds >= 1;
                         const cost = this.game.getMessageCost();
                         const hasMoney = this.game.state.money >= cost;
 
                         if (hasBirds && hasMoney) {
                             newText = `💰${cost}`;
-                            newColor = '#ffd700';
+                            newColor = UI_COLORS.warningGold;
                         } else if (!hasBirds) {
                             newText = 'Pas d\'oiseau';
-                            newColor = '#ff6b6b';
+                            newColor = UI_COLORS.error;
                         } else {
                             newText = `💰${cost} (manque)`;
-                            newColor = '#ff6b6b';
+                            newColor = UI_COLORS.error;
                         }
                     }
-                    if (progressEl.textContent !== newText) {
-                        progressEl.textContent = newText;
-                    }
-                    if (progressEl.style.color !== newColor) {
-                        progressEl.style.color = newColor;
-                    }
+                    updateTextIfChanged(progressEl, newText);
+                    updateStyleIfChanged(progressEl, 'color', newColor);
 
-                    // Afficher/masquer le bouton d'envoi
                     const sendBtn = element.querySelector('.send-message-btn-cleo');
                     if (sendBtn) {
                         const hasBirds = this.game.state.birds >= 1;
                         const cost = this.game.getMessageCost();
                         const hasMoney = this.game.state.money >= cost;
                         const canSend = hasBirds && hasMoney && !task.messageCompleted;
-                        const newDisplay = canSend ? 'inline-block' : 'none';
-                        if (sendBtn.style.display !== newDisplay) {
-                            sendBtn.style.display = newDisplay;
-                        }
+                        updateStyleIfChanged(sendBtn, 'display', canSend ? 'inline-block' : 'none');
                     }
                     break;
                 }
@@ -965,12 +946,8 @@ class CleopatraSystem {
 
         // Cacher le timer de prochaine mission si max atteint
         const nextTaskTimer = document.getElementById('nextTaskTimer');
-        if (nextTaskTimer) {
-            if (this.activeTasks.length >= this.maxActiveTasks) {
-                if (nextTaskTimer.style.display !== 'none') {
-                    nextTaskTimer.style.display = 'none';
-                }
-            }
+        if (nextTaskTimer && this.activeTasks.length >= this.maxActiveTasks) {
+            updateStyleIfChanged(nextTaskTimer, 'display', 'none');
         }
     }
 
@@ -985,34 +962,20 @@ class CleopatraSystem {
 
         if (!nextTaskTimer || !countdown) return;
 
-        // Afficher le timer
-        if (nextTaskTimer.style.display !== 'flex') {
-            nextTaskTimer.style.display = 'flex';
-        }
+        updateStyleIfChanged(nextTaskTimer, 'display', 'flex');
 
         let newText;
         let newColor;
         if (timeRemaining <= 0) {
             newText = 'Imminent...';
-            newColor = '#ffd700';
+            newColor = UI_COLORS.warningGold;
         } else {
-            const seconds = Math.ceil(timeRemaining);
-            if (seconds >= 60) {
-                const mins = Math.floor(seconds / 60);
-                const secs = seconds % 60;
-                newText = secs > 0 ? `${mins}m${secs}s` : `${mins}m`;
-            } else {
-                newText = `${seconds}s`;
-            }
-            newColor = '#4ade80';
+            newText = formatTime(Math.ceil(timeRemaining));
+            newColor = UI_COLORS.success;
         }
 
-        if (countdown.textContent !== newText) {
-            countdown.textContent = newText;
-        }
-        if (countdown.style.color !== newColor) {
-            countdown.style.color = newColor;
-        }
+        updateTextIfChanged(countdown, newText);
+        updateStyleIfChanged(countdown, 'color', newColor);
     }
 
     /**
@@ -1101,8 +1064,7 @@ class CleopatraSystem {
      */
     changeMood(amount) {
         const oldMood = this.game.state.cleopatraMood;
-        // Clamp entre 0 et 100
-        this.game.state.cleopatraMood = Math.max(0, Math.min(100, oldMood + amount));
+        this.game.state.cleopatraMood = clamp(oldMood + amount, 0, 100);
 
         // Mettre à jour l'affichage de la jauge
         this.updateMoodDisplay();
@@ -1141,31 +1103,21 @@ class CleopatraSystem {
         const moodElement = document.getElementById('cleopatraMood');
         const moodBar = document.getElementById('moodBar');
 
-        if (moodElement) {
-            const newMoodText = `${mood}%`;
-            if (moodElement.textContent !== newMoodText) {
-                moodElement.textContent = newMoodText;
-            }
-        }
+        updateTextIfChanged(moodElement, `${mood}%`);
 
         if (moodBar) {
-            const newWidth = `${mood}%`;
-            if (moodBar.style.width !== newWidth) {
-                moodBar.style.width = newWidth;
-            }
+            updateStyleIfChanged(moodBar, 'width', `${mood}%`);
 
-            // Couleur selon l'humeur
+            // Couleur selon l'humeur (seuils depuis constants)
             let newBackground;
             if (mood <= 20) {
-                newBackground = 'linear-gradient(90deg, #ff4444, #ff6b6b)'; // Rouge critique
+                newBackground = `linear-gradient(90deg, ${UI_COLORS.errorDark}, ${UI_COLORS.error})`;
             } else if (mood <= 50) {
-                newBackground = 'linear-gradient(90deg, #ffaa00, #ffd700)'; // Orange attention
+                newBackground = `linear-gradient(90deg, ${UI_COLORS.warning}, ${UI_COLORS.warningGold})`;
             } else {
-                newBackground = 'linear-gradient(90deg, #4ade80, #22c55e)'; // Vert OK
+                newBackground = `linear-gradient(90deg, ${UI_COLORS.success}, ${UI_COLORS.successDark})`;
             }
-            if (moodBar.style.background !== newBackground) {
-                moodBar.style.background = newBackground;
-            }
+            updateStyleIfChanged(moodBar, 'background', newBackground);
         }
     }
 

@@ -10,7 +10,7 @@
 // - Sélection de périodes (1min, 5min, 10min, 30min, 1h)
 // ==========================================
 
-import { BUILDINGS } from '../data/index.js';
+import { BUILDINGS, UI_COLORS, formatTime } from '../data/index.js';
 
 /**
  * Menu de statistiques détaillé avec graphiques interactifs
@@ -438,7 +438,7 @@ class StatsMenu {
             stone: 'Pierre'
         };
 
-        const changeColor = change > 0 ? '#4ade80' : change < 0 ? '#ff6b6b' : '#888';
+        const changeColor = change > 0 ? UI_COLORS.success : change < 0 ? UI_COLORS.error : UI_COLORS.neutral;
         const changeSign = change > 0 ? '+' : '';
         const periodLabel = this.getPeriodLabel(periodSeconds);
 
@@ -604,7 +604,7 @@ class StatsMenu {
             const res = resourceNames[key];
             if (!res) continue;
 
-            const rateColor = stat.rate > 0 ? '#4ade80' : stat.rate < 0 ? '#ff6b6b' : '#888';
+            const rateColor = stat.rate > 0 ? UI_COLORS.success : stat.rate < 0 ? UI_COLORS.error : UI_COLORS.neutral;
 
             html += `
                 <div class="mega-stat-item">
@@ -693,7 +693,7 @@ class StatsMenu {
         let html = '';
         alerts.forEach(alert => {
             const icon = alert.level === 'critical' ? '🚨' : alert.level === 'warning' ? '⚠️' : '📉';
-            const color = alert.level === 'critical' ? '#ff6b6b' : alert.level === 'warning' ? '#ffaa00' : '#60a5fa';
+            const color = alert.level === 'critical' ? UI_COLORS.error : alert.level === 'warning' ? UI_COLORS.warning : '#60a5fa';
 
             html += `
                 <div class="mega-alert-item" style="border-left-color: ${color}">
@@ -719,8 +719,6 @@ class StatsMenu {
 
         const state = this.game.state;
         const gameTime = state.gameTime || 0;
-        const minutes = Math.floor(gameTime / 60);
-        const seconds = Math.floor(gameTime % 60);
 
         // Compter le total de bâtiments
         let totalBuildings = 0;
@@ -732,7 +730,7 @@ class StatsMenu {
         const gatheringsInProgress = state.gatheringTasks.length;
 
         const stats = [
-            { label: 'Temps de jeu', value: `${minutes}m ${seconds}s` },
+            { label: 'Temps de jeu', value: formatTime(gameTime) },
             { label: 'Bâtiments construits', value: totalBuildings },
             { label: 'Constructions en cours', value: constructionsInProgress },
             { label: 'Collectes en cours', value: gatheringsInProgress },

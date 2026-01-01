@@ -8,34 +8,16 @@
 // - Affichage des statistiques de production
 // ==========================================
 
-import { BUILDINGS, RESOURCES, TIER_NAMES, BUILDING_TIER_UNLOCK } from '../data/index.js';
-
-/**
- * Formate un temps en secondes en format lisible
- * Exemples: 3661s → "1h1m", 90s → "1m30s", 45s → "45s"
- * @param {number} seconds - Temps en secondes à formater
- * @returns {string} Temps formaté en chaîne lisible
- */
-function formatTime(seconds) {
-    const s = Math.ceil(seconds);
-    if (s >= 3600) {
-        // Plus d'une heure: afficher heures et minutes
-        const hours = Math.floor(s / 3600);
-        const mins = Math.floor((s % 3600) / 60);
-        if (mins > 0) {
-            return `${hours}h${mins}m`;
-        }
-        return `${hours}h`;
-    }
-    if (s >= 60) {
-        // Plus d'une minute: afficher minutes et secondes
-        const mins = Math.floor(s / 60);
-        const secs = s % 60;
-        return secs > 0 ? `${mins}m${secs}s` : `${mins}m`;
-    }
-    // Moins d'une minute: afficher les secondes uniquement
-    return `${s}s`;
-}
+import {
+    BUILDINGS,
+    RESOURCES,
+    TIER_NAMES,
+    BUILDING_TIER_UNLOCK,
+    formatTime,
+    updateTextIfChanged,
+    updateStyleIfChanged,
+    toggleClassIfNeeded
+} from '../data/index.js';
 
 /**
  * Gestionnaire des panneaux d'interface utilisateur
@@ -880,73 +862,45 @@ class PanelManager {
                 newBtnText = 'Envoyer 🕊️';
             }
 
-            const newBirdsCount = `${currentBirds}/${maxBirds}`;
-            const newCostText = `💰${messageCost}`;
-
-            // Mettre à jour UNIQUEMENT si les valeurs ont changé
-            const descDiv = sendMessageItem.querySelector('.task-desc');
-            if (descDiv && descDiv.textContent !== newDescText) {
-                descDiv.textContent = newDescText;
-            }
-
-            const birdsCountEl = sendMessageItem.querySelector('.message-birds-count');
-            if (birdsCountEl && birdsCountEl.textContent !== newBirdsCount) {
-                birdsCountEl.textContent = newBirdsCount;
-            }
-
-            const sentCountEl = sendMessageItem.querySelector('.message-sent-count');
-            if (sentCountEl && sentCountEl.textContent !== newSentCount) {
-                sentCountEl.textContent = newSentCount;
-            }
+            // Mettre à jour les éléments DOM avec les helpers
+            updateTextIfChanged(sendMessageItem.querySelector('.task-desc'), newDescText);
+            updateTextIfChanged(sendMessageItem.querySelector('.message-birds-count'), `${currentBirds}/${maxBirds}`);
+            updateTextIfChanged(sendMessageItem.querySelector('.message-sent-count'), newSentCount);
 
             const costValueEl = sendMessageItem.querySelector('.message-cost .cost-value');
             if (costValueEl) {
-                if (costValueEl.textContent !== newCostText) {
-                    costValueEl.textContent = newCostText;
-                }
-                costValueEl.classList.toggle('insufficient', !hasEnoughMoney);
+                updateTextIfChanged(costValueEl, `💰${messageCost}`);
+                toggleClassIfNeeded(costValueEl, 'insufficient', !hasEnoughMoney);
             }
 
             const sendBtn = sendMessageItem.querySelector('.send-message-btn');
             if (sendBtn) {
                 sendBtn.disabled = !canSend;
-                if (sendBtn.textContent !== newBtnText) {
-                    sendBtn.textContent = newBtnText;
-                }
+                updateTextIfChanged(sendBtn, newBtnText);
             }
 
             // Afficher/masquer l'indicateur de verrouillage
-            const lockedDiv = sendMessageItem.querySelector('.task-locked');
-            if (lockedDiv) {
-                lockedDiv.style.display = !hasAviary ? 'block' : 'none';
-            }
+            updateStyleIfChanged(sendMessageItem.querySelector('.task-locked'), 'display', !hasAviary ? 'block' : 'none');
 
             // Afficher les infos de mission si disponible
             const missionInfoDiv = sendMessageItem.querySelector('.task-mission-info');
             if (missionInfoDiv) {
                 if (hasMessageTask && uncompletedMessageTask) {
-                    // Calculer le temps restant
                     const timeLeft = uncompletedMessageTask.timeRemaining;
                     const newTimeText = formatTime(timeLeft);
-
-                    // Ne mettre à jour que si nécessaire
                     const timeSpan = missionInfoDiv.querySelector('.mission-time');
+
                     if (missionInfoDiv.style.display !== 'flex') {
                         missionInfoDiv.innerHTML = `
                             <span class="mission-progress">📨 0/1</span>
                             <span class="mission-time">⏱️ ${newTimeText}</span>
                         `;
                         missionInfoDiv.style.display = 'flex';
-                    } else if (timeSpan) {
-                        const expectedTimeText = `⏱️ ${newTimeText}`;
-                        if (timeSpan.textContent !== expectedTimeText) {
-                            timeSpan.textContent = expectedTimeText;
-                        }
+                    } else {
+                        updateTextIfChanged(timeSpan, `⏱️ ${newTimeText}`);
                     }
                 } else {
-                    if (missionInfoDiv.style.display !== 'none') {
-                        missionInfoDiv.style.display = 'none';
-                    }
+                    updateStyleIfChanged(missionInfoDiv, 'display', 'none');
                 }
             }
         }
@@ -976,151 +930,96 @@ class PanelManager {
             const gatherings = state.gatheringTasks.filter(t => t.resourceId === resource.id);
             const isGathering = gatherings.length > 0;
 
-            // Mettre à jour les classes CSS seulement si nécessaire
-            if (item.classList.contains('disabled') !== !canGather) {
-                item.classList.toggle('disabled', !canGather);
-            }
-            if (item.classList.contains('gathering') !== isGathering) {
-                item.classList.toggle('gathering', isGathering);
-            }
+            // Mettre à jour les classes CSS
+            toggleClassIfNeeded(item, 'disabled', !canGather);
+            toggleClassIfNeeded(item, 'gathering', isGathering);
 
             // Mettre à jour le stock affiché
             const stockEl = item.querySelector(`#${resource.id}StockBar`);
-            if (stockEl) {
-                const newStock = String(Math.floor(state.resources[resource.id]));
-                if (stockEl.textContent !== newStock) {
-                    stockEl.textContent = newStock;
-                }
-            }
+            updateTextIfChanged(stockEl, String(Math.floor(state.resources[resource.id])));
 
             // Mettre à jour les ressources en cours de récupération
             const pendingEl = item.querySelector(`#${resource.id}PendingBar`);
-            if (pendingEl) {
-                const pendingAmount = gatherings.length * resource.gatherAmount;
-                const newPending = pendingAmount > 0 ? ` +${pendingAmount}` : '';
-                if (pendingEl.textContent !== newPending) {
-                    pendingEl.textContent = newPending;
-                }
-            }
+            const pendingAmount = gatherings.length * resource.gatherAmount;
+            updateTextIfChanged(pendingEl, pendingAmount > 0 ? ` +${pendingAmount}` : '');
 
             // Mettre à jour le rendement affiché
             const yieldEl = item.querySelector('.resource-bar-yield');
-            if (yieldEl) {
-                const newYield = workerCount > 1 ? `+${totalGather} (x${workerCount})` : `+${resource.gatherAmount}`;
-                if (yieldEl.textContent !== newYield) {
-                    yieldEl.textContent = newYield;
-                }
-            }
+            const newYield = workerCount > 1 ? `+${totalGather} (x${workerCount})` : `+${resource.gatherAmount}`;
+            updateTextIfChanged(yieldEl, newYield);
 
             // Mettre à jour le coût affiché
             const costEl = item.querySelector('.cost-value');
             if (costEl) {
                 const displayCost = workerCount > 0 ? totalCost : resource.gatherCost;
-                const newCost = `💰${displayCost}`;
-                if (costEl.textContent !== newCost) {
-                    costEl.textContent = newCost;
-                }
-                const isInsufficient = state.money < displayCost;
-                if (costEl.classList.contains('insufficient') !== isInsufficient) {
-                    costEl.classList.toggle('insufficient', isInsufficient);
-                }
+                updateTextIfChanged(costEl, `💰${displayCost}`);
+                toggleClassIfNeeded(costEl, 'insufficient', state.money < displayCost);
             }
 
             // Mettre à jour la barre de progression de collecte
             const progressContainer = item.querySelector('.resource-bar-progress');
             if (progressContainer) {
-                const isHidden = progressContainer.classList.contains('hidden');
+                toggleClassIfNeeded(progressContainer, 'hidden', !isGathering);
                 if (isGathering) {
-                    if (isHidden) {
-                        progressContainer.classList.remove('hidden');
-                    }
                     const task = gatherings[0];
                     const progress = (task.elapsed / task.totalTime) * 100;
                     const progressFill = progressContainer.querySelector('.progress-fill');
                     const progressText = progressContainer.querySelector('.progress-text');
-                    if (progressFill) {
-                        const newWidth = `${progress}%`;
-                        if (progressFill.style.width !== newWidth) {
-                            progressFill.style.width = newWidth;
-                        }
-                    }
-                    if (progressText) {
-                        const remaining = task.totalTime - task.elapsed;
-                        const suffix = gatherings.length > 1 ? ` +${gatherings.length - 1}` : '';
-                        const newText = `${Math.floor(progress)}% - ${formatTime(remaining)}${suffix}`;
-                        if (progressText.textContent !== newText) {
-                            progressText.textContent = newText;
-                        }
-                    }
-                } else {
-                    if (!isHidden) {
-                        progressContainer.classList.add('hidden');
-                    }
+                    updateStyleIfChanged(progressFill, 'width', `${progress}%`);
+                    const remaining = task.totalTime - task.elapsed;
+                    const suffix = gatherings.length > 1 ? ` +${gatherings.length - 1}` : '';
+                    updateTextIfChanged(progressText, `${Math.floor(progress)}% - ${formatTime(remaining)}${suffix}`);
                 }
             }
         });
 
         // Affichage spécial pour les oiseaux (pas de bouton de collecte)
+        this.updateBirdsDisplay(container, state);
+    }
+
+    /**
+     * Met à jour l'affichage des oiseaux dans la barre de ressources
+     * @param {HTMLElement} container - Container de la barre de ressources
+     * @param {object} state - État du jeu
+     */
+    updateBirdsDisplay(container, state) {
         const birdsItem = container.querySelector('[data-resource="birds"]');
-        if (birdsItem) {
-            const aviaries = this.game.getBuildingCount('aviary');
-            const maxBirds = aviaries * 1;
-            const currentBirds = state.birds;
-            const birdsStockEl = birdsItem.querySelector('#birdsStockBar');
-            if (birdsStockEl) {
-                const newBirdsStock = `${Math.floor(currentBirds)}/${maxBirds}`;
-                if (birdsStockEl.textContent !== newBirdsStock) {
-                    birdsStockEl.textContent = newBirdsStock;
-                }
+        if (!birdsItem) return;
+
+        const aviaries = this.game.getBuildingCount('aviary');
+        const maxBirds = aviaries;
+        const currentBirds = state.birds;
+
+        // Stock
+        const birdsStockEl = birdsItem.querySelector('#birdsStockBar');
+        updateTextIfChanged(birdsStockEl, `${Math.floor(currentBirds)}/${maxBirds}`);
+
+        // Temps de production: 3 volières = 1 oiseau/min → 180/N secondes par oiseau
+        const costTimeEl = birdsItem.querySelector('.cost-time');
+        const progressFill = birdsItem.querySelector('#birdProgressFill');
+
+        if (aviaries > 0) {
+            const secondsPerBird = 180 / aviaries;
+            const mins = Math.floor(secondsPerBird / 60);
+            const secs = Math.floor(secondsPerBird % 60);
+
+            let timeText;
+            if (mins > 0 && secs > 0) {
+                timeText = `${mins}m${secs}s/🕊️`;
+            } else if (mins > 0) {
+                timeText = `${mins}min/🕊️`;
+            } else {
+                timeText = `${secs}s/🕊️`;
             }
+            updateTextIfChanged(costTimeEl, timeText);
 
-            // Calculer le temps de production et la progression
-            // 3 volières = 1 oiseau/min, donc avec N volières: 180/N secondes par oiseau
-            const costTimeEl = birdsItem.querySelector('.cost-time');
-            const progressFill = birdsItem.querySelector('#birdProgressFill');
-
-            if (aviaries > 0) {
-                const secondsPerBird = 180 / aviaries;
-
-                // Afficher le temps exact (minutes et secondes)
-                if (costTimeEl) {
-                    const mins = Math.floor(secondsPerBird / 60);
-                    const secs = Math.floor(secondsPerBird % 60);
-                    let newTimeText;
-                    if (mins > 0 && secs > 0) {
-                        newTimeText = `${mins}m${secs}s/🕊️`;
-                    } else if (mins > 0) {
-                        newTimeText = `${mins}min/🕊️`;
-                    } else {
-                        newTimeText = `${secs}s/🕊️`;
-                    }
-                    if (costTimeEl.textContent !== newTimeText) {
-                        costTimeEl.textContent = newTimeText;
-                    }
-                }
-
-                // Calculer la progression vers le prochain oiseau
-                // La partie décimale de currentBirds représente la progression
-                if (progressFill) {
-                    let newWidth;
-                    if (currentBirds >= maxBirds) {
-                        newWidth = '0%';
-                    } else {
-                        const progress = (currentBirds % 1) * 100;
-                        newWidth = `${progress}%`;
-                    }
-                    if (progressFill.style.width !== newWidth) {
-                        progressFill.style.width = newWidth;
-                    }
-                }
-            }
-
-            // Masquer si aucune volière construite
-            const shouldDisplay = aviaries > 0 ? '' : 'none';
-            if (birdsItem.style.display !== shouldDisplay) {
-                birdsItem.style.display = shouldDisplay;
-            }
+            // Progression vers le prochain oiseau
+            const newWidth = currentBirds >= maxBirds ? '0%' : `${(currentBirds % 1) * 100}%`;
+            updateStyleIfChanged(progressFill, 'width', newWidth);
         }
+
+        // Masquer si aucune volière construite
+        updateStyleIfChanged(birdsItem, 'display', aviaries > 0 ? '' : 'none');
     }
 
     /**

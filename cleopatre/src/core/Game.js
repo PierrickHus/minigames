@@ -789,59 +789,45 @@ class Game {
 
     /**
      * Met à jour la production automatique des bâtiments
-     * Calcule la production par seconde et l'applique
+     * Parcourt tous les bâtiments et applique leurs effets de production
      * @param {number} dt - Delta time en secondes
      */
     updateProduction(dt) {
-        // Production de nourriture
-        const fields = this.state.buildings['field'] || 0;
-        this.state.food += fields * (5 / 60) * dt;
+        const perSecondFactor = dt / 60;
 
-        const bakeries = this.state.buildings['bakery'] || 0;
-        this.state.food += bakeries * (15 / 60) * dt;
+        for (const [buildingId, count] of Object.entries(this.state.buildings)) {
+            if (count <= 0) continue;
 
-        const farms = this.state.buildings['farm'] || 0;
-        this.state.food += farms * (10 / 60) * dt;
+            const building = BUILDINGS[buildingId];
+            if (!building?.effects) continue;
 
-        const gardens = this.state.buildings['gardens'] || 0;
-        this.state.food += gardens * (5 / 60) * dt;
+            const effects = building.effects;
 
-        // Production d'eau
-        const wells = this.state.buildings['well'] || 0;
-        this.state.water += wells * (10 / 60) * dt;
+            if (effects.foodPerMinute) {
+                this.state.food += count * effects.foodPerMinute * perSecondFactor;
+            }
+            if (effects.waterPerMinute) {
+                this.state.water += count * effects.waterPerMinute * perSecondFactor;
+            }
+            if (effects.moneyPerMinute) {
+                this.state.money += count * effects.moneyPerMinute * perSecondFactor;
+            }
+            if (effects.woodPerMinute) {
+                this.state.resources.wood += count * effects.woodPerMinute * perSecondFactor;
+            }
+            if (effects.stonePerMinute) {
+                this.state.resources.stone += count * effects.stonePerMinute * perSecondFactor;
+            }
+        }
 
-        const cisterns = this.state.buildings['cistern'] || 0;
-        this.state.water += cisterns * (20 / 60) * dt;
-
-        // Production d'argent
-        const markets = this.state.buildings['market'] || 0;
-        this.state.money += markets * (20 / 60) * dt;
-
-        const harbors = this.state.buildings['harbor'] || 0;
-        this.state.money += harbors * (30 / 60) * dt;
-
-        const coliseums = this.state.buildings['coliseum'] || 0;
-        this.state.money += coliseums * (25 / 60) * dt;
-
-        // Production de ressources
-        const quarries = this.state.buildings['quarry'] || 0;
-        this.state.resources.stone += quarries * (3 / 60) * dt;
-
-        const lumbermills = this.state.buildings['lumbermill'] || 0;
-        this.state.resources.wood += lumbermills * (3 / 60) * dt;
-
-        const workshops = this.state.buildings['workshop'] || 0;
-        this.state.resources.wood += workshops * (2 / 60) * dt;
-        this.state.resources.stone += workshops * (2 / 60) * dt;
-
-        // Production d'oiseaux (volières)
-        // 3 volières = 1 oiseau/min, donc 1 volière = 1 oiseau/3min = 1/180 par seconde
-        // Capacité: 1 oiseau par volière
+        // Production d'oiseaux (cas spécial avec capacité limitée)
         const aviaries = this.state.buildings['aviary'] || 0;
-        this.state.birds += aviaries * (1 / 180) * dt;
-        const maxBirds = aviaries * 1;
-        if (this.state.birds > maxBirds) {
-            this.state.birds = maxBirds;
+        if (aviaries > 0) {
+            const birdsPerSecond = aviaries / 180;
+            this.state.birds = Math.min(
+                this.state.birds + birdsPerSecond * dt,
+                aviaries
+            );
         }
     }
 

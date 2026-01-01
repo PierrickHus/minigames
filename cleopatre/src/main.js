@@ -11,6 +11,7 @@
 
 import Game from './core/Game.js';
 import SettingsManager from './ui/settings.js';
+import { formatTime } from './data/index.js';
 
 /**
  * Affiche l'écran de chargement avec une barre de progression animée
@@ -457,13 +458,6 @@ function setupEventHandlers(game) {
                 const { BUILDING_TIER_UNLOCK } = module;
                 const gameTime = game.state.gameTime || 0;
 
-                // Fonction locale pour formater le temps
-                const formatTime = (s) => {
-                    if (s >= 3600) return `${Math.floor(s/3600)}h${Math.floor((s%3600)/60)}m`;
-                    if (s >= 60) return `${Math.floor(s/60)}m${Math.ceil(s%60)}s`;
-                    return `${Math.ceil(s)}s`;
-                };
-
                 console.log('=== TIERS DE BÂTIMENTS ===');
                 console.log(`Temps de jeu: ${formatTime(gameTime)}`);
                 console.log('');
@@ -508,7 +502,7 @@ function setupEventHandlers(game) {
                 game.state.gameTime = requiredTime;
                 game.notifications.success(`${config.icon} Tier ${tier} débloqué !`);
                 console.log(`Tier ${tier} (${config.name}) débloqué !`);
-                console.log(`Temps de jeu avancé à ${Math.floor(requiredTime / 60)}m${Math.floor(requiredTime % 60)}s`);
+                console.log(`Temps de jeu avancé à ${formatTime(requiredTime)}`);
             });
         },
 
@@ -536,7 +530,7 @@ function setupEventHandlers(game) {
                 game.state.gameTime = targetTime;
                 game.notifications.warning(`🔒 Tier ${tier} verrouillé !`);
                 console.log(`Tier ${tier} verrouillé !`);
-                console.log(`Temps de jeu reculé à ${Math.floor(targetTime / 60)}m${Math.floor(targetTime % 60)}s`);
+                console.log(`Temps de jeu reculé à ${formatTime(targetTime)}`);
             });
         },
 
@@ -551,7 +545,7 @@ function setupEventHandlers(game) {
                 game.state.gameTime = tier3Time;
                 game.notifications.success('👑 Tous les tiers débloqués !');
                 console.log('Tous les tiers de bâtiments débloqués !');
-                console.log(`Temps de jeu avancé à ${Math.floor(tier3Time / 60)}m${Math.floor(tier3Time % 60)}s`);
+                console.log(`Temps de jeu avancé à ${formatTime(tier3Time)}`);
             });
         },
 
@@ -669,15 +663,14 @@ function setupEventHandlers(game) {
         time: (seconds) => {
             if (typeof seconds !== 'number' || seconds <= 0) {
                 console.log('Usage: cheat.time(300) - Avance le temps de 300 secondes (5 minutes)');
-                console.log(`Temps actuel: ${Math.floor(game.state.gameTime / 60)}m${Math.floor(game.state.gameTime % 60)}s`);
+                console.log(`Temps actuel: ${formatTime(game.state.gameTime)}`);
                 return;
             }
 
             game.state.gameTime += seconds;
-            const totalTime = game.state.gameTime;
-            game.notifications.info(`⏰ +${Math.floor(seconds / 60)}m${Math.floor(seconds % 60)}s`);
-            console.log(`Temps avancé de ${seconds}s`);
-            console.log(`Nouveau temps: ${Math.floor(totalTime / 60)}m${Math.floor(totalTime % 60)}s`);
+            game.notifications.info(`⏰ +${formatTime(seconds)}`);
+            console.log(`Temps avancé de ${formatTime(seconds)}`);
+            console.log(`Nouveau temps: ${formatTime(game.state.gameTime)}`);
         },
 
         /**
