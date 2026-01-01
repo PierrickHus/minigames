@@ -1,15 +1,25 @@
 // ==========================================
 // GESTION DES PANNEAUX D'INTERFACE
 // ==========================================
+// Ce module gère tous les panneaux de l'interface utilisateur du jeu:
+// - Liste des bâtiments constructibles (avec système de tiers)
+// - Liste des tâches et actions (nourrir, envoyer messages)
+// - Barre de ressources collectables en bas de l'écran
+// - Affichage des statistiques de production
+// ==========================================
 
 import { BUILDINGS, RESOURCES, TIER_NAMES, BUILDING_TIER_UNLOCK } from '../data/index.js';
 
 /**
- * Formate un temps en secondes en format lisible (ex: 1h30m, 1m26s, 45s)
+ * Formate un temps en secondes en format lisible
+ * Exemples: 3661s → "1h1m", 90s → "1m30s", 45s → "45s"
+ * @param {number} seconds - Temps en secondes à formater
+ * @returns {string} Temps formaté en chaîne lisible
  */
 function formatTime(seconds) {
     const s = Math.ceil(seconds);
     if (s >= 3600) {
+        // Plus d'une heure: afficher heures et minutes
         const hours = Math.floor(s / 3600);
         const mins = Math.floor((s % 3600) / 60);
         if (mins > 0) {
@@ -18,27 +28,47 @@ function formatTime(seconds) {
         return `${hours}h`;
     }
     if (s >= 60) {
+        // Plus d'une minute: afficher minutes et secondes
         const mins = Math.floor(s / 60);
         const secs = s % 60;
         return secs > 0 ? `${mins}m${secs}s` : `${mins}m`;
     }
+    // Moins d'une minute: afficher les secondes uniquement
     return `${s}s`;
 }
 
+/**
+ * Gestionnaire des panneaux d'interface utilisateur
+ * Gère l'affichage et l'interaction avec les différents panneaux du jeu:
+ * bâtiments, tâches, ressources et statistiques
+ */
 class PanelManager {
+    /**
+     * Crée une nouvelle instance du gestionnaire de panneaux
+     * @param {Game} game - Instance du jeu principal
+     */
     constructor(game) {
+        /** @type {Game} Référence au jeu principal */
         this.game = game;
+
+        /** @type {string} Onglet actuellement actif ('buildings', 'tasks', 'stats') */
         this.activeTab = 'buildings';
-        this.gatherMultiplier = 1; // Multiplicateur actuel pour la collecte
-        this.buildMultiplier = 1; // Multiplicateur actuel pour la construction
+
+        /** @type {number|string} Multiplicateur pour la collecte de ressources (1, 5, 10 ou 'max') */
+        this.gatherMultiplier = 1;
+
+        /** @type {number|string} Multiplicateur pour la construction de bâtiments (1, 5, 10 ou 'max') */
+        this.buildMultiplier = 1;
+
+        // Initialisation des composants UI
         this.setupTabs();
-        this.setupMultiplierSelector();
         this.setupBuildMultiplierSelector();
-        this.initGatherButtons();
+        this.setupResourcesBar();
     }
 
     /**
      * Configure les onglets du panneau d'actions
+     * Attache les événements click aux boutons d'onglets
      */
     setupTabs() {
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -50,100 +80,134 @@ class PanelManager {
     }
 
     /**
-     * Change d'onglet
+     * Change l'onglet actif du panneau d'actions
+     * Met à jour les classes CSS et rafraîchit le contenu
+     * @param {string} tabName - Nom de l'onglet ('buildings', 'tasks', 'stats')
      */
     switchTab(tabName) {
         this.activeTab = tabName;
 
-        // Mettre à jour les boutons
+        // Mettre à jour les boutons d'onglets (classe 'active')
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === tabName);
         });
 
-        // Mettre à jour le contenu
+        // Mettre à jour le contenu visible
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.toggle('active', content.id === `${tabName}Tab`);
         });
 
-        // Rafraîchir le contenu
+        // Rafraîchir le contenu du nouvel onglet
         this.refresh();
     }
 
     /**
-     * Configure le sélecteur de multiplicateur
+     * Configure la barre de ressources en bas de l'écran
+     * Initialise le sélecteur de multiplicateur et les boutons de collecte
      */
-    setupMultiplierSelector() {
-        const container = document.getElementById('gatherButtons');
-        if (!container) return;
-
-        // Vérifier si le sélecteur existe déjà pour éviter les doublons
-        const existingSelector = document.getElementById('multiplierSelector');
-        if (existingSelector) {
-            // Réattacher les événements sur le sélecteur existant
-            existingSelector.querySelectorAll('.mult-btn').forEach(btn => {
-                btn.onclick = () => this.setMultiplier(btn.dataset.mult === 'max' ? 'max' : parseInt(btn.dataset.mult));
+    setupResourcesBar() {
+        // Configuration du sélecteur de multiplicateur de collecte
+        const multiplierContainer = document.getElementById('resourceMultiplierBar');
+        if (multiplierContainer) {
+            multiplierContainer.querySelectorAll('.mult-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const mult = btn.dataset.mult === 'max' ? 'max' : parseInt(btn.dataset.mult);
+                    this.setGatherMultiplier(mult);
+                });
             });
-            return;
         }
 
-        // Créer le sélecteur de multiplicateur
-        const selector = document.createElement('div');
-        selector.className = 'multiplier-selector';
-        selector.id = 'multiplierSelector';
+        // Configuration des boutons de collecte pour chaque ressource
+        const resourcesList = document.getElementById('resourcesBarList');
+        if (resourcesList) {
+            resourcesList.querySelectorAll('.resource-bar-item').forEach(item => {
+                const resourceId = item.dataset.resource;
+                // Les oiseaux ne sont pas collectables manuellement
+                if (resourceId === 'birds') return;
 
-        const multipliers = [1, 5, 10, 'max'];
-        multipliers.forEach(mult => {
-            const btn = document.createElement('button');
-            btn.className = `mult-btn ${mult === 1 ? 'active' : ''}`;
-            btn.dataset.mult = mult;
-            btn.textContent = mult === 'max' ? 'Max' : `x${mult}`;
-            btn.addEventListener('click', () => this.setMultiplier(mult));
-            selector.appendChild(btn);
-        });
+                const gatherBtn = item.querySelector('.gather-btn');
+                if (gatherBtn) {
+                    gatherBtn.addEventListener('click', () => {
+                        const resource = RESOURCES[resourceId];
+                        if (!resource) return;
 
-        container.parentNode.insertBefore(selector, container);
+                        // Calculer le nombre d'ouvriers à envoyer selon le multiplicateur
+                        const count = this.getActualWorkerCount(resource);
+                        if (count > 0) {
+                            // Lancer autant de collectes que possible
+                            for (let i = 0; i < count; i++) {
+                                this.game.gatherResource(resourceId);
+                            }
+                        } else {
+                            // Afficher un message d'erreur explicatif
+                            const state = this.game.state;
+                            if (state.availablePeasants < 1) {
+                                this.game.notifications.error("Pas d'ouvriers disponibles !");
+                            } else if (state.money < resource.gatherCost) {
+                                this.game.notifications.error("Pas assez d'argent !");
+                            } else {
+                                this.game.notifications.error("Action impossible !");
+                            }
+                        }
+                    });
+                }
+            });
+        }
     }
 
     /**
-     * Change le multiplicateur
+     * Change le multiplicateur de collecte de ressources
+     * @param {number|string} mult - Nouveau multiplicateur (1, 5, 10 ou 'max')
      */
-    setMultiplier(mult) {
+    setGatherMultiplier(mult) {
         this.gatherMultiplier = mult;
 
-        // Mettre à jour les boutons actifs
-        document.querySelectorAll('.mult-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.mult === String(mult));
-        });
+        // Mettre à jour l'affichage des boutons actifs
+        const container = document.getElementById('resourceMultiplierBar');
+        if (container) {
+            container.querySelectorAll('.mult-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.mult === String(mult));
+            });
+        }
 
-        // Rafraîchir les boutons de collecte
-        this.updateGatherButtons();
+        // Rafraîchir la barre de ressources pour montrer les nouveaux coûts
+        this.updateResourcesBar();
     }
 
     /**
-     * Calcule le nombre réel d'ouvriers à envoyer
+     * Calcule le nombre réel d'ouvriers à envoyer pour une collecte
+     * Prend en compte: multiplicateur choisi, argent disponible, ouvriers disponibles
+     * @param {object} resource - Objet ressource avec gatherCost
+     * @returns {number} Nombre d'ouvriers pouvant être envoyés
      */
     getActualWorkerCount(resource) {
         const state = this.game.state;
+        // Maximum d'ouvriers qu'on peut payer
         const maxAffordable = Math.floor(state.money / resource.gatherCost);
+        // Ouvriers disponibles
         const maxWorkers = state.availablePeasants;
 
         if (this.gatherMultiplier === 'max') {
+            // Mode max: envoyer autant que possible
             return Math.min(maxAffordable, maxWorkers);
         }
 
+        // Mode multiplicateur fixe: limité par le multiplicateur, l'argent et les ouvriers
         return Math.min(this.gatherMultiplier, maxAffordable, maxWorkers);
     }
 
     /**
-     * Configure le sélecteur de multiplicateur pour les bâtiments
+     * Configure le sélecteur de multiplicateur pour la construction de bâtiments
+     * Crée dynamiquement le sélecteur si nécessaire
      */
     setupBuildMultiplierSelector() {
         const container = document.getElementById('buildingsList');
         if (!container) return;
 
-        // Vérifier si le sélecteur existe déjà
+        // Vérifier si le sélecteur existe déjà (éviter les doublons)
         const existingSelector = document.getElementById('buildMultiplierSelector');
         if (existingSelector) {
+            // Réattacher les événements
             existingSelector.querySelectorAll('.mult-btn').forEach(btn => {
                 btn.onclick = () => this.setBuildMultiplier(btn.dataset.mult === 'max' ? 'max' : parseInt(btn.dataset.mult));
             });
@@ -155,6 +219,7 @@ class PanelManager {
         selector.className = 'multiplier-selector';
         selector.id = 'buildMultiplierSelector';
 
+        // Boutons disponibles: x1, x5, x10, Max
         const multipliers = [1, 5, 10, 'max'];
         multipliers.forEach(mult => {
             const btn = document.createElement('button');
@@ -165,11 +230,13 @@ class PanelManager {
             selector.appendChild(btn);
         });
 
+        // Insérer avant la liste des bâtiments
         container.parentNode.insertBefore(selector, container);
     }
 
     /**
-     * Change le multiplicateur de construction
+     * Change le multiplicateur de construction de bâtiments
+     * @param {number|string} mult - Nouveau multiplicateur (1, 5, 10 ou 'max')
      */
     setBuildMultiplier(mult) {
         this.buildMultiplier = mult;
@@ -187,7 +254,11 @@ class PanelManager {
     }
 
     /**
-     * Calcule le nombre réel de bâtiments à construire
+     * Calcule le nombre réel de bâtiments constructibles avec le multiplicateur actuel
+     * Simule les coûts cumulés avec le scaling logarithmique pour déterminer
+     * combien de bâtiments on peut construire avec les ressources actuelles
+     * @param {object} building - Objet bâtiment avec cost, maxCount, id
+     * @returns {number} Nombre de bâtiments pouvant être construits
      */
     getActualBuildCount(building) {
         const state = this.game.state;
@@ -195,100 +266,80 @@ class PanelManager {
         const pendingCount = state.constructions.filter(c => c.buildingId === building.id).length;
         const remainingSlots = building.maxCount - builtCount - pendingCount;
 
-        // Calculer combien on peut construire avec les ressources
-        let maxByMoney = Math.floor(state.money / building.cost.money);
-        let maxByWorkers = state.availablePeasants;
-        let maxByResources = Infinity;
+        // Vérifications préalables
+        if (remainingSlots <= 0) return 0;
+        if (state.availablePeasants < 1) return 0;
 
-        // Vérifier chaque ressource
-        if (building.cost.wood) {
-            maxByResources = Math.min(maxByResources, Math.floor(state.resources.wood / building.cost.wood));
-        }
-        if (building.cost.stone) {
-            maxByResources = Math.min(maxByResources, Math.floor(state.resources.stone / building.cost.stone));
-        }
-        if (building.cost.sand) {
-            maxByResources = Math.min(maxByResources, Math.floor(state.resources.sand / building.cost.sand));
-        }
-        if (building.cost.dirt) {
-            maxByResources = Math.min(maxByResources, Math.floor(state.resources.dirt / building.cost.dirt));
-        }
-        if (building.cost.clay) {
-            maxByResources = Math.min(maxByResources, Math.floor(state.resources.clay / building.cost.clay));
-        }
-        if (building.cost.water) {
-            maxByResources = Math.min(maxByResources, Math.floor(state.water / building.cost.water));
-        }
-
-        const maxPossible = Math.min(remainingSlots, maxByMoney, maxByWorkers, maxByResources);
-
+        // Déterminer le nombre cible selon le multiplicateur
+        let targetCount;
         if (this.buildMultiplier === 'max') {
-            return Math.max(0, maxPossible);
+            targetCount = Math.min(remainingSlots, state.availablePeasants);
+        } else {
+            targetCount = Math.min(this.buildMultiplier, remainingSlots, state.availablePeasants);
         }
 
-        return Math.max(0, Math.min(this.buildMultiplier, maxPossible));
+        // Simulation des coûts cumulés pour chaque bâtiment successif
+        // Le coût augmente de 15% pour chaque bâtiment déjà construit (scaling logarithmique)
+        let canBuild = 0;
+        let simulatedMoney = state.money;
+        let simulatedResources = { ...state.resources };
+        let simulatedWater = state.water;
+        const totalCount = builtCount + pendingCount;
+
+        for (let i = 0; i < targetCount; i++) {
+            // Calculer le coût pour le (n+i)ème bâtiment
+            // Formule: coût_base * 1.15^nombre_existants
+            const multiplier = Math.pow(1.15, totalCount + i);
+
+            const cost = {
+                money: building.cost.money, // L'or reste fixe (pas de scaling)
+                wood: building.cost.wood ? Math.ceil(building.cost.wood * multiplier) : 0,
+                stone: building.cost.stone ? Math.ceil(building.cost.stone * multiplier) : 0,
+                sand: building.cost.sand ? Math.ceil(building.cost.sand * multiplier) : 0,
+                dirt: building.cost.dirt ? Math.ceil(building.cost.dirt * multiplier) : 0,
+                clay: building.cost.clay ? Math.ceil(building.cost.clay * multiplier) : 0,
+                water: building.cost.water ? Math.ceil(building.cost.water * multiplier) : 0
+            };
+
+            // Vérifier si on peut payer ce bâtiment
+            if (simulatedMoney < cost.money) break;
+            if (cost.wood && simulatedResources.wood < cost.wood) break;
+            if (cost.stone && simulatedResources.stone < cost.stone) break;
+            if (cost.sand && simulatedResources.sand < cost.sand) break;
+            if (cost.dirt && simulatedResources.dirt < cost.dirt) break;
+            if (cost.clay && simulatedResources.clay < cost.clay) break;
+            if (cost.water && simulatedWater < cost.water) break;
+
+            // Déduire les coûts de la simulation
+            simulatedMoney -= cost.money;
+            if (cost.wood) simulatedResources.wood -= cost.wood;
+            if (cost.stone) simulatedResources.stone -= cost.stone;
+            if (cost.sand) simulatedResources.sand -= cost.sand;
+            if (cost.dirt) simulatedResources.dirt -= cost.dirt;
+            if (cost.clay) simulatedResources.clay -= cost.clay;
+            if (cost.water) simulatedWater -= cost.water;
+
+            canBuild++;
+        }
+
+        return canBuild;
     }
 
     /**
-     * Initialise les boutons de collecte de ressources (appelé une seule fois)
-     */
-    initGatherButtons() {
-        const container = document.getElementById('gatherButtons');
-        if (!container) return;
-
-        container.innerHTML = '';
-
-        Object.values(RESOURCES).forEach(resource => {
-            const item = document.createElement('div');
-            item.className = 'gather-item';
-            item.dataset.resource = resource.id;
-
-            item.innerHTML = `
-                <div class="gather-header">
-                    <span class="gather-name">${resource.icon} ${resource.name}</span>
-                    <span class="gather-icon">${resource.icon}</span>
-                </div>
-                <div class="gather-details">+${resource.gatherAmount} en ${resource.gatherTime}s</div>
-                <div class="gather-time">⏱️ ${resource.gatherTime}s</div>
-                <div class="gather-cost">💰${resource.gatherCost}</div>
-            `;
-
-            item.addEventListener('click', () => {
-                const count = this.getActualWorkerCount(resource);
-                if (count > 0) {
-                    for (let i = 0; i < count; i++) {
-                        this.game.gatherResource(resource.id);
-                    }
-                } else {
-                    // Déterminer la cause exacte du blocage
-                    const state = this.game.state;
-                    if (state.availablePeasants < 1) {
-                        this.game.notifications.error("Pas d'ouvriers disponibles !");
-                    } else if (state.money < resource.gatherCost) {
-                        this.game.notifications.error("Pas assez d'argent !");
-                    } else {
-                        this.game.notifications.error("Action impossible !");
-                    }
-                }
-            });
-
-            container.appendChild(item);
-        });
-    }
-
-    /**
-     * Rafraîchit l'affichage des panneaux
+     * Rafraîchit l'affichage de tous les panneaux
+     * Appelé lors des changements d'onglet ou des mises à jour de l'état du jeu
      */
     refresh() {
         this.updateBuildingsList();
         this.updateTasksList();
-        this.updateResourcesDisplay();
-        this.updateGatherButtons();
+        this.updateResourcesBar();
         this.updateStatsDisplay();
     }
 
     /**
-     * Obtient les informations de déblocage d'un tier
+     * Obtient les informations de déblocage d'un tier de bâtiments
+     * @param {number} tier - Numéro du tier (1, 2, 3)
+     * @returns {object} Informations: unlocked (boolean), timeRemaining (seconds), config
      */
     getTierUnlockInfo(tier) {
         const unlockConfig = BUILDING_TIER_UNLOCK[tier];
@@ -306,7 +357,9 @@ class PanelManager {
     }
 
     /**
-     * Initialise la liste des bâtiments (appelé une seule fois)
+     * Initialise la structure DOM de la liste des bâtiments
+     * Appelé une seule fois au démarrage, crée les éléments pour chaque bâtiment
+     * Organisation par tiers avec headers et containers
      */
     initBuildingsList() {
         const container = document.getElementById('buildingsList');
@@ -314,7 +367,7 @@ class PanelManager {
 
         container.innerHTML = '';
 
-        // Trier les bâtiments par tier
+        // Regrouper les bâtiments par tier
         const buildingsByTier = {};
         Object.values(BUILDINGS).forEach(building => {
             const tier = building.tier || 1;
@@ -324,14 +377,14 @@ class PanelManager {
             buildingsByTier[tier].push(building);
         });
 
-        // Afficher par tier
+        // Créer la structure pour chaque tier (1, 2, 3)
         [1, 2, 3].forEach(tier => {
             if (!buildingsByTier[tier] || buildingsByTier[tier].length === 0) return;
 
             const unlockInfo = this.getTierUnlockInfo(tier);
             const unlockConfig = BUILDING_TIER_UNLOCK[tier];
 
-            // Header de tier
+            // Header du tier (avec icône et timer si verrouillé)
             const tierHeader = document.createElement('div');
             tierHeader.className = 'tier-header';
             tierHeader.dataset.tier = tier;
@@ -356,16 +409,17 @@ class PanelManager {
                 tierContainer.classList.add('locked');
             }
 
-            // Bâtiments du tier
+            // Créer les éléments pour chaque bâtiment du tier
             buildingsByTier[tier].forEach(building => {
                 const item = document.createElement('div');
                 item.className = 'building-item';
                 item.dataset.buildingId = building.id;
                 item.dataset.tier = tier;
 
+                // Structure HTML de l'élément bâtiment
                 item.innerHTML = `
                     <div class="building-header">
-                        <span class="building-name">${building.name} (<span class="count">0</span>/${building.maxCount})</span>
+                        <span class="building-name">${building.name} (<span class="count-display"><span class="count-built">0</span></span>/${building.maxCount})</span>
                         <span class="building-icon">${building.icon}</span>
                     </div>
                     <div class="building-desc">${building.description}</div>
@@ -374,22 +428,24 @@ class PanelManager {
                     <div class="max-reached" style="color: #ff6b6b; margin-top: 5px; display: none;">Maximum atteint</div>
                 `;
 
-                // Event listener permanent
+                // Attacher l'événement click (permanent)
                 item.addEventListener('click', () => {
-                    // Vérifier si le tier est débloqué
+                    // Vérifier si le tier est débloqué au moment du clic
                     const currentUnlockInfo = this.getTierUnlockInfo(tier);
                     if (!currentUnlockInfo.unlocked) {
                         this.game.notifications.error(`Tier verrouillé ! Débloque dans ${formatTime(currentUnlockInfo.timeRemaining)}`);
                         return;
                     }
 
+                    // Calculer combien de bâtiments on peut construire
                     const count = this.getActualBuildCount(building);
                     if (count > 0) {
+                        // Lancer autant de constructions que possible
                         for (let i = 0; i < count; i++) {
                             this.game.startBuilding(building.id);
                         }
                     } else {
-                        // Déterminer la cause exacte du blocage
+                        // Déterminer la cause exacte du blocage pour le message d'erreur
                         const state = this.game.state;
                         const builtCount = this.game.getBuildingCount(building.id);
                         const pendingCount = state.constructions.filter(c => c.buildingId === building.id).length;
@@ -426,21 +482,22 @@ class PanelManager {
     }
 
     /**
-     * Met à jour la liste des bâtiments (mise à jour des états seulement)
+     * Met à jour l'affichage de la liste des bâtiments
+     * Rafraîchit les états (coûts, progression, disponibilité) sans recréer le DOM
      */
     updateBuildingsList() {
         const container = document.getElementById('buildingsList');
         if (!container) return;
 
-        // Si la liste n'est pas initialisée, l'initialiser
+        // Initialiser la liste si elle n'existe pas encore
         if (!container.querySelector('[data-building-id]')) {
             this.initBuildingsList();
         }
 
-        // Compteur de bâtiments visibles par tier (pour gérer les headers)
+        // Compteur de bâtiments visibles par tier (pour gérer l'affichage des headers)
         const visibleByTier = { 1: 0, 2: 0, 3: 0 };
 
-        // Mettre à jour le statut des tiers
+        // Mettre à jour le statut des tiers (verrouillé/déverrouillé)
         [1, 2, 3].forEach(tier => {
             const unlockInfo = this.getTierUnlockInfo(tier);
             const unlockConfig = BUILDING_TIER_UNLOCK[tier];
@@ -466,7 +523,7 @@ class PanelManager {
             }
         });
 
-        // Mettre à jour chaque élément
+        // Mettre à jour chaque élément de bâtiment
         Object.values(BUILDINGS).forEach(building => {
             const item = container.querySelector(`[data-building-id="${building.id}"]`);
             if (!item) return;
@@ -477,41 +534,47 @@ class PanelManager {
             const count = this.game.getBuildingCount(building.id);
             const maxReached = count >= building.maxCount;
 
-            // Vérifier si ce bâtiment est en construction
+            // Vérifier les constructions en cours
             const constructions = this.game.state.constructions.filter(c => c.buildingId === building.id);
             const isBuilding = constructions.length > 0;
             const pendingCount = constructions.length;
 
-            // Vérifier si le max est atteint avec les constructions en cours
+            // Max atteint avec les constructions en cours
             const totalWithPending = count + pendingCount;
             const maxReachedWithPending = totalWithPending >= building.maxCount;
 
-            // Cacher si max atteint définitivement (constructions terminées)
+            // Cacher si max définitivement atteint (pas de construction en cours)
             const shouldHide = maxReached && !isBuilding;
             item.style.display = shouldHide ? 'none' : '';
 
-            // Compter les visibles par tier
+            // Compter les bâtiments visibles par tier
             if (!shouldHide) {
                 visibleByTier[tier]++;
             }
 
-            // Mettre à jour la classe disabled et building
-            // Désactivé si tier verrouillé OU si on ne peut pas construire
+            // Mettre à jour les classes CSS
             item.classList.toggle('disabled', !unlockInfo.unlocked || !canBuild || maxReached);
             item.classList.toggle('tier-locked', !unlockInfo.unlocked);
             item.classList.toggle('building', isBuilding);
-            // Contour vert si au max avec constructions en cours (attente)
+            // Contour vert si max atteint avec constructions en cours (attente)
             item.classList.toggle('building-max', maxReachedWithPending && isBuilding && !maxReached);
 
-            // Mettre à jour le compteur
-            const countSpan = item.querySelector('.count');
-            if (countSpan) countSpan.textContent = count;
+            // Mettre à jour le compteur (construits + en cours)
+            const countDisplay = item.querySelector('.count-display');
+            if (countDisplay) {
+                if (pendingCount > 0) {
+                    // Format: "3+2" (3 construits, 2 en construction)
+                    countDisplay.innerHTML = `<span class="count-built">${count}</span><span class="count-pending">+${pendingCount}</span>`;
+                } else {
+                    countDisplay.innerHTML = `<span class="count-built">${count}</span>`;
+                }
+            }
 
-            // Mettre à jour le temps/progression
+            // Mettre à jour le temps/progression de construction
             const timeDiv = item.querySelector('.building-time');
             if (timeDiv) {
                 if (isBuilding) {
-                    // Afficher la progression
+                    // Afficher la barre de progression
                     const construction = constructions[0];
                     const progress = ((construction.elapsed / construction.totalTime) * 100).toFixed(0);
                     const remaining = construction.totalTime - construction.elapsed;
@@ -525,54 +588,58 @@ class PanelManager {
                 }
             }
 
-            // Mettre à jour les coûts
+            // Mettre à jour les coûts (avec scaling logarithmique)
             const costsDiv = item.querySelector('.building-cost');
             if (costsDiv) {
-                // Calculer le multiplicateur effectif pour ce bâtiment
-                const buildCount = this.getActualBuildCount(building);
-                const mult = buildCount > 0 ? buildCount : 1;
-                const showMult = this.buildMultiplier !== 1 && mult > 1;
+                // Obtenir les coûts scalés depuis le jeu
+                const scaledCost = this.game.getScaledBuildingCost(building.id);
 
                 const costs = [];
-                if (building.cost.money) {
-                    const totalCost = building.cost.money * mult;
-                    const hasEnough = this.game.state.money >= totalCost;
-                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">💰${totalCost}${showMult ? ` (x${mult})` : ''}</span>`);
+                // Or (pas de scaling, reste fixe)
+                if (scaledCost.money) {
+                    const hasEnough = this.game.state.money >= scaledCost.money;
+                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">💰${scaledCost.money}</span>`);
                 }
-                if (building.cost.wood) {
-                    const totalCost = building.cost.wood * mult;
-                    const hasEnough = this.game.state.resources.wood >= totalCost;
-                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🪵${totalCost}</span>`);
+                // Bois (avec indicateur d'augmentation si scalé)
+                if (scaledCost.wood) {
+                    const hasEnough = this.game.state.resources.wood >= scaledCost.wood;
+                    const suffix = scaledCost.wood > building.cost.wood ? ' ↑' : '';
+                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🪵${scaledCost.wood}${suffix}</span>`);
                 }
-                if (building.cost.stone) {
-                    const totalCost = building.cost.stone * mult;
-                    const hasEnough = this.game.state.resources.stone >= totalCost;
-                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🪨${totalCost}</span>`);
+                // Pierre
+                if (scaledCost.stone) {
+                    const hasEnough = this.game.state.resources.stone >= scaledCost.stone;
+                    const suffix = scaledCost.stone > building.cost.stone ? ' ↑' : '';
+                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🪨${scaledCost.stone}${suffix}</span>`);
                 }
-                if (building.cost.sand) {
-                    const totalCost = building.cost.sand * mult;
-                    const hasEnough = this.game.state.resources.sand >= totalCost;
-                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🏜️${totalCost}</span>`);
+                // Sable
+                if (scaledCost.sand) {
+                    const hasEnough = this.game.state.resources.sand >= scaledCost.sand;
+                    const suffix = scaledCost.sand > building.cost.sand ? ' ↑' : '';
+                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🏜️${scaledCost.sand}${suffix}</span>`);
                 }
-                if (building.cost.dirt) {
-                    const totalCost = building.cost.dirt * mult;
-                    const hasEnough = this.game.state.resources.dirt >= totalCost;
-                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🟤${totalCost}</span>`);
+                // Terre
+                if (scaledCost.dirt) {
+                    const hasEnough = this.game.state.resources.dirt >= scaledCost.dirt;
+                    const suffix = scaledCost.dirt > building.cost.dirt ? ' ↑' : '';
+                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🟤${scaledCost.dirt}${suffix}</span>`);
                 }
-                if (building.cost.clay) {
-                    const totalCost = building.cost.clay * mult;
-                    const hasEnough = this.game.state.resources.clay >= totalCost;
-                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🧱${totalCost}</span>`);
+                // Argile
+                if (scaledCost.clay) {
+                    const hasEnough = this.game.state.resources.clay >= scaledCost.clay;
+                    const suffix = scaledCost.clay > building.cost.clay ? ' ↑' : '';
+                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">🧱${scaledCost.clay}${suffix}</span>`);
                 }
-                if (building.cost.water) {
-                    const totalCost = building.cost.water * mult;
-                    const hasEnough = this.game.state.water >= totalCost;
-                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">💧${totalCost}</span>`);
+                // Eau
+                if (scaledCost.water) {
+                    const hasEnough = this.game.state.water >= scaledCost.water;
+                    const suffix = scaledCost.water > building.cost.water ? ' ↑' : '';
+                    costs.push(`<span class="${hasEnough ? '' : 'insufficient'}">💧${scaledCost.water}${suffix}</span>`);
                 }
                 costsDiv.innerHTML = costs.join(' ');
             }
 
-            // Mettre à jour l'affichage du max
+            // Mettre à jour l'indicateur de maximum atteint
             const maxDiv = item.querySelector('.max-reached');
             if (maxDiv) {
                 maxDiv.style.display = maxReached ? 'block' : 'none';
@@ -585,9 +652,8 @@ class PanelManager {
             const tierContainer = container.querySelector(`.tier-buildings[data-tier="${tier}"]`);
             const unlockInfo = this.getTierUnlockInfo(tier);
 
-            // Afficher le header et le container même si locked (pour voir le timer)
-            // Mais cacher si tous les bâtiments sont max et le tier est unlock
             if (tierHeader && tierContainer) {
+                // Afficher si verrouillé (pour voir le timer) ou s'il y a des bâtiments visibles
                 const shouldShow = !unlockInfo.unlocked || visibleByTier[tier] > 0;
                 tierHeader.style.display = shouldShow ? '' : 'none';
                 tierContainer.style.display = shouldShow ? '' : 'none';
@@ -596,25 +662,21 @@ class PanelManager {
     }
 
     /**
-     * Initialise la liste des tâches (appelé une seule fois)
+     * Initialise la structure DOM de la liste des tâches
+     * Crée les tâches statiques (nourrir, messages) et la zone pour les tâches en cours
      */
     initTasksList() {
         const container = document.getElementById('tasksList');
         if (!container) return;
 
-        // Zone pour les tâches en cours (constructions, collectes)
-        const inProgressSection = document.createElement('div');
-        inProgressSection.id = 'tasksInProgress';
-        container.appendChild(inProgressSection);
-
-        // Tâches de base statiques
+        // Définition des tâches statiques (toujours affichées en haut)
         const staticTasks = [
             {
                 id: 'feed',
                 name: 'Nourrir les paysans',
                 desc: 'Distribuer nourriture et eau aux paysans',
                 cost: 'Auto (consommation)',
-                action: null,
+                action: null, // Pas d'action manuelle, consommation automatique
                 requiresBuilding: null
             },
             {
@@ -627,9 +689,10 @@ class PanelManager {
             }
         ];
 
+        // Créer les éléments pour chaque tâche statique
         staticTasks.forEach(task => {
             const item = document.createElement('div');
-            item.className = 'task-item';
+            item.className = 'task-item static-task';
             item.dataset.taskId = task.id;
             item.innerHTML = `
                 <div class="task-name">${task.name}</div>
@@ -638,7 +701,7 @@ class PanelManager {
                 <div class="task-locked" style="display: none;">🔒 Nécessite une volière</div>
             `;
 
-            // Attacher l'événement une seule fois
+            // Attacher l'événement click si la tâche a une action
             if (task.action) {
                 item.addEventListener('click', () => {
                     // Vérifier dynamiquement si cliquable
@@ -650,10 +713,16 @@ class PanelManager {
 
             container.appendChild(item);
         });
+
+        // Zone pour les tâches en cours (constructions, collectes)
+        const inProgressSection = document.createElement('div');
+        inProgressSection.id = 'tasksInProgress';
+        container.appendChild(inProgressSection);
     }
 
     /**
-     * Met à jour la liste des tâches (mise à jour des états seulement)
+     * Met à jour la liste des tâches
+     * Rafraîchit les états des tâches statiques et affiche les tâches en cours
      */
     updateTasksList() {
         const container = document.getElementById('tasksList');
@@ -664,12 +733,12 @@ class PanelManager {
             this.initTasksList();
         }
 
-        // Mettre à jour la zone des tâches en cours
+        // Mettre à jour la zone des tâches en cours (constructions, collectes)
         const inProgressSection = document.getElementById('tasksInProgress');
         if (inProgressSection) {
             let html = '';
 
-            // Constructions en cours
+            // Afficher les constructions en cours
             this.game.state.constructions.forEach((construction) => {
                 const building = BUILDINGS[construction.buildingId];
                 const progress = ((construction.elapsed / construction.totalTime) * 100).toFixed(0);
@@ -687,7 +756,7 @@ class PanelManager {
                 `;
             });
 
-            // Collectes en cours
+            // Afficher les collectes en cours
             this.game.state.gatheringTasks.forEach((task) => {
                 const resource = RESOURCES[task.resourceId];
                 const progress = ((task.elapsed / task.totalTime) * 100).toFixed(0);
@@ -708,38 +777,146 @@ class PanelManager {
             inProgressSection.innerHTML = html;
         }
 
-        // Mettre à jour l'état des tâches statiques
+        // Mettre à jour l'état de la tâche "Envoyer un message"
         const sendMessageItem = container.querySelector('[data-task-id="sendMessage"]');
         if (sendMessageItem) {
             const hasAviary = this.game.hasBuilding('aviary');
-            const isDisabled = !hasAviary;
+            const hasMessageTask = this.game.hasActiveMessageTask();
+            const hasBirds = this.game.state.birds >= 1;
+            const messageCost = this.game.getMessageCost();
+            const hasEnoughMoney = this.game.state.money >= messageCost;
+
+            // Conditions pour activer: volière + mission active + oiseaux + argent
+            const isDisabled = !hasAviary || !hasMessageTask || !hasBirds || !hasEnoughMoney;
 
             sendMessageItem.classList.toggle('disabled', isDisabled);
             sendMessageItem.classList.toggle('clickable', !isDisabled);
 
+            // Mettre à jour la description selon l'état
+            const descDiv = sendMessageItem.querySelector('.task-desc');
+            if (descDiv) {
+                if (!hasAviary) {
+                    descDiv.textContent = '🔒 Nécessite une volière';
+                } else if (!hasMessageTask) {
+                    descDiv.textContent = '⏳ En attente d\'une mission de message';
+                } else if (!hasBirds) {
+                    descDiv.textContent = `🕊️ Aucun oiseau (${Math.floor(this.game.state.birds)}/${this.game.getBuildingCount('aviary') * 5})`;
+                } else {
+                    descDiv.textContent = `🕊️ ${Math.floor(this.game.state.birds)} oiseau(x) disponible(s)`;
+                }
+            }
+
+            // Mettre à jour le coût affiché
+            const costDiv = sendMessageItem.querySelector('.task-cost');
+            if (costDiv) {
+                if (hasAviary) {
+                    const costClass = hasEnoughMoney ? '' : 'insufficient';
+                    costDiv.innerHTML = `<span class="${costClass}">💰${messageCost}</span> 🕊️1`;
+                } else {
+                    costDiv.textContent = '💰??';
+                }
+            }
+
+            // Afficher/masquer l'indicateur de verrouillage
             const lockedDiv = sendMessageItem.querySelector('.task-locked');
             if (lockedDiv) {
-                lockedDiv.style.display = isDisabled ? 'block' : 'none';
+                lockedDiv.style.display = !hasAviary ? 'block' : 'none';
             }
         }
     }
 
     /**
-     * Met à jour l'affichage des ressources
+     * Met à jour la barre de ressources en bas de l'écran
+     * Affiche le stock, le coût de collecte et la progression des collectes en cours
      */
-    updateResourcesDisplay() {
+    updateResourcesBar() {
         const state = this.game.state;
+        const container = document.getElementById('resourcesBarList');
+        if (!container) return;
 
-        // Ressources stockées
-        document.getElementById('woodStock').textContent = Math.floor(state.resources.wood);
-        document.getElementById('stoneStock').textContent = Math.floor(state.resources.stone);
-        document.getElementById('sandStock').textContent = Math.floor(state.resources.sand);
-        document.getElementById('dirtStock').textContent = Math.floor(state.resources.dirt);
-        document.getElementById('clayStock').textContent = Math.floor(state.resources.clay);
+        // Mettre à jour chaque ressource
+        Object.values(RESOURCES).forEach(resource => {
+            const item = container.querySelector(`[data-resource="${resource.id}"]`);
+            if (!item) return;
+
+            const workerCount = this.getActualWorkerCount(resource);
+            const canGather = workerCount > 0;
+            const totalCost = workerCount * resource.gatherCost;
+            const totalGather = workerCount * resource.gatherAmount;
+
+            // Vérifier les collectes en cours pour cette ressource
+            const gatherings = state.gatheringTasks.filter(t => t.resourceId === resource.id);
+            const isGathering = gatherings.length > 0;
+
+            // Mettre à jour les classes CSS
+            item.classList.toggle('disabled', !canGather);
+            item.classList.toggle('gathering', isGathering);
+
+            // Mettre à jour le stock affiché
+            const stockEl = item.querySelector(`#${resource.id}StockBar`);
+            if (stockEl) {
+                stockEl.textContent = Math.floor(state.resources[resource.id]);
+            }
+
+            // Mettre à jour le rendement affiché
+            const yieldEl = item.querySelector('.resource-bar-yield');
+            if (yieldEl) {
+                if (workerCount > 1) {
+                    yieldEl.textContent = `+${totalGather} (x${workerCount})`;
+                } else {
+                    yieldEl.textContent = `+${resource.gatherAmount}`;
+                }
+            }
+
+            // Mettre à jour le coût du bouton de collecte
+            const costEl = item.querySelector('.gather-btn-cost');
+            if (costEl) {
+                const displayCost = workerCount > 0 ? totalCost : resource.gatherCost;
+                costEl.textContent = `💰${displayCost}`;
+                costEl.classList.toggle('insufficient', state.money < displayCost);
+            }
+
+            // Mettre à jour la barre de progression de collecte
+            const progressContainer = item.querySelector('.resource-bar-progress');
+            if (progressContainer) {
+                if (isGathering) {
+                    progressContainer.classList.remove('hidden');
+                    const task = gatherings[0];
+                    const progress = (task.elapsed / task.totalTime) * 100;
+                    const progressFill = progressContainer.querySelector('.progress-fill');
+                    const progressText = progressContainer.querySelector('.progress-text');
+                    if (progressFill) {
+                        progressFill.style.width = `${progress}%`;
+                    }
+                    if (progressText) {
+                        const remaining = task.totalTime - task.elapsed;
+                        const suffix = gatherings.length > 1 ? ` +${gatherings.length - 1}` : '';
+                        progressText.textContent = `${Math.floor(progress)}% - ${formatTime(remaining)}${suffix}`;
+                    }
+                } else {
+                    progressContainer.classList.add('hidden');
+                }
+            }
+        });
+
+        // Affichage spécial pour les oiseaux (pas de bouton de collecte)
+        const birdsItem = container.querySelector('[data-resource="birds"]');
+        if (birdsItem) {
+            const aviaries = this.game.getBuildingCount('aviary');
+            const maxBirds = aviaries * 5; // 5 oiseaux par volière
+            const birdsStockEl = birdsItem.querySelector('#birdsStockBar');
+            if (birdsStockEl) {
+                birdsStockEl.textContent = `${Math.floor(state.birds)}/${maxBirds}`;
+            }
+
+            // Masquer si aucune volière construite
+            birdsItem.style.display = aviaries > 0 ? '' : 'none';
+        }
     }
 
     /**
-     * Met à jour l'affichage des statistiques
+     * Met à jour l'affichage des statistiques de production
+     * Affiche les taux de production/consommation, alertes et production théorique
      */
     updateStatsDisplay() {
         const stats = this.game.statistics;
@@ -749,6 +926,7 @@ class PanelManager {
         const alertsContainer = document.getElementById('statsAlerts');
         const theoreticalContainer = document.getElementById('statsTheoretical');
 
+        // Section production: afficher chaque ressource avec son taux
         if (productionContainer) {
             const allStats = stats.getAllStats();
             const resourceNames = {
@@ -768,6 +946,7 @@ class PanelManager {
                 const res = resourceNames[key];
                 if (!res) continue;
 
+                // Couleur selon le taux: vert si positif, rouge si négatif, gris si nul
                 const rateColor = stat.rate > 0 ? '#4ade80' : stat.rate < 0 ? '#ff6b6b' : '#aaa';
                 const alertClass = stat.alertLevel === 'critical' ? 'stat-critical' : stat.alertLevel === 'warning' ? 'stat-warning' : '';
 
@@ -783,6 +962,7 @@ class PanelManager {
             productionContainer.innerHTML = html;
         }
 
+        // Section alertes: afficher les ressources en danger
         if (alertsContainer) {
             const allStats = stats.getAllStats();
             const alerts = [];
@@ -823,6 +1003,7 @@ class PanelManager {
             }
         }
 
+        // Section production théorique: afficher les productions automatiques des bâtiments
         if (theoreticalContainer) {
             const theoretical = stats.getTheoreticalProduction();
             const items = [
@@ -831,7 +1012,7 @@ class PanelManager {
                 { icon: '💰', name: 'Or', value: theoretical.money },
                 { icon: '🪵', name: 'Bois', value: theoretical.wood },
                 { icon: '🪨', name: 'Pierre', value: theoretical.stone }
-            ].filter(i => i.value !== 0);
+            ].filter(i => i.value !== 0); // Ne montrer que les non-nuls
 
             if (items.length === 0) {
                 theoreticalContainer.innerHTML = '<div class="no-production">Aucune production automatique</div>';
@@ -851,77 +1032,6 @@ class PanelManager {
         }
     }
 
-    /**
-     * Met à jour les boutons de collecte
-     */
-    updateGatherButtons() {
-        const state = this.game.state;
-        const container = document.getElementById('gatherButtons');
-        if (!container) return;
-
-        // Si pas initialisé, initialiser
-        if (!container.querySelector('[data-resource]')) {
-            this.initGatherButtons();
-        }
-
-        Object.values(RESOURCES).forEach(resource => {
-            const item = container.querySelector(`[data-resource="${resource.id}"]`);
-            if (!item) return;
-
-            const workerCount = this.getActualWorkerCount(resource);
-            const canGather = workerCount > 0;
-            const totalCost = workerCount * resource.gatherCost;
-            const totalGather = workerCount * resource.gatherAmount;
-
-            // Vérifier si cette ressource est en cours de collecte
-            const gatherings = state.gatheringTasks.filter(t => t.resourceId === resource.id);
-            const isGathering = gatherings.length > 0;
-
-            // Mettre à jour les classes
-            item.classList.toggle('disabled', !canGather);
-            item.classList.toggle('gathering', isGathering);
-
-            // Mettre à jour les détails (quantité collectée et nombre d'ouvriers)
-            const detailsDiv = item.querySelector('.gather-details');
-            if (detailsDiv) {
-                if (workerCount > 1) {
-                    detailsDiv.innerHTML = `<strong>+${totalGather}</strong> ${resource.icon} avec <strong>${workerCount} ouvriers</strong> <span class="per-worker">(${resource.gatherAmount}/ouvrier)</span>`;
-                } else if (workerCount === 1) {
-                    detailsDiv.innerHTML = `+${resource.gatherAmount} ${resource.icon} en ${resource.gatherTime}s`;
-                } else {
-                    detailsDiv.innerHTML = `+${resource.gatherAmount} ${resource.icon} en ${resource.gatherTime}s`;
-                }
-            }
-
-            // Mettre à jour le temps/progression
-            const timeDiv = item.querySelector('.gather-time');
-            if (timeDiv) {
-                if (isGathering) {
-                    const task = gatherings[0];
-                    const progress = ((task.elapsed / task.totalTime) * 100).toFixed(0);
-                    const remaining = task.totalTime - task.elapsed;
-                    const suffix = gatherings.length > 1 ? ` (+${gatherings.length - 1})` : '';
-                    timeDiv.innerHTML = `🧑‍🌾 ${progress}% - ${formatTime(remaining)}${suffix}`;
-                    timeDiv.classList.add('in-progress');
-                } else {
-                    timeDiv.innerHTML = `⏱️ ${formatTime(resource.gatherTime)}`;
-                    timeDiv.classList.remove('in-progress');
-                }
-            }
-
-            // Mettre à jour le coût affiché
-            const costDiv = item.querySelector('.gather-cost');
-            if (costDiv) {
-                if (workerCount > 1) {
-                    costDiv.innerHTML = `<span class="${canGather ? '' : 'insufficient'}">💰${totalCost}</span> (${workerCount} ouvriers)`;
-                } else if (workerCount === 1) {
-                    costDiv.innerHTML = `<span class="${canGather ? '' : 'insufficient'}">💰${resource.gatherCost}</span>`;
-                } else {
-                    costDiv.innerHTML = `<span class="insufficient">💰${resource.gatherCost}</span>`;
-                }
-            }
-        });
-    }
 }
 
 export default PanelManager;

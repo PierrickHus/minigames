@@ -1,43 +1,50 @@
-// ==========================================
-// RENDU DU VILLAGE - SYSTÈME AVANCÉ
-// ==========================================
+/**
+ * Système de rendu du village égyptien
+ * Gère l'affichage de la grille, des bâtiments, du Nil et des animations
+ */
 
 import { BUILDINGS, BUILDING_SHAPES } from '../data/index.js';
 
 class VillageRenderer {
+    /**
+     * Crée une nouvelle instance du renderer de village
+     * @param {Game} game - Instance du jeu principal
+     */
     constructor(game) {
         this.game = game;
         this.canvas = document.getElementById('villageCanvas');
         this.ctx = this.canvas.getContext('2d');
 
-        // Configuration de la grille - Plus grande avec tuiles plus petites
-        this.tileSize = 24; // Tuiles plus petites (était 60)
-        this.gridWidth = 40; // Plus large (était 15)
-        this.gridHeight = 25; // Plus haut (était 10)
+        // Configuration de la grille
+        this.tileSize = 26;
+        this.gridWidth = 48;
+        this.gridHeight = 28;
 
-        // État de la vue
+        // Décalage de la vue (position de la grille dans le canvas)
         this.offsetX = 0;
         this.offsetY = 0;
+
+        // État de sélection
         this.selectedTile = null;
         this.hoveredTile = null;
 
-        // Grille du village
-        // Chaque cellule contient soit null, soit un objet { buildingUid, isOrigin }
-        // buildingUid = identifiant unique du placement
-        // isOrigin = true si c'est la cellule d'origine (coin supérieur gauche)
+        // Grille de placement: chaque cellule contient null ou { buildingUid, isOrigin }
+        // isOrigin = true uniquement pour la cellule en haut à gauche du bâtiment
         this.grid = [];
         this.initGrid();
 
-        // Registre des bâtiments placés
-        // { uid: { buildingId, x, y, shapeIndex, constructing, builtAt } }
+        // Registre des bâtiments placés indexé par uid
+        // Format: { uid: { buildingId, x, y, shapeIndex, constructing, builtAt, ... } }
         this.placedBuildings = {};
         this.nextBuildingUid = 1;
 
-        // Animations
+        // Animations visuelles (ex: flash doré quand construction terminée)
         this.animations = [];
+
+        // Positions des paysans animés
         this.peasantPositions = [];
 
-        // Cache des positions par type de placement
+        // Cache des positions pour optimiser le placement intelligent
         this.placementCache = {
             wells: [],
             farms: [],
@@ -50,7 +57,7 @@ class VillageRenderer {
     }
 
     /**
-     * Initialise la grille vide
+     * Initialise la grille vide avec des cellules null
      */
     initGrid() {
         this.grid = [];
@@ -63,7 +70,7 @@ class VillageRenderer {
     }
 
     /**
-     * Configure le canvas
+     * Configure le canvas et l'écouteur de redimensionnement
      */
     setupCanvas() {
         this.resize();
@@ -71,22 +78,38 @@ class VillageRenderer {
     }
 
     /**
-     * Redimensionne le canvas
+     * Redimensionne le canvas et recalcule la position de la grille
+     * La grille est centrée horizontalement après le panneau Cléopâtre
+     * et alignée verticalement pour que la rivière touche le bas
      */
     resize() {
         const container = this.canvas.parentElement;
         this.canvas.width = container.clientWidth;
         this.canvas.height = container.clientHeight;
 
-        // Centrer la vue
-        this.offsetX = (this.canvas.width - this.gridWidth * this.tileSize) / 2;
-        this.offsetY = (this.canvas.height - this.gridHeight * this.tileSize) / 2 - 30; // Décalé vers le haut pour le Nil
+        // Positionner la grille après le panneau Cléopâtre (300px à gauche)
+        const cleopatraPanelWidth = 300;
+        const gridWidthPx = this.gridWidth * this.tileSize;
+        const availableWidth = this.canvas.width - cleopatraPanelWidth;
+
+        // Centrer la grille dans l'espace disponible
+        if (gridWidthPx <= availableWidth) {
+            this.offsetX = cleopatraPanelWidth + (availableWidth - gridWidthPx) / 2;
+        } else {
+            this.offsetX = cleopatraPanelWidth;
+        }
+
+        // Aligner la grille pour que la rivière (80px de haut) soit au bas du canvas
+        // Les 3 dernières rangées de la grille sont réservées pour la zone d'eau
+        const riverHeight = 80;
+        this.offsetY = this.canvas.height - riverHeight - (this.gridHeight - 3) * this.tileSize;
     }
 
     /**
-     * Configure les événements
+     * Configure les événements de souris sur le canvas
      */
     setupEvents() {
+        // Détection de la tuile survolée
         this.canvas.addEventListener('mousemove', (e) => {
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left - this.offsetX;
@@ -102,6 +125,7 @@ class VillageRenderer {
             }
         });
 
+        // Clic sur une tuile
         this.canvas.addEventListener('click', (e) => {
             if (this.hoveredTile) {
                 this.handleTileClick(this.hoveredTile.x, this.hoveredTile.y);
@@ -110,24 +134,28 @@ class VillageRenderer {
             }
         });
 
+        // Réinitialiser le survol quand la souris quitte le canvas
         this.canvas.addEventListener('mouseleave', () => {
             this.hoveredTile = null;
         });
     }
 
     /**
-     * Gère le clic sur une tuile
+     * Gère le clic sur une tuile de la grille
+     * @param {number} x - Coordonnée X de la tuile
+     * @param {number} y - Coordonnée Y de la tuile
      */
     handleTileClick(x, y) {
         const cell = this.grid[y][x];
 
         if (cell && cell.buildingUid) {
+            // Tuile occupée par un bâtiment -> afficher ses infos
             const placed = this.placedBuildings[cell.buildingUid];
             if (placed) {
-                // Passer l'uid pour identifier cette instance spécifique
                 this.game.showBuildingInfo(placed.uid);
             }
         } else {
+            // Tuile vide -> fermer le panneau et sélectionner la tuile
             this.game.closeSidePanel();
             this.selectedTile = { x, y };
         }
@@ -135,20 +163,24 @@ class VillageRenderer {
 
     /**
      * Trouve le meilleur emplacement pour un bâtiment selon sa logique de placement
+     * Essaie d'abord le placement intelligent, puis fallback sur n'importe quelle position libre
+     * @param {string} buildingId - ID du type de bâtiment
+     * @returns {object|null} - Position {x, y, shapeIndex} ou null si impossible
      */
     findBestPosition(buildingId) {
         const shapeConfig = BUILDING_SHAPES[buildingId];
         if (!shapeConfig) {
-            // Fallback: bâtiment 1x1
+            // Bâtiment sans configuration de forme -> 1x1 par défaut
             return this.findAnyFreePosition(1, 1, [[1]]);
         }
 
         const placement = shapeConfig.placement;
         const shapes = shapeConfig.shapes;
 
-        // Essayer chaque forme dans un ordre aléatoire
+        // Essayer chaque variante de forme dans un ordre aléatoire
         const shuffledShapes = [...shapes].sort(() => Math.random() - 0.5);
 
+        // Essayer d'abord le placement intelligent
         for (const shapeData of shuffledShapes) {
             const position = this.findPositionForPlacement(placement, shapeData, buildingId);
             if (position) {
@@ -168,7 +200,11 @@ class VillageRenderer {
     }
 
     /**
-     * Trouve une position selon le type de placement
+     * Trouve une position selon le type de placement défini pour le bâtiment
+     * @param {string} placementType - Type de placement (periphery, near_well, center, etc.)
+     * @param {object} shapeData - Données de forme {width, height, shape}
+     * @param {string} buildingId - ID du bâtiment
+     * @returns {object|null} - Position {x, y} ou null
      */
     findPositionForPlacement(placementType, shapeData, buildingId) {
         const { width, height, shape } = shapeData;
@@ -204,39 +240,48 @@ class VillageRenderer {
     }
 
     /**
-     * Trouve une position en périphérie
+     * Trouve une position en périphérie de la grille (près des bords)
+     * @param {number} width - Largeur du bâtiment en tuiles
+     * @param {number} height - Hauteur du bâtiment en tuiles
+     * @param {number[][]} shape - Matrice de forme du bâtiment
+     * @returns {object|null} - Position {x, y, score} ou null
      */
     findPeripheryPosition(width, height, shape) {
         const positions = [];
-        const margin = 3; // Marge depuis le bord
+        const margin = 3; // Distance depuis le bord pour être considéré en périphérie
 
-        // Parcourir la périphérie (haut, bas, gauche, droite)
         for (let y = 0; y < this.gridHeight - height + 1; y++) {
             for (let x = 0; x < this.gridWidth - width + 1; x++) {
+                // Vérifier si la position est en périphérie (près d'un bord)
                 const isPeriphery = x < margin || x >= this.gridWidth - width - margin ||
-                                   y < margin || y >= this.gridHeight - height - margin - 3; // -3 pour éviter l'eau
+                                   y < margin || y >= this.gridHeight - height - margin - 3;
 
                 if (isPeriphery && this.canPlaceShape(x, y, width, height, shape)) {
-                    // Score basé sur la distance au bord
+                    // Score négatif = plus proche du bord = meilleur
                     const distToBorder = Math.min(x, y, this.gridWidth - x - width, this.gridHeight - y - height);
-                    positions.push({ x, y, score: -distToBorder }); // Plus proche du bord = meilleur
+                    positions.push({ x, y, score: -distToBorder });
                 }
             }
         }
 
         if (positions.length === 0) return null;
 
-        // Trier par score et prendre un des meilleurs avec un peu d'aléatoire
+        // Trier par score et choisir aléatoirement parmi les meilleurs
         positions.sort((a, b) => b.score - a.score);
         const topPositions = positions.slice(0, Math.min(10, positions.length));
         return topPositions[Math.floor(Math.random() * topPositions.length)];
     }
 
     /**
-     * Trouve une position près d'un type de bâtiment
+     * Trouve une position près d'un type de bâtiment spécifique
+     * @param {string[]} buildingTypes - Types de bâtiments à proximité desquels placer
+     * @param {number} width - Largeur du bâtiment
+     * @param {number} height - Hauteur du bâtiment
+     * @param {number[][]} shape - Matrice de forme
+     * @returns {object|null} - Position ou null
      */
     findNearBuildingPosition(buildingTypes, width, height, shape) {
-        // Trouver tous les bâtiments du type recherché
+        // Trouver tous les bâtiments du type recherché qui sont construits
         const targetBuildings = [];
         for (const uid in this.placedBuildings) {
             const placed = this.placedBuildings[uid];
@@ -246,15 +291,15 @@ class VillageRenderer {
         }
 
         if (targetBuildings.length === 0) {
-            // Aucun bâtiment cible, placer au centre
+            // Aucun bâtiment cible trouvé -> placer au centre
             return this.findCenterPosition(width, height, shape);
         }
 
         const positions = [];
         const searchRadius = 8;
 
+        // Chercher autour de chaque bâtiment cible
         for (const target of targetBuildings) {
-            // Chercher autour du bâtiment cible
             for (let dy = -searchRadius; dy <= searchRadius; dy++) {
                 for (let dx = -searchRadius; dx <= searchRadius; dx++) {
                     const x = target.x + dx;
@@ -262,10 +307,11 @@ class VillageRenderer {
 
                     if (x >= 0 && y >= 0 &&
                         x + width <= this.gridWidth &&
-                        y + height <= this.gridHeight - 3 && // Éviter l'eau
+                        y + height <= this.gridHeight - 3 &&
                         this.canPlaceShape(x, y, width, height, shape)) {
                         const dist = Math.sqrt(dx * dx + dy * dy);
-                        if (dist >= 2) { // Pas trop proche
+                        // Éviter de placer trop près (distance >= 2)
+                        if (dist >= 2) {
                             positions.push({ x, y, score: -dist });
                         }
                     }
@@ -281,17 +327,22 @@ class VillageRenderer {
     }
 
     /**
-     * Trouve une position au centre
+     * Trouve une position au centre de la grille (recherche en spirale)
+     * @param {number} width - Largeur du bâtiment
+     * @param {number} height - Hauteur du bâtiment
+     * @param {number[][]} shape - Matrice de forme
+     * @returns {object|null} - Position ou null
      */
     findCenterPosition(width, height, shape) {
         const centerX = Math.floor(this.gridWidth / 2);
-        const centerY = Math.floor((this.gridHeight - 3) / 2); // -3 pour l'eau
+        const centerY = Math.floor((this.gridHeight - 3) / 2); // -3 pour éviter l'eau
         const positions = [];
 
-        // Chercher en spirale depuis le centre
+        // Recherche en spirale depuis le centre
         for (let radius = 0; radius < Math.max(this.gridWidth, this.gridHeight) / 2; radius++) {
             for (let dy = -radius; dy <= radius; dy++) {
                 for (let dx = -radius; dx <= radius; dx++) {
+                    // Ne considérer que le périmètre de la spirale
                     if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
 
                     const x = centerX + dx - Math.floor(width / 2);
@@ -306,6 +357,7 @@ class VillageRenderer {
                     }
                 }
             }
+            // Dès qu'on trouve des positions valides, arrêter la recherche
             if (positions.length > 0) break;
         }
 
@@ -315,10 +367,15 @@ class VillageRenderer {
     }
 
     /**
-     * Trouve une position au centre des habitations
+     * Trouve une position au centre de masse des habitations existantes
+     * Idéal pour les bâtiments de service (marché, temple, etc.)
+     * @param {number} width - Largeur du bâtiment
+     * @param {number} height - Hauteur du bâtiment
+     * @param {number[][]} shape - Matrice de forme
+     * @returns {object|null} - Position ou null
      */
     findCenterHousesPosition(width, height, shape) {
-        // Trouver le centre de masse des maisons
+        // Collecter toutes les habitations
         const houses = [];
         for (const uid in this.placedBuildings) {
             const placed = this.placedBuildings[uid];
@@ -331,7 +388,7 @@ class VillageRenderer {
             return this.findCenterPosition(width, height, shape);
         }
 
-        // Calculer le centre de masse
+        // Calculer le centre de masse des habitations
         let avgX = 0, avgY = 0;
         for (const h of houses) {
             avgX += h.x;
@@ -367,17 +424,22 @@ class VillageRenderer {
     }
 
     /**
-     * Trouve une position près de l'eau
+     * Trouve une position près de l'eau (le Nil)
+     * @param {number} width - Largeur du bâtiment
+     * @param {number} height - Hauteur du bâtiment
+     * @param {number[][]} shape - Matrice de forme
+     * @returns {object|null} - Position ou null
      */
     findNearWaterPosition(width, height, shape) {
         const positions = [];
-        const waterY = this.gridHeight - 3; // Zone près de l'eau
+        const waterY = this.gridHeight - 3; // Limite de la zone d'eau
 
+        // Chercher dans les 5 rangées au-dessus de l'eau
         for (let y = waterY - 5; y < waterY - height + 1; y++) {
             for (let x = 0; x < this.gridWidth - width + 1; x++) {
                 if (y >= 0 && this.canPlaceShape(x, y, width, height, shape)) {
                     const distToWater = waterY - y - height;
-                    positions.push({ x, y, score: -distToWater }); // Plus proche de l'eau = meilleur
+                    positions.push({ x, y, score: -distToWater }); // Plus proche = meilleur
                 }
             }
         }
@@ -390,12 +452,17 @@ class VillageRenderer {
     }
 
     /**
-     * Trouve n'importe quelle position libre
+     * Trouve n'importe quelle position libre sur la grille
+     * @param {number} width - Largeur du bâtiment
+     * @param {number} height - Hauteur du bâtiment
+     * @param {number[][]} shape - Matrice de forme
+     * @returns {object|null} - Position {x, y} ou null si grille pleine
      */
     findAnyFreePosition(width, height, shape) {
         const positions = [];
 
-        for (let y = 0; y < this.gridHeight - height - 3 + 1; y++) { // -3 pour l'eau
+        // Parcourir toute la grille (sauf zone d'eau)
+        for (let y = 0; y < this.gridHeight - height - 3 + 1; y++) {
             for (let x = 0; x < this.gridWidth - width + 1; x++) {
                 if (this.canPlaceShape(x, y, width, height, shape)) {
                     positions.push({ x, y });
@@ -408,7 +475,13 @@ class VillageRenderer {
     }
 
     /**
-     * Vérifie si une forme peut être placée
+     * Vérifie si une forme peut être placée à une position donnée
+     * @param {number} startX - Position X de départ
+     * @param {number} startY - Position Y de départ
+     * @param {number} width - Largeur de la forme
+     * @param {number} height - Hauteur de la forme
+     * @param {number[][]} shape - Matrice de forme (1 = occupé, 0 = vide)
+     * @returns {boolean} - true si le placement est possible
      */
     canPlaceShape(startX, startY, width, height, shape) {
         for (let dy = 0; dy < height; dy++) {
@@ -417,12 +490,12 @@ class VillageRenderer {
                     const x = startX + dx;
                     const y = startY + dy;
 
-                    // Vérifier les limites
+                    // Vérifier les limites (gridHeight - 3 pour éviter l'eau)
                     if (x < 0 || x >= this.gridWidth || y < 0 || y >= this.gridHeight - 3) {
                         return false;
                     }
 
-                    // Vérifier si la cellule est libre
+                    // Vérifier si la cellule est déjà occupée
                     if (this.grid[y][x] !== null) {
                         return false;
                     }
@@ -467,7 +540,7 @@ class VillageRenderer {
 
         this.placedBuildings[uid] = placedBuilding;
 
-        // Marquer les cellules sur la grille
+        // Marquer les cellules occupées sur la grille
         for (let dy = 0; dy < height; dy++) {
             for (let dx = 0; dx < width; dx++) {
                 if (shape[dy][dx] === 1) {
@@ -479,10 +552,8 @@ class VillageRenderer {
             }
         }
 
-        // Mettre à jour le cache de placement
         this.updatePlacementCache(buildingId, x, y);
 
-        // Retourner l'objet complet pour permettre l'accès à toutes les propriétés
         return placedBuilding;
     }
 
@@ -496,7 +567,7 @@ class VillageRenderer {
     }
 
     /**
-     * Récupère un bâtiment à partir de coordonnées
+     * Récupère un bâtiment à partir de coordonnées de grille
      * @param {number} x - Coordonnée X
      * @param {number} y - Coordonnée Y
      * @returns {object|null} - L'objet bâtiment ou null si non trouvé
@@ -510,7 +581,10 @@ class VillageRenderer {
     }
 
     /**
-     * Met à jour le cache de placement
+     * Met à jour le cache de placement pour optimiser les placements futurs
+     * @param {string} buildingId - ID du bâtiment placé
+     * @param {number} x - Position X
+     * @param {number} y - Position Y
      */
     updatePlacementCache(buildingId, x, y) {
         if (['well', 'cistern'].includes(buildingId)) {
@@ -525,16 +599,19 @@ class VillageRenderer {
     }
 
     /**
-     * Finalise un bâtiment construit (par UID ou coordonnées)
+     * Finalise un bâtiment construit (marque comme terminé)
+     * Peut être appelé avec un UID ou des coordonnées
+     * @param {number} xOrUid - UID du bâtiment ou coordonnée X
+     * @param {number} [y] - Coordonnée Y (si xOrUid est une coordonnée X)
      */
     finishBuilding(xOrUid, y) {
         let placed = null;
 
-        // Si y n'est pas défini, xOrUid est un UID
         if (y === undefined) {
+            // xOrUid est un UID
             placed = this.placedBuildings[xOrUid];
         } else {
-            // Sinon, chercher par coordonnées
+            // xOrUid est une coordonnée X
             const cell = this.grid[y] && this.grid[y][xOrUid];
             if (cell && cell.buildingUid) {
                 placed = this.placedBuildings[cell.buildingUid];
@@ -545,7 +622,7 @@ class VillageRenderer {
             placed.constructing = false;
             placed.builtAt = Date.now();
 
-            // Animation de construction terminée
+            // Déclencher l'animation de construction terminée
             this.addAnimation({
                 type: 'build',
                 x: placed.x,
@@ -559,14 +636,16 @@ class VillageRenderer {
     }
 
     /**
-     * Ajoute une animation
+     * Ajoute une animation à la file d'attente
+     * @param {object} animation - Configuration de l'animation
      */
     addAnimation(animation) {
         this.animations.push(animation);
     }
 
     /**
-     * Met à jour les animations
+     * Met à jour les animations en cours (supprime celles terminées)
+     * @param {number} deltaTime - Temps écoulé depuis la dernière frame
      */
     updateAnimations(deltaTime) {
         const now = Date.now();
@@ -576,11 +655,14 @@ class VillageRenderer {
     }
 
     /**
-     * Met à jour les positions des paysans
+     * Met à jour les positions des paysans animés
+     * Les paysans se déplacent aléatoirement sur la grille
      */
     updatePeasants() {
+        // Limiter le nombre de paysans visibles à 30 pour les performances
         const peasantCount = Math.min(this.game.state.availablePeasants, 30);
 
+        // Ajouter des paysans si nécessaire
         while (this.peasantPositions.length < peasantCount) {
             this.peasantPositions.push({
                 x: Math.random() * this.gridWidth * this.tileSize,
@@ -591,19 +673,23 @@ class VillageRenderer {
             });
         }
 
+        // Retirer des paysans si trop nombreux
         while (this.peasantPositions.length > peasantCount) {
             this.peasantPositions.pop();
         }
 
+        // Déplacer chaque paysan vers sa cible
         this.peasantPositions.forEach(peasant => {
             const dx = peasant.targetX - peasant.x;
             const dy = peasant.targetY - peasant.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             if (dist < 3) {
+                // Nouvelle cible aléatoire quand destination atteinte
                 peasant.targetX = Math.random() * this.gridWidth * this.tileSize;
                 peasant.targetY = Math.random() * (this.gridHeight - 3) * this.tileSize;
             } else {
+                // Déplacement vers la cible
                 peasant.x += (dx / dist) * 0.3;
                 peasant.y += (dy / dist) * 0.3;
             }
@@ -611,7 +697,8 @@ class VillageRenderer {
     }
 
     /**
-     * Dessine le village
+     * Dessine le village complet
+     * Ordre de rendu: fond -> Nil -> grille -> bâtiments -> paysans -> animations -> survol -> décorations
      */
     render() {
         const ctx = this.ctx;
@@ -620,43 +707,33 @@ class VillageRenderer {
         ctx.fillStyle = '#c2a668';
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Dessiner le Nil
         this.drawNile();
 
         ctx.save();
         ctx.translate(this.offsetX, this.offsetY);
 
-        // Dessiner la grille
         this.drawGrid();
-
-        // Dessiner les bâtiments
         this.drawBuildings();
-
-        // Dessiner les paysans
         this.drawPeasants();
-
-        // Dessiner les animations
         this.drawAnimations();
 
-        // Dessiner le survol
         if (this.hoveredTile) {
             this.drawHover();
         }
 
         ctx.restore();
 
-        // Dessiner les décorations
         this.drawDecorations();
     }
 
     /**
-     * Dessine le Nil
+     * Dessine le Nil avec un gradient, des vagues animées et des roseaux
      */
     drawNile() {
         const ctx = this.ctx;
         const riverY = this.offsetY + (this.gridHeight - 3) * this.tileSize;
 
-        // Gradient pour l'eau
+        // Gradient bleu pour l'eau
         const gradient = ctx.createLinearGradient(0, riverY, 0, riverY + 80);
         gradient.addColorStop(0, '#4a90c2');
         gradient.addColorStop(1, '#2c5a8a');
@@ -664,7 +741,7 @@ class VillageRenderer {
         ctx.fillStyle = gradient;
         ctx.fillRect(0, riverY, this.canvas.width, 80);
 
-        // Vagues
+        // Vagues animées
         ctx.strokeStyle = 'rgba(255,255,255,0.3)';
         ctx.lineWidth = 1;
         const time = Date.now() / 1000;
@@ -682,7 +759,7 @@ class VillageRenderer {
             ctx.stroke();
         }
 
-        // Roseaux
+        // Roseaux sur la berge
         ctx.fillStyle = '#4a7c4e';
         for (let x = 20; x < this.canvas.width; x += 60) {
             const height = 25 + Math.sin(x) * 8;
@@ -693,17 +770,18 @@ class VillageRenderer {
     }
 
     /**
-     * Dessine la grille
+     * Dessine la grille de placement avec un motif en damier subtil
      */
     drawGrid() {
         const ctx = this.ctx;
 
-        for (let y = 0; y < this.gridHeight - 3; y++) { // -3 pour l'eau
+        // Ne pas dessiner sur la zone d'eau (3 dernières rangées)
+        for (let y = 0; y < this.gridHeight - 3; y++) {
             for (let x = 0; x < this.gridWidth; x++) {
                 const px = x * this.tileSize;
                 const py = y * this.tileSize;
 
-                // Fond de la tuile
+                // Motif en damier avec alternance de couleurs
                 if ((x + y) % 2 === 0) {
                     ctx.fillStyle = 'rgba(210,180,120,0.2)';
                 } else {
@@ -720,12 +798,11 @@ class VillageRenderer {
     }
 
     /**
-     * Dessine les bâtiments
+     * Dessine tous les bâtiments placés
      */
     drawBuildings() {
         const ctx = this.ctx;
 
-        // Dessiner chaque bâtiment placé
         for (const uid in this.placedBuildings) {
             const placed = this.placedBuildings[uid];
             const building = BUILDINGS[placed.buildingId];
@@ -736,7 +813,6 @@ class VillageRenderer {
             const pw = placed.width * this.tileSize;
             const ph = placed.height * this.tileSize;
 
-            // Obtenir la forme pour dessiner correctement
             const shapeConfig = BUILDING_SHAPES[placed.buildingId];
             const shapeData = shapeConfig ? shapeConfig.shapes[placed.shapeIndex || 0] : { shape: [[1]] };
 
@@ -747,7 +823,7 @@ class VillageRenderer {
                 );
                 const progress = construction ? construction.elapsed / construction.totalTime : 0;
 
-                // Dessiner la forme en construction
+                // Fond semi-transparent
                 this.drawBuildingShape(px, py, shapeData.shape, 'rgba(255,215,0,0.3)');
 
                 // Barre de progression
@@ -757,7 +833,7 @@ class VillageRenderer {
                 ctx.fillStyle = '#4ade80';
                 ctx.fillRect(px + 2, barY, (pw - 4) * progress, 6);
 
-                // Icône semi-transparente au centre
+                // Icône du bâtiment (semi-transparente)
                 ctx.globalAlpha = 0.5;
                 const iconSize = Math.min(pw, ph) * 0.6;
                 ctx.font = `${iconSize}px Arial`;
@@ -766,12 +842,13 @@ class VillageRenderer {
                 ctx.fillText(building.icon, px + pw / 2, py + ph / 2 - 5);
                 ctx.globalAlpha = 1;
 
-                // Icône de construction
+                // Icône de chantier
                 ctx.font = '12px Arial';
                 ctx.fillText('🏗️', px + pw - 10, py + 10);
             } else {
                 // Bâtiment terminé
-                // Ombre
+
+                // Ombre portée
                 ctx.fillStyle = 'rgba(0,0,0,0.15)';
                 this.drawBuildingShape(px + 3, py + 3, shapeData.shape, 'rgba(0,0,0,0.15)');
 
@@ -783,7 +860,7 @@ class VillageRenderer {
                 ctx.lineWidth = 1;
                 this.strokeBuildingShape(px, py, shapeData.shape);
 
-                // Icône
+                // Icône centrale
                 const iconSize = Math.min(pw, ph) * 0.7;
                 ctx.font = `${iconSize}px Arial`;
                 ctx.textAlign = 'center';
@@ -794,7 +871,11 @@ class VillageRenderer {
     }
 
     /**
-     * Dessine la forme d'un bâtiment
+     * Dessine la forme d'un bâtiment (remplissage)
+     * @param {number} startX - Position X de départ en pixels
+     * @param {number} startY - Position Y de départ en pixels
+     * @param {number[][]} shape - Matrice de forme
+     * @param {string} color - Couleur de remplissage
      */
     drawBuildingShape(startX, startY, shape, color) {
         const ctx = this.ctx;
@@ -816,6 +897,9 @@ class VillageRenderer {
 
     /**
      * Dessine le contour d'un bâtiment
+     * @param {number} startX - Position X de départ en pixels
+     * @param {number} startY - Position Y de départ en pixels
+     * @param {number[][]} shape - Matrice de forme
      */
     strokeBuildingShape(startX, startY, shape) {
         const ctx = this.ctx;
@@ -835,7 +919,7 @@ class VillageRenderer {
     }
 
     /**
-     * Dessine les paysans
+     * Dessine les paysans animés sur la grille
      */
     drawPeasants() {
         const ctx = this.ctx;
@@ -850,7 +934,7 @@ class VillageRenderer {
     }
 
     /**
-     * Dessine les animations
+     * Dessine les animations visuelles (flash de construction, etc.)
      */
     drawAnimations() {
         const ctx = this.ctx;
@@ -858,9 +942,10 @@ class VillageRenderer {
 
         this.animations.forEach(anim => {
             const progress = Math.min(1, (now - anim.startTime) / anim.duration);
-            if (progress >= 1) return; // Animation terminée
+            if (progress >= 1) return;
 
             if (anim.type === 'build') {
+                // Cercle doré qui s'estompe
                 const px = anim.x * this.tileSize + (anim.width * this.tileSize) / 2;
                 const py = anim.y * this.tileSize + (anim.height * this.tileSize) / 2;
                 const radius = Math.max(0, (1 - progress) * 40);
@@ -874,27 +959,27 @@ class VillageRenderer {
     }
 
     /**
-     * Dessine le survol
+     * Dessine le survol de tuile/bâtiment
      */
     drawHover() {
         const ctx = this.ctx;
         const { x, y } = this.hoveredTile;
 
-        if (y >= this.gridHeight - 3) return; // Pas de survol sur l'eau
+        // Pas de survol sur la zone d'eau
+        if (y >= this.gridHeight - 3) return;
 
         const px = x * this.tileSize;
         const py = y * this.tileSize;
 
-        // Si c'est un bâtiment, surligner avec le contour exact de la forme
         const cell = this.grid[y][x];
         if (cell && cell.buildingUid) {
+            // Survol d'un bâtiment -> surligner toute sa forme
             const placed = this.placedBuildings[cell.buildingUid];
             if (placed && placed.shape) {
                 this.drawShapeOutline(placed.x, placed.y, placed.shape, 'rgba(255,215,0,0.8)', 3);
-                // Remplissage léger sur les cellules occupées
                 this.fillShapeCells(placed.x, placed.y, placed.shape, 'rgba(255,215,0,0.1)');
             } else if (placed) {
-                // Fallback si pas de shape (bâtiment 1x1)
+                // Fallback pour bâtiment 1x1 sans shape
                 ctx.strokeStyle = 'rgba(255,215,0,0.8)';
                 ctx.lineWidth = 3;
                 ctx.strokeRect(
@@ -905,7 +990,7 @@ class VillageRenderer {
                 );
             }
         } else {
-            // Cellule vide - simple rectangle
+            // Survol d'une cellule vide
             ctx.strokeStyle = '#ffd700';
             ctx.lineWidth = 2;
             ctx.strokeRect(px, py, this.tileSize, this.tileSize);
@@ -915,7 +1000,12 @@ class VillageRenderer {
     }
 
     /**
-     * Dessine le contour exact d'une forme de bâtiment
+     * Dessine le contour exact d'une forme de bâtiment (bords extérieurs uniquement)
+     * @param {number} startX - Position X en tuiles
+     * @param {number} startY - Position Y en tuiles
+     * @param {number[][]} shape - Matrice de forme
+     * @param {string} color - Couleur du contour
+     * @param {number} lineWidth - Épaisseur du trait
      */
     drawShapeOutline(startX, startY, shape, color, lineWidth) {
         const ctx = this.ctx;
@@ -927,7 +1017,7 @@ class VillageRenderer {
         ctx.lineWidth = lineWidth;
         ctx.beginPath();
 
-        // Pour chaque cellule occupée, dessiner les bords extérieurs
+        // Pour chaque cellule occupée, dessiner uniquement les bords extérieurs
         for (let dy = 0; dy < height; dy++) {
             for (let dx = 0; dx < width; dx++) {
                 if (shape[dy][dx] !== 1) continue;
@@ -966,6 +1056,10 @@ class VillageRenderer {
 
     /**
      * Remplit les cellules d'une forme avec une couleur
+     * @param {number} startX - Position X en tuiles
+     * @param {number} startY - Position Y en tuiles
+     * @param {number[][]} shape - Matrice de forme
+     * @param {string} color - Couleur de remplissage
      */
     fillShapeCells(startX, startY, shape, color) {
         const ctx = this.ctx;
@@ -988,25 +1082,27 @@ class VillageRenderer {
     }
 
     /**
-     * Dessine les décorations
+     * Dessine les décorations (palmiers, soleil) autour de la grille
      */
     drawDecorations() {
         const ctx = this.ctx;
+        const gridRight = this.offsetX + this.gridWidth * this.tileSize;
 
-        // Palmiers
+        // Palmiers aux quatre coins de la grille
         ctx.font = '30px Arial';
-        ctx.fillText('🌴', 25, 100);
-        ctx.fillText('🌴', this.canvas.width - 380, 150);
-        ctx.fillText('🌴', 40, this.canvas.height - 140);
-        ctx.fillText('🌴', this.canvas.width - 400, this.canvas.height - 160);
+        ctx.fillText('🌴', this.offsetX - 40, this.offsetY + 30);
+        ctx.fillText('🌴', gridRight + 10, this.offsetY + 50);
+        ctx.fillText('🌴', this.offsetX - 35, this.offsetY + (this.gridHeight - 4) * this.tileSize);
+        ctx.fillText('🌴', gridRight + 15, this.offsetY + (this.gridHeight - 5) * this.tileSize);
 
-        // Soleil
+        // Soleil en haut à droite
         ctx.font = '40px Arial';
-        ctx.fillText('☀️', this.canvas.width - 420, 50);
+        ctx.fillText('☀️', this.canvas.width - 60, 50);
     }
 
     /**
-     * Boucle de mise à jour
+     * Boucle de mise à jour appelée chaque frame
+     * @param {number} deltaTime - Temps écoulé depuis la dernière frame en ms
      */
     update(deltaTime) {
         this.updateAnimations(deltaTime);
@@ -1014,7 +1110,8 @@ class VillageRenderer {
     }
 
     /**
-     * Exporte l'état pour la sauvegarde
+     * Exporte l'état du renderer pour la sauvegarde
+     * @returns {object} - État sérialisable
      */
     exportState() {
         return {
@@ -1026,6 +1123,7 @@ class VillageRenderer {
 
     /**
      * Importe l'état depuis une sauvegarde
+     * @param {object} savedState - État sauvegardé
      */
     importState(savedState) {
         if (!savedState) return;
@@ -1039,7 +1137,7 @@ class VillageRenderer {
             this.placedBuildings = savedState.placedBuildings;
             this.nextBuildingUid = savedState.nextBuildingUid || 1;
 
-            // Reconstruire la grille
+            // Reconstruire la grille à partir des bâtiments
             for (const uid in this.placedBuildings) {
                 const placed = this.placedBuildings[uid];
                 const shapeConfig = BUILDING_SHAPES[placed.buildingId];
@@ -1047,7 +1145,7 @@ class VillageRenderer {
                     shapeConfig.shapes[placed.shapeIndex || 0] :
                     { width: 1, height: 1, shape: [[1]] };
 
-                // Marquer les cellules
+                // Marquer les cellules occupées
                 for (let dy = 0; dy < shapeData.height; dy++) {
                     for (let dx = 0; dx < shapeData.width; dx++) {
                         if (shapeData.shape[dy][dx] === 1) {
@@ -1065,7 +1163,7 @@ class VillageRenderer {
             }
         }
 
-        // Restaurer le cache
+        // Restaurer le cache de placement
         if (savedState.placementCache) {
             this.placementCache = savedState.placementCache;
         }

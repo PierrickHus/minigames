@@ -18,6 +18,7 @@
                 <button data-action="newGame">Nouvelle Partie</button>
                 <button data-action="loadGame" id="loadBtn" disabled>Charger</button>
                 <button data-action="showGuide">Guide du Jeu</button>
+                <button data-action="showSettings">Parametres</button>
             </div>
         </div>
         <div class="menu-footer">
@@ -99,7 +100,7 @@
                         <span class="next-task-label">Prochaine mission:</span>
                         <span id="nextTaskCountdown">--</span>
                     </div>
-                    <div id="currentTask" class="hidden">
+                    <div id="currentTask">
                         <div class="task-header-row">
                             <div class="task-header">Tâches de Cléopâtre:</div>
                             <label class="toggle-switch" title="Envoi automatique des ressources">
@@ -118,7 +119,6 @@
             <div class="panel-tabs">
                 <button class="tab-btn active" data-tab="buildings">Bâtiments</button>
                 <button class="tab-btn" data-tab="tasks">Tâches</button>
-                <button class="tab-btn" data-tab="resources">Ressources</button>
                 <button class="tab-btn" data-tab="stats">Stats</button>
             </div>
 
@@ -130,44 +130,6 @@
             <!-- Onglet Tâches -->
             <div id="tasksTab" class="tab-content">
                 <div id="tasksList"></div>
-            </div>
-
-            <!-- Onglet Ressources -->
-            <div id="resourcesTab" class="tab-content">
-                <div class="resource-section">
-                    <h4>Ressources stockées</h4>
-                    <div id="resourcesStock">
-                        <div class="resource-item">
-                            <span class="resource-icon">🪵</span>
-                            <span class="resource-name">Bois</span>
-                            <span id="woodStock" class="resource-value">0</span>
-                        </div>
-                        <div class="resource-item">
-                            <span class="resource-icon">🪨</span>
-                            <span class="resource-name">Pierre</span>
-                            <span id="stoneStock" class="resource-value">0</span>
-                        </div>
-                        <div class="resource-item">
-                            <span class="resource-icon">🏜️</span>
-                            <span class="resource-name">Sable</span>
-                            <span id="sandStock" class="resource-value">0</span>
-                        </div>
-                        <div class="resource-item">
-                            <span class="resource-icon">🟤</span>
-                            <span class="resource-name">Terre</span>
-                            <span id="dirtStock" class="resource-value">0</span>
-                        </div>
-                        <div class="resource-item">
-                            <span class="resource-icon">🧱</span>
-                            <span class="resource-name">Argile</span>
-                            <span id="clayStock" class="resource-value">0</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="resource-actions">
-                    <h4>Envoyer chercher des ressources</h4>
-                    <div id="gatherButtons"></div>
-                </div>
             </div>
 
             <!-- Onglet Statistiques (résumé) -->
@@ -192,6 +154,156 @@
             <button class="close-btn" data-action="closeSidePanel">✕</button>
         </div>
     </div>
+
+        <!-- Panneau de ressources (fixe en bas) -->
+        <div id="resourcesBar">
+            <div class="resources-bar-content">
+                <!-- Multiplicateur -->
+                <div class="resources-multiplier">
+                    <span class="mult-label">Ouvriers:</span>
+                    <div class="mult-buttons" id="resourceMultiplierBar">
+                        <button type="button" class="mult-btn active" data-mult="1">x1</button>
+                        <button type="button" class="mult-btn" data-mult="5">x5</button>
+                        <button type="button" class="mult-btn" data-mult="10">x10</button>
+                        <button type="button" class="mult-btn" data-mult="max">Max</button>
+                    </div>
+                </div>
+
+                <!-- Liste des ressources -->
+                <div class="resources-list" id="resourcesBarList">
+                    <!-- Bois -->
+                    <div class="resource-bar-item" data-resource="wood">
+                        <div class="resource-bar-icon">🪵</div>
+                        <div class="resource-bar-info">
+                            <div class="resource-bar-name">Bois</div>
+                            <div class="resource-bar-stock">Stock: <span id="woodStockBar">0</span></div>
+                        </div>
+                        <div class="resource-bar-gather">
+                            <div class="resource-bar-yield">+10</div>
+                            <div class="resource-bar-time">⏱️ 15s</div>
+                        </div>
+                        <div class="resource-bar-action">
+                            <button type="button" class="gather-btn">
+                                <span class="gather-btn-cost">💰5</span>
+                                <span class="gather-btn-label">Chercher</span>
+                            </button>
+                        </div>
+                        <div class="resource-bar-progress hidden">
+                            <div class="progress-fill"></div>
+                            <span class="progress-text">0%</span>
+                        </div>
+                    </div>
+
+                    <!-- Pierre -->
+                    <div class="resource-bar-item" data-resource="stone">
+                        <div class="resource-bar-icon">🪨</div>
+                        <div class="resource-bar-info">
+                            <div class="resource-bar-name">Pierre</div>
+                            <div class="resource-bar-stock">Stock: <span id="stoneStockBar">0</span></div>
+                        </div>
+                        <div class="resource-bar-gather">
+                            <div class="resource-bar-yield">+8</div>
+                            <div class="resource-bar-time">⏱️ 20s</div>
+                        </div>
+                        <div class="resource-bar-action">
+                            <button type="button" class="gather-btn">
+                                <span class="gather-btn-cost">💰8</span>
+                                <span class="gather-btn-label">Chercher</span>
+                            </button>
+                        </div>
+                        <div class="resource-bar-progress hidden">
+                            <div class="progress-fill"></div>
+                            <span class="progress-text">0%</span>
+                        </div>
+                    </div>
+
+                    <!-- Sable -->
+                    <div class="resource-bar-item" data-resource="sand">
+                        <div class="resource-bar-icon">🏜️</div>
+                        <div class="resource-bar-info">
+                            <div class="resource-bar-name">Sable</div>
+                            <div class="resource-bar-stock">Stock: <span id="sandStockBar">0</span></div>
+                        </div>
+                        <div class="resource-bar-gather">
+                            <div class="resource-bar-yield">+15</div>
+                            <div class="resource-bar-time">⏱️ 10s</div>
+                        </div>
+                        <div class="resource-bar-action">
+                            <button type="button" class="gather-btn">
+                                <span class="gather-btn-cost">💰3</span>
+                                <span class="gather-btn-label">Chercher</span>
+                            </button>
+                        </div>
+                        <div class="resource-bar-progress hidden">
+                            <div class="progress-fill"></div>
+                            <span class="progress-text">0%</span>
+                        </div>
+                    </div>
+
+                    <!-- Terre -->
+                    <div class="resource-bar-item" data-resource="dirt">
+                        <div class="resource-bar-icon">🟤</div>
+                        <div class="resource-bar-info">
+                            <div class="resource-bar-name">Terre</div>
+                            <div class="resource-bar-stock">Stock: <span id="dirtStockBar">0</span></div>
+                        </div>
+                        <div class="resource-bar-gather">
+                            <div class="resource-bar-yield">+12</div>
+                            <div class="resource-bar-time">⏱️ 12s</div>
+                        </div>
+                        <div class="resource-bar-action">
+                            <button type="button" class="gather-btn">
+                                <span class="gather-btn-cost">💰4</span>
+                                <span class="gather-btn-label">Chercher</span>
+                            </button>
+                        </div>
+                        <div class="resource-bar-progress hidden">
+                            <div class="progress-fill"></div>
+                            <span class="progress-text">0%</span>
+                        </div>
+                    </div>
+
+                    <!-- Argile -->
+                    <div class="resource-bar-item" data-resource="clay">
+                        <div class="resource-bar-icon">🧱</div>
+                        <div class="resource-bar-info">
+                            <div class="resource-bar-name">Argile</div>
+                            <div class="resource-bar-stock">Stock: <span id="clayStockBar">0</span></div>
+                        </div>
+                        <div class="resource-bar-gather">
+                            <div class="resource-bar-yield">+6</div>
+                            <div class="resource-bar-time">⏱️ 25s</div>
+                        </div>
+                        <div class="resource-bar-action">
+                            <button type="button" class="gather-btn">
+                                <span class="gather-btn-cost">💰10</span>
+                                <span class="gather-btn-label">Chercher</span>
+                            </button>
+                        </div>
+                        <div class="resource-bar-progress hidden">
+                            <div class="progress-fill"></div>
+                            <span class="progress-text">0%</span>
+                        </div>
+                    </div>
+
+                    <!-- Oiseaux (affichage spécial) -->
+                    <div class="resource-bar-item bird-bar-item" data-resource="birds">
+                        <div class="resource-bar-icon">🕊️</div>
+                        <div class="resource-bar-info">
+                            <div class="resource-bar-name">Oiseaux</div>
+                            <div class="resource-bar-stock"><span id="birdsStockBar">0/0</span></div>
+                        </div>
+                        <div class="resource-bar-gather">
+                            <div class="resource-bar-yield">Volières</div>
+                            <div class="resource-bar-time">1/30s</div>
+                        </div>
+                        <div class="resource-bar-action">
+                            <span class="bird-info">Auto</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Écran Guide -->

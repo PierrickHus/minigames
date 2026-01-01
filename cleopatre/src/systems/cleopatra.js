@@ -1,107 +1,213 @@
 // ==========================================
 // SYSTÈME DE CLÉOPÂTRE
 // ==========================================
+// Ce système gère les interactions avec Cléopâtre, la reine d'Égypte.
+// Il assigne des tâches au joueur (construction, collecte, nourriture, messages),
+// gère l'humeur de Cléopâtre et détermine la progression de la partie.
+// L'humeur à 0% = Game Over (exécution par Cléopâtre)
+// ==========================================
 
 import { CLEOPATRA_TASKS, CLEOPATRA_IDLE_MESSAGES, REWARD_MESSAGES, DIFFICULTY_CONFIG, BUILDINGS, RESOURCES } from '../data/index.js';
 import CleopatraSprite from './cleopatra-sprite.js';
 
+/**
+ * Système de gestion de Cléopâtre et de ses missions
+ * Gère l'attribution des tâches, leur suivi, les récompenses et l'humeur de la reine
+ */
 class CleopatraSystem {
+    /**
+     * Crée une nouvelle instance du système Cléopâtre
+     * @param {Game} game - Instance du jeu principal
+     */
     constructor(game) {
+        /** @type {Game} Référence au jeu principal */
         this.game = game;
 
-        // Liste des tâches actives (peut en avoir plusieurs)
+        /** @type {Array<object>} Liste des tâches actives (peut en avoir plusieurs simultanément) */
         this.activeTasks = [];
 
-        // Nombre maximum de tâches simultanées
+        /** @type {number} Nombre maximum de tâches simultanées autorisées */
         this.maxActiveTasks = 3;
 
-        // Délai entre l'ajout de nouvelles tâches (en secondes)
+        // Configuration des délais de tâches
+        /** @type {number} Délai entre l'ajout de nouvelles tâches (en secondes) */
         this.taskCooldown = 45;
-        this.lastTaskTime = 0;
+        /** @type {number} Délai initial avant la première tâche (en secondes) */
+        this.initialDelay = 10;
+        /** @type {number} Timestamp du dernier ajout de tâche */
+        this.lastTaskTime = Date.now() - (this.taskCooldown - this.initialDelay) * 1000;
 
-        // Messages
+        // Système de messages
+        /** @type {string} Message actuellement affiché par Cléopâtre */
         this.currentMessage = "Bienvenue, chef de village. Je compte sur vous pour faire prospérer ce village.";
-
-        // Intervalle de messages idle
-        this.idleMessageInterval = 20000; // 20 secondes
+        /** @type {number} Intervalle entre les messages idle (en ms) */
+        this.idleMessageInterval = 20000;
+        /** @type {number} Timestamp du dernier message idle */
         this.lastIdleMessageTime = Date.now();
 
         // Sprite de Cléopâtre
+        /** @type {CleopatraSprite|null} Instance du sprite animé de Cléopâtre */
         this.sprite = null;
         // Initialiser le sprite après un court délai pour s'assurer que le DOM est prêt
         setTimeout(() => this.initSprite(), 200);
+
+        // État pour détecter les changements de liste
+        /** @type {number} Nombre de tâches au dernier update (pour détecter les transitions) */
+        this._previousTaskCount = 0;
+
+        // Timer séparé pour les tâches de type "message" (invisible au joueur)
+        /** @type {number} Timer interne pour les tâches de message */
+        this.messageTaskTimer = 0;
+        /** @type {number} Délai jusqu'à la prochaine tâche de message */
+        this.nextMessageTaskTime = this.getRandomMessageTaskDelay();
+
+        // Initialiser l'affichage de la liste vide
+        this.initEmptyTaskDisplay();
     }
 
     /**
-     * Initialise le sprite de Cléopâtre
+     * Génère un délai aléatoire pour la prochaine tâche de message
+     * Le délai est compris entre 60 et 180 secondes (1 à 3 minutes)
+     * @returns {number} Délai en secondes
+     */
+    getRandomMessageTaskDelay() {
+        return 60 + Math.random() * 120;
+    }
+
+    /**
+     * Initialise l'affichage lorsque la liste de tâches est vide
+     * Affiche un message "Aucune mission en cours"
+     */
+    initEmptyTaskDisplay() {
+        const desc = document.getElementById('taskDescription');
+        if (desc && this.activeTasks.length === 0) {
+            desc.innerHTML = '<div class="no-tasks">Aucune mission en cours</div>';
+        }
+    }
+
+    /**
+     * Initialise le sprite animé de Cléopâtre
+     * Le sprite est attaché au conteneur du portrait dans le DOM
      */
     initSprite() {
         const portraitContainer = document.querySelector('.cleopatra-portrait');
         if (portraitContainer) {
             this.sprite = new CleopatraSprite(portraitContainer);
-            // Initialiser l'humeur du sprite
+            // Synchroniser l'humeur du sprite avec l'état du jeu
             this.sprite.setMood(this.game.state.cleopatraMood);
         }
     }
 
     /**
-     * Met à jour le système
+     * Met à jour le système à chaque frame du jeu
+     * Gère les timers, vérifie la complétion/échec des tâches, et déclenche de nouvelles tâches
+     * @param {number} deltaTime - Temps écoulé depuis la dernière frame (en secondes)
      */
     update(deltaTime) {
         const now = Date.now();
 
-        // Mettre à jour toutes les tâches actives
+        // Mettre à jour toutes les tâches actives (itération inverse pour suppression sûre)
         for (let i = this.activeTasks.length - 1; i >= 0; i--) {
             const task = this.activeTasks[i];
+            // Calculer le temps restant
             task.timeRemaining = task.timeLimit - ((now - task.startTime) / 1000);
 
-            // Vérifier si le temps est écoulé
+            // Vérifier si le temps est écoulé → échec de la tâche
             if (task.timeRemaining <= 0) {
                 this.failTask(task);
                 continue;
             }
 
-            // Vérifier si la tâche est complétée
-            if (this.checkTaskCompletion(task)) {
+            // Vérifier si la tâche est complétée (et pas déjà en cours de finalisation)
+            if (!task.isCompleting && this.checkTaskCompletion(task)) {
                 this.completeTask(task);
                 continue;
             }
 
-            // Message de rappel à mi-temps
+            // Construction automatique si l'option est activée et que c'est une tâche de construction
+            if (this.game.state.autoSendResources && task.type === 'build') {
+                this.tryAutoBuild(task);
+            }
+
+            // Message de rappel à mi-temps (une seule fois par tâche)
             if (task.timeRemaining < task.timeLimit / 2 && !task.reminderSent) {
                 task.reminderSent = true;
                 this.game.notifications.warning(`⏰ ${task.name} - Dépêchez-vous !`);
             }
         }
 
-        // Mettre à jour l'affichage
+        // Mettre à jour l'affichage des tâches
         this.updateTasksDisplay();
 
         // Vérifier si on peut ajouter une nouvelle tâche
         const timeSinceLastTask = (now - this.lastTaskTime) / 1000;
         const timeUntilNextTask = this.taskCooldown - timeSinceLastTask;
 
-        // Mettre à jour le timer de prochaine mission
+        // Mettre à jour le timer de prochaine mission dans l'UI
         this.updateNextTaskTimer(timeUntilNextTask);
 
+        // Ajouter une nouvelle tâche si le cooldown est passé et qu'on n'a pas atteint le max
         if (timeSinceLastTask > this.taskCooldown && this.activeTasks.length < this.maxActiveTasks) {
             this.assignNewTask();
         }
 
-        // Messages idle aléatoires (seulement si pas de tâches)
+        // Messages idle aléatoires (uniquement si aucune tâche active)
         if (this.activeTasks.length === 0 && now - this.lastIdleMessageTime > this.idleMessageInterval) {
             this.showIdleMessage();
             this.lastIdleMessageTime = now;
         }
+
+        // Timer séparé et invisible pour les tâches de messages (ex: message à César)
+        this.messageTaskTimer += deltaTime;
+        if (this.messageTaskTimer >= this.nextMessageTaskTime) {
+            this.tryAssignMessageTask();
+            this.messageTaskTimer = 0;
+            this.nextMessageTaskTime = this.getRandomMessageTaskDelay();
+        }
     }
 
     /**
-     * Calcule le tier maximum disponible selon le temps de jeu
+     * Tente d'assigner une tâche de message (envoi de pigeon à César)
+     * Cette méthode est appelée sur un timer invisible séparé du système de tâches principal.
+     * Conditions requises: volière construite, pas de tâche message déjà active, place disponible
+     */
+    tryAssignMessageTask() {
+        // Vérifier qu'une volière existe
+        if (!this.game.hasBuilding('aviary')) {
+            return;
+        }
+
+        // Vérifier qu'il n'y a pas déjà une tâche de message active
+        const hasActiveMessageTask = this.activeTasks.some(t => t.type === 'message');
+        if (hasActiveMessageTask) {
+            return;
+        }
+
+        // Vérifier qu'on n'a pas atteint le max de tâches
+        if (this.activeTasks.length >= this.maxActiveTasks) {
+            return;
+        }
+
+        // Chercher la tâche send_message dans les templates
+        const messageTaskTemplate = CLEOPATRA_TASKS.find(t => t.id === 'send_message');
+        if (!messageTaskTemplate) {
+            return;
+        }
+
+        // Créer la tâche
+        this.assignSpecificTask('send_message');
+    }
+
+    /**
+     * Calcule le tier maximum de tâches disponible selon le temps de jeu
+     * Les tiers supérieurs se débloquent progressivement pour augmenter la difficulté
+     * @returns {number} Tier maximum disponible (1, 2, 3...)
      */
     getMaxAvailableTier() {
         const gameTime = this.game.state.gameTime || 0; // temps en secondes
         let maxTier = 1;
 
+        // Parcourir les temps de déverrouillage définis dans la config
         for (const [tier, unlockTime] of Object.entries(DIFFICULTY_CONFIG.tierUnlockTimes)) {
             if (gameTime >= unlockTime) {
                 maxTier = Math.max(maxTier, parseInt(tier));
@@ -113,6 +219,9 @@ class CleopatraSystem {
 
     /**
      * Calcule le multiplicateur de ressources selon le temps de jeu
+     * Les quantités demandées augmentent progressivement avec le temps
+     * Formule: 1 + (minutes_de_jeu * facteur_par_minute), plafonné au max configuré
+     * @returns {number} Multiplicateur à appliquer aux quantités de ressources
      */
     getResourceMultiplier() {
         const gameTimeMinutes = (this.game.state.gameTime || 0) / 60;
@@ -121,7 +230,9 @@ class CleopatraSystem {
     }
 
     /**
-     * Assigne une nouvelle tâche
+     * Assigne une nouvelle tâche aléatoire parmi celles disponibles
+     * Filtre les tâches selon: tier actuel, bâtiments requis, place disponible
+     * Configure la tâche avec des valeurs concrètes et l'ajoute à la liste active
      */
     assignNewTask() {
         const maxTier = this.getMaxAvailableTier();
@@ -138,11 +249,15 @@ class CleopatraSystem {
                 return false;
             }
 
-            // Vérifier si le bâtiment n'a pas atteint le max
+            // Vérifier si le bâtiment n'a pas atteint le max (inclure les constructions en cours et réservées)
             if (task.type === 'build') {
                 const building = BUILDINGS[task.building];
                 const count = this.game.getBuildingCount(task.building);
-                if (count >= building.maxCount) {
+                const inProgress = this.game.state.constructions.filter(c => c.buildingId === task.building).length;
+                const reserved = this.getReservedBuildingCount(task.building);
+                const minRequired = Math.min(...task.count);
+                // Vérifier s'il reste assez de place pour au moins le minimum requis
+                if (count + inProgress + reserved + minRequired > building.maxCount) {
                     return false;
                 }
             }
@@ -154,18 +269,36 @@ class CleopatraSystem {
             return;
         }
 
-        // Choisir une tâche aléatoire
+        // Choisir une tâche aléatoire parmi les possibles
         const taskTemplate = possibleTasks[Math.floor(Math.random() * possibleTasks.length)];
 
-        // Créer la tâche avec des valeurs concrètes
+        // Créer une copie de la tâche pour la modifier
         const task = { ...taskTemplate };
 
-        // Déterminer le nombre/quantité
+        // Déterminer le nombre/quantité cible
         if (task.count) {
-            task.targetCount = task.count[Math.floor(Math.random() * task.count.length)];
+            if (task.type === 'build') {
+                // Pour les constructions, limiter au nombre de places restantes
+                const building = BUILDINGS[task.building];
+                const count = this.game.getBuildingCount(task.building);
+                const inProgress = this.game.state.constructions.filter(c => c.buildingId === task.building).length;
+                const reserved = this.getReservedBuildingCount(task.building);
+                const remaining = building.maxCount - count - inProgress - reserved;
+
+                // Filtrer les counts possibles selon la place restante
+                const possibleCounts = task.count.filter(c => c <= remaining);
+                if (possibleCounts.length > 0) {
+                    task.targetCount = possibleCounts[Math.floor(Math.random() * possibleCounts.length)];
+                } else {
+                    task.targetCount = remaining;
+                }
+            } else {
+                // Pour les autres types, choisir aléatoirement dans la liste
+                task.targetCount = task.count[Math.floor(Math.random() * task.count.length)];
+            }
         }
 
-        // Pour les ressources
+        // Pour les tâches de collecte, choisir une ressource aléatoire
         if (task.resources) {
             task.targetResource = task.resources[Math.floor(Math.random() * task.resources.length)];
         }
@@ -176,13 +309,14 @@ class CleopatraSystem {
             task.targetCount = Math.round(task.targetCount * multiplier);
         }
 
-        // Remplacer les variables dans les messages
+        // Fonction helper pour remplacer les variables dans les textes
         const replaceVars = (text) => {
             return text
                 .replace('{count}', task.targetCount || 1)
                 .replace('{resource}', task.targetResource ? RESOURCES[task.targetResource].name : '');
         };
 
+        // Appliquer les remplacements aux messages
         task.messages = {
             start: replaceVars(task.messages.start),
             reminder: replaceVars(task.messages.reminder),
@@ -192,10 +326,10 @@ class CleopatraSystem {
 
         task.description = replaceVars(task.description);
 
-        // Stocker l'état initial pour vérification
+        // Stocker l'état initial pour vérifier la progression
         task.initialState = this.captureRelevantState(task);
 
-        // Ajouter la tâche à la liste des tâches actives
+        // Initialiser les métadonnées de la tâche
         task.startTime = Date.now();
         task.timeRemaining = task.timeLimit;
         task.id = Date.now() + Math.random(); // ID unique
@@ -204,31 +338,59 @@ class CleopatraSystem {
         // Mettre à jour le dernier temps d'ajout de tâche
         this.lastTaskTime = Date.now();
 
-        // Afficher le message
+        // Afficher le message de démarrage
         this.setMessage(task.messages.start);
         this.game.notifications.cleopatra(task.name);
+
+        // Jouer un son de nouvelle tâche
+        this.game.playCleopatraNewTaskSound();
 
         // Afficher le panneau de tâches
         this.showTaskPanel();
     }
 
     /**
-     * Capture l'état pertinent pour la tâche
+     * Calcule le nombre de bâtiments déjà réservés par des tâches actives
+     * Évite d'assigner des tâches impossibles à compléter
+     * @param {string} buildingId - ID du type de bâtiment
+     * @returns {number} Nombre de bâtiments réservés par d'autres tâches
+     */
+    getReservedBuildingCount(buildingId) {
+        let reserved = 0;
+        for (const activeTask of this.activeTasks) {
+            if (activeTask.type === 'build' && activeTask.building === buildingId && !activeTask.isCompleting) {
+                reserved += activeTask.targetCount;
+            }
+        }
+        return reserved;
+    }
+
+    /**
+     * Capture l'état actuel du jeu pertinent pour une tâche
+     * Utilisé comme référence pour mesurer la progression
+     * @param {object} task - Tâche pour laquelle capturer l'état
+     * @returns {object} État capturé (structure dépend du type de tâche)
      */
     captureRelevantState(task) {
         const state = {};
 
         switch (task.type) {
             case 'build':
+                // Capturer le nombre total de bâtiments (construits + en cours + réservés)
                 state.buildingCount = this.game.getBuildingCount(task.building);
+                state.pendingCount = this.game.state.constructions.filter(c => c.buildingId === task.building).length;
+                state.reservedByOtherTasks = this.getReservedBuildingCount(task.building);
                 break;
             case 'gather':
+                // Capturer le stock actuel de la ressource
                 state.resourceAmount = this.game.state.resources[task.targetResource] || 0;
                 break;
             case 'feed':
+                // Capturer le stock de nourriture
                 state.foodAmount = this.game.state.food;
                 break;
             case 'message':
+                // Capturer le nombre de messages envoyés à César
                 state.messagesSent = this.game.state.messagesSentToCaesar || 0;
                 break;
         }
@@ -238,6 +400,9 @@ class CleopatraSystem {
 
     /**
      * Vérifie si une tâche est complétée
+     * La logique dépend du type de tâche (build, gather, feed, message)
+     * @param {object} task - Tâche à vérifier
+     * @returns {boolean} true si la tâche est complétée
      */
     checkTaskCompletion(task) {
         if (!task) return false;
@@ -248,12 +413,15 @@ class CleopatraSystem {
                 const builtCount = this.game.getBuildingCount(task.building);
                 const pendingCount = this.game.state.constructions.filter(c => c.buildingId === task.building).length;
                 const totalCount = builtCount + pendingCount;
-                const needed = task.initialState.buildingCount + task.targetCount;
+                // Calculer l'objectif en tenant compte de l'état initial complet
+                const initialTotal = task.initialState.buildingCount
+                    + (task.initialState.pendingCount || 0)
+                    + (task.initialState.reservedByOtherTasks || 0);
+                const needed = initialTotal + task.targetCount;
                 return totalCount >= needed;
 
             case 'gather':
-                // Les tâches de collecte nécessitent un envoi manuel
-                // Sauf si auto-send est activé
+                // Les tâches de collecte nécessitent un envoi manuel (sauf si auto-send activé)
                 if (this.game.state.autoSendResources) {
                     return this.canSendResourcesForTask(task);
                 }
@@ -261,9 +429,11 @@ class CleopatraSystem {
                 return task.resourcesSent === true;
 
             case 'feed':
+                // Vérifier si le stock de nourriture atteint l'objectif
                 return this.game.state.food >= task.targetCount;
 
             case 'message':
+                // Vérifier si un nouveau message a été envoyé depuis le début de la tâche
                 const messagesSent = this.game.state.messagesSentToCaesar || 0;
                 return messagesSent > task.initialState.messagesSent;
 
@@ -273,7 +443,36 @@ class CleopatraSystem {
     }
 
     /**
-     * Vérifie si on peut envoyer les ressources pour une tâche spécifique
+     * Tente de construire automatiquement un bâtiment pour une tâche
+     * Appelé uniquement si autoSendResources est activé et pour les tâches de type 'build'
+     * @param {object} task - Tâche de construction à traiter
+     */
+    tryAutoBuild(task) {
+        if (!task || task.type !== 'build') return;
+
+        // Calculer combien de bâtiments on doit encore construire
+        const builtCount = this.game.getBuildingCount(task.building);
+        const pendingCount = this.game.state.constructions.filter(c => c.buildingId === task.building).length;
+        const totalCount = builtCount + pendingCount;
+        // Prendre en compte l'état initial complet
+        const initialTotal = task.initialState.buildingCount
+            + (task.initialState.pendingCount || 0)
+            + (task.initialState.reservedByOtherTasks || 0);
+        const needed = initialTotal + task.targetCount;
+
+        // Si on a déjà assez de bâtiments (construits + en cours), ne rien faire
+        if (totalCount >= needed) return;
+
+        // Tenter de construire un bâtiment si les ressources sont disponibles
+        if (this.game.canBuild(task.building)) {
+            this.game.startBuilding(task.building);
+        }
+    }
+
+    /**
+     * Vérifie si le joueur peut envoyer les ressources pour compléter une tâche de collecte
+     * @param {object} task - Tâche de type 'gather' à vérifier
+     * @returns {boolean} true si les ressources sont suffisantes
      */
     canSendResourcesForTask(task) {
         if (!task || task.type !== 'gather') return false;
@@ -283,7 +482,10 @@ class CleopatraSystem {
     }
 
     /**
-     * Envoie manuellement les ressources pour compléter une tâche
+     * Envoie manuellement les ressources pour compléter une tâche de collecte
+     * Appelé par le bouton d'envoi dans l'UI
+     * @param {number} taskId - ID unique de la tâche
+     * @returns {boolean} true si l'envoi a réussi
      */
     sendResourcesForTask(taskId) {
         const task = this.activeTasks.find(t => t.id === taskId);
@@ -299,15 +501,21 @@ class CleopatraSystem {
             return false;
         }
 
-        // Marquer comme envoyé (sera consommé dans completeTask)
+        // Marquer comme envoyé (les ressources seront consommées dans completeTask)
         task.resourcesSent = true;
         return true;
     }
 
     /**
      * Complète une tâche avec succès
+     * Distribue les récompenses, améliore l'humeur, joue les animations et sons
+     * @param {object} task - Tâche à compléter
      */
     completeTask(task) {
+        // Empêcher les doubles completions
+        if (task.isCompleting) return;
+        task.isCompleting = true;
+
         // Consommer les ressources si c'est une tâche de collecte avec consumeResources
         if (task.type === 'gather' && task.consumeResources && task.targetResource) {
             const resourceToConsume = task.targetCount;
@@ -318,32 +526,48 @@ class CleopatraSystem {
             this.game.notifications.info(`${resource.icon} -${resourceToConsume} envoyé à Cléopâtre`);
         }
 
-        // Récompense
+        // Donner la récompense en argent
         this.game.addMoney(task.reward);
 
         // Calculer le bonus d'humeur en fonction du temps restant
-        // Plus il reste de temps, plus le bonus est grand (5 à 25 points)
+        // Plus il reste de temps, plus le bonus est grand (5 minimum, jusqu'à 25 si très rapide)
         const timeRatio = task.timeRemaining / task.timeLimit;
-        const moodGain = Math.round(5 + (timeRatio * 20)); // 5 minimum, jusqu'à 25 si très rapide
+        const moodGain = Math.round(5 + (timeRatio * 20));
 
         // Améliorer l'humeur de Cléopâtre
         this.changeMood(moodGain);
 
-        // Message de succès
+        // Afficher le message de succès
         this.setMessage(task.messages.success);
         this.game.notifications.success(`✓ ${task.name} +${task.reward} 💰 | Humeur +${moodGain}`);
 
-        // Retirer la tâche de la liste
-        this.removeTask(task);
+        // Jouer le son de tâche réussie
+        this.game.playCleopatraTaskSuccessSound();
+
+        // Ajouter l'animation de complétion à l'élément DOM
+        const taskElement = document.querySelector(`.task-item-cleo[data-task-id="${task.id}"]`);
+        if (taskElement) {
+            taskElement.classList.add('completed');
+            // Retirer la tâche après l'animation (1.6s = 1s délai + 0.6s fadeout)
+            setTimeout(() => {
+                this.removeTask(task);
+            }, 1600);
+        } else {
+            // Si pas d'élément DOM, retirer immédiatement
+            this.removeTask(task);
+        }
 
         // Réduire le cooldown progressivement pour augmenter la difficulté
+        // Minimum: 20 secondes
         if (this.taskCooldown > 20) {
             this.taskCooldown -= 1;
         }
     }
 
     /**
-     * Échoue une tâche
+     * Échoue une tâche (temps écoulé)
+     * Applique les pénalités d'humeur, joue les sons d'échec
+     * @param {object} task - Tâche échouée
      */
     failTask(task) {
         // Pour les tâches de collecte, tenter un envoi automatique à la dernière seconde
@@ -354,17 +578,20 @@ class CleopatraSystem {
             return;
         }
 
-        // Message d'échec
+        // Afficher le message d'échec
         this.setMessage(task.messages.failure);
 
         // Calculer la perte d'humeur en fonction du temps alloué
-        // Plus la tâche était longue (temps alloué), plus la pénalité est grande
+        // Plus la tâche était longue, plus la pénalité est grande (~5 par minute allouée)
         const basePenalty = 5;
-        const timePenalty = Math.round(task.timeLimit / 12); // ~5 par minute allouée
+        const timePenalty = Math.round(task.timeLimit / 12);
         const moodLoss = Math.max(10, basePenalty + timePenalty);
 
         this.changeMood(-moodLoss);
         this.game.notifications.error(`✗ ${task.name} échouée ! Humeur -${moodLoss}`);
+
+        // Jouer le son de tâche échouée
+        this.game.playCleopatraTaskFailedSound();
 
         // Retirer la tâche de la liste
         this.removeTask(task);
@@ -372,6 +599,7 @@ class CleopatraSystem {
 
     /**
      * Retire une tâche de la liste des tâches actives
+     * @param {object} task - Tâche à retirer
      */
     removeTask(task) {
         const index = this.activeTasks.findIndex(t => t.id === task.id);
@@ -381,7 +609,8 @@ class CleopatraSystem {
     }
 
     /**
-     * Affiche un message idle
+     * Affiche un message idle aléatoire de Cléopâtre
+     * Appelé périodiquement quand aucune tâche n'est active
      */
     showIdleMessage() {
         const message = CLEOPATRA_IDLE_MESSAGES[
@@ -391,7 +620,9 @@ class CleopatraSystem {
     }
 
     /**
-     * Met à jour le message affiché
+     * Met à jour le message affiché par Cléopâtre
+     * Déclenche également l'animation de parole du sprite
+     * @param {string} message - Nouveau message à afficher
      */
     setMessage(message) {
         this.currentMessage = message;
@@ -400,18 +631,19 @@ class CleopatraSystem {
             textElement.textContent = message;
         }
 
-        // Animation de parole
+        // Déclencher l'animation de parole du sprite
         if (this.sprite) {
             this.sprite.speak();
         }
     }
 
     /**
-     * Affiche le panneau de tâches
+     * Affiche le panneau de tâches dans l'UI
+     * Initialise également le switch d'auto-envoi global
      */
     showTaskPanel() {
         const panel = document.getElementById('currentTask');
-        if (panel && this.activeTasks.length > 0) {
+        if (panel) {
             panel.classList.remove('hidden');
             this.initAutoSendSwitch();
         }
@@ -419,24 +651,23 @@ class CleopatraSystem {
 
     /**
      * Cache le panneau de tâches si vide
+     * Note: Désactivé - le panneau est toujours affiché
      */
     hideTaskPanelIfEmpty() {
-        const panel = document.getElementById('currentTask');
-        if (panel && this.activeTasks.length === 0) {
-            panel.classList.add('hidden');
-        }
+        // Ne plus cacher le panneau, toujours l'afficher
     }
 
     /**
-     * Initialise le switch global d'auto-envoi
+     * Initialise le switch global d'auto-envoi des ressources
+     * Synchronise l'état avec le jeu et attache les événements
      */
     initAutoSendSwitch() {
         const autoSwitch = document.getElementById('autoSendGlobal');
         if (autoSwitch) {
-            // Synchroniser avec l'état actuel
+            // Synchroniser avec l'état actuel du jeu
             autoSwitch.checked = this.game.state.autoSendResources;
 
-            // Attacher l'événement
+            // Attacher l'événement de changement
             autoSwitch.onchange = (e) => {
                 this.game.state.autoSendResources = e.target.checked;
                 if (e.target.checked) {
@@ -449,7 +680,10 @@ class CleopatraSystem {
     }
 
     /**
-     * Crée l'élément DOM pour une tâche (appelé une seule fois par tâche)
+     * Crée l'élément DOM pour afficher une tâche
+     * Appelé une seule fois lors de l'ajout de la tâche
+     * @param {object} task - Tâche pour laquelle créer l'élément
+     * @returns {HTMLElement} Élément DOM de la tâche
      */
     createTaskElement(task) {
         const div = document.createElement('div');
@@ -459,6 +693,7 @@ class CleopatraSystem {
         let labelText = '';
         let icon = '';
 
+        // Déterminer le texte et l'icône selon le type de tâche
         switch (task.type) {
             case 'build': {
                 const building = BUILDINGS[task.building];
@@ -486,6 +721,7 @@ class CleopatraSystem {
                 labelText = task.description;
         }
 
+        // Structure HTML de l'élément
         div.innerHTML = `
             <div class="task-objective-row">
                 <span class="task-icon">${icon}</span>
@@ -496,7 +732,7 @@ class CleopatraSystem {
             <div class="task-timer" data-timer>⏱️ --:--</div>
         `;
 
-        // Attacher l'événement du bouton d'envoi une seule fois
+        // Pour les tâches de collecte, ajouter le bouton d'envoi manuel
         const sendContainer = div.querySelector('[data-send-container]');
         if (task.type === 'gather' && sendContainer) {
             sendContainer.innerHTML = `<button class="send-btn-small" style="display:none;">📦</button>`;
@@ -514,6 +750,9 @@ class CleopatraSystem {
 
     /**
      * Met à jour les valeurs dynamiques d'un élément de tâche existant
+     * Appelé à chaque frame pour rafraîchir le timer et la progression
+     * @param {HTMLElement} element - Élément DOM de la tâche
+     * @param {object} task - Tâche correspondante
      */
     updateTaskElement(element, task) {
         // Mettre à jour le timer
@@ -523,12 +762,13 @@ class CleopatraSystem {
             const seconds = Math.floor(task.timeRemaining % 60);
             const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-            let timerColor = '#4ade80';
+            // Couleur du timer selon l'urgence
+            let timerColor = '#4ade80'; // Vert par défaut
             if (task.timeRemaining < 30) {
-                timerColor = '#ff6b6b';
+                timerColor = '#ff6b6b'; // Rouge - critique
                 element.classList.add('urgent');
             } else if (task.timeRemaining < 60) {
-                timerColor = '#ffaa00';
+                timerColor = '#ffaa00'; // Orange - attention
                 element.classList.remove('urgent');
             } else {
                 element.classList.remove('urgent');
@@ -538,22 +778,27 @@ class CleopatraSystem {
             timerEl.style.color = timerColor;
         }
 
-        // Mettre à jour la progression
+        // Mettre à jour l'indicateur de progression
         const progressEl = element.querySelector('[data-progress]');
         if (progressEl) {
             switch (task.type) {
                 case 'build': {
+                    // Afficher construits+en cours / objectif
                     const currentCount = this.game.getBuildingCount(task.building);
-                    const pendingCount = this.game.state.constructions.filter(c => c.buildingId === task.building).length;
-                    const targetCount = task.initialState.buildingCount + task.targetCount;
-                    progressEl.textContent = `${currentCount + pendingCount}/${targetCount}`;
+                    const currentPending = this.game.state.constructions.filter(c => c.buildingId === task.building).length;
+                    const initialTotal = task.initialState.buildingCount
+                        + (task.initialState.pendingCount || 0)
+                        + (task.initialState.reservedByOtherTasks || 0);
+                    const targetCount = initialTotal + task.targetCount;
+                    progressEl.textContent = `${currentCount + currentPending}/${targetCount}`;
                     break;
                 }
                 case 'gather': {
+                    // Afficher le stock actuel
                     const currentAmount = Math.floor(this.game.state.resources[task.targetResource] || 0);
                     progressEl.textContent = `${currentAmount} en stock`;
 
-                    // Afficher/masquer le bouton d'envoi
+                    // Afficher/masquer le bouton d'envoi selon la disponibilité
                     const sendBtn = element.querySelector('.send-btn-small');
                     if (sendBtn) {
                         const canSend = currentAmount >= task.targetCount && !task.resourcesSent;
@@ -562,11 +807,13 @@ class CleopatraSystem {
                     break;
                 }
                 case 'feed': {
+                    // Afficher nourriture actuelle / objectif
                     const currentFood = Math.floor(this.game.state.food);
                     progressEl.textContent = `${currentFood}/${task.targetCount}`;
                     break;
                 }
                 case 'message': {
+                    // Afficher si le message a été envoyé
                     const hasSent = (this.game.state.messagesSentToCaesar || 0) > task.initialState.messagesSent;
                     progressEl.textContent = hasSent ? '✓' : '✗';
                     break;
@@ -576,7 +823,8 @@ class CleopatraSystem {
     }
 
     /**
-     * Met à jour l'affichage de toutes les tâches
+     * Met à jour l'affichage complet de la liste des tâches
+     * Gère les transitions vide/non-vide et synchronise le DOM avec les tâches actives
      */
     updateTasksDisplay() {
         const panel = document.getElementById('currentTask');
@@ -584,40 +832,64 @@ class CleopatraSystem {
 
         if (!panel || !desc) return;
 
-        // Cacher si pas de tâches
-        if (this.activeTasks.length === 0) {
-            panel.classList.add('hidden');
+        // Toujours afficher le panneau
+        panel.classList.remove('hidden');
+
+        const currentCount = this.activeTasks.length;
+        const wasEmpty = this._previousTaskCount === 0;
+        const isEmpty = currentCount === 0;
+
+        // Détecter les changements d'état (vide <-> avec tâches)
+        if (wasEmpty !== isEmpty) {
+            if (isEmpty) {
+                // Transition vers liste vide: afficher le message
+                desc.innerHTML = '<div class="no-tasks">Aucune mission en cours</div>';
+            } else {
+                // Transition vers liste avec tâches: supprimer le message
+                const noTasksEl = desc.querySelector('.no-tasks');
+                if (noTasksEl) {
+                    noTasksEl.remove();
+                }
+            }
+        }
+
+        this._previousTaskCount = currentCount;
+
+        // Si liste vide, ne rien faire de plus
+        if (isEmpty) {
             return;
         }
 
-        // Afficher le panneau
-        panel.classList.remove('hidden');
-
-        // Obtenir les IDs des tâches actuelles
+        // Obtenir les IDs des tâches actuelles pour comparaison
         const currentTaskIds = new Set(this.activeTasks.map(t => String(t.id)));
 
-        // Supprimer les éléments de tâches qui n'existent plus
+        // Supprimer les éléments de tâches qui n'existent plus (sauf si en animation de complétion)
         desc.querySelectorAll('.task-item-cleo').forEach(el => {
-            if (!currentTaskIds.has(el.dataset.taskId)) {
+            if (!currentTaskIds.has(el.dataset.taskId) && !el.classList.contains('completed')) {
                 el.remove();
             }
         });
 
         // Créer ou mettre à jour chaque tâche
         for (const task of this.activeTasks) {
+            // Ne pas mettre à jour les tâches en cours de complétion (animation)
+            if (task.isCompleting) continue;
+
             let taskEl = desc.querySelector(`.task-item-cleo[data-task-id="${task.id}"]`);
 
             if (!taskEl) {
-                // Créer le nouvel élément
+                // Créer le nouvel élément DOM
                 taskEl = this.createTaskElement(task);
                 desc.appendChild(taskEl);
             }
 
-            // Mettre à jour les valeurs dynamiques
-            this.updateTaskElement(taskEl, task);
+            // Mettre à jour les valeurs dynamiques (sauf si en animation)
+            if (!taskEl.classList.contains('completed')) {
+                this.updateTaskElement(taskEl, task);
+            }
         }
 
-        // Cacher/montrer le timer de prochaine mission
+        // Cacher le timer de prochaine mission si max atteint
         const nextTaskTimer = document.getElementById('nextTaskTimer');
         if (nextTaskTimer) {
             if (this.activeTasks.length >= this.maxActiveTasks) {
@@ -627,7 +899,8 @@ class CleopatraSystem {
     }
 
     /**
-     * Met à jour le timer de prochaine mission
+     * Met à jour l'affichage du timer de prochaine mission
+     * @param {number} timeRemaining - Secondes restantes avant la prochaine mission
      */
     updateNextTaskTimer(timeRemaining) {
         const nextTaskTimer = document.getElementById('nextTaskTimer');
@@ -655,55 +928,115 @@ class CleopatraSystem {
     }
 
     /**
-     * Obtient les tâches actives
+     * Retourne la liste des tâches actives
+     * @returns {Array<object>} Tableau des tâches actives
      */
     getActiveTasks() {
         return this.activeTasks;
     }
 
     /**
-     * Obtient la première tâche active (compatibilité)
+     * Retourne la première tâche active (méthode de compatibilité)
+     * @returns {object|null} Première tâche ou null si aucune
      */
     getCurrentTask() {
         return this.activeTasks.length > 0 ? this.activeTasks[0] : null;
     }
 
     /**
-     * Force une nouvelle tâche (pour tests)
+     * Force l'assignation d'une nouvelle tâche (pour les tests/cheats)
+     * Tente d'abord la méthode normale, puis cherche manuellement une tâche réalisable
+     * @returns {boolean} true si une tâche a été créée
      */
     forceNewTask() {
+        // Réinitialiser le timer
         this.lastTaskTime = 0;
+
+        // Essayer d'abord la méthode normale
+        const beforeCount = this.activeTasks.length;
         this.assignNewTask();
+
+        // Si une tâche a été ajoutée, succès
+        if (this.activeTasks.length > beforeCount) {
+            return true;
+        }
+
+        // Sinon, chercher manuellement une tâche réalisable
+        const maxTier = this.getMaxAvailableTier();
+
+        // Filtrer les tâches réalisables avec des critères assouplis
+        const possibleTasks = CLEOPATRA_TASKS.filter(task => {
+            // Vérifier le tier
+            if (task.tier > maxTier) return false;
+
+            // Pour les tâches de type message, vérifier la volière
+            if (task.type === 'message') {
+                if (task.requiresBuilding && !this.game.hasBuilding(task.requiresBuilding)) {
+                    return false;
+                }
+            }
+
+            // Pour les tâches de construction, vérifier qu'il reste de la place
+            if (task.type === 'build') {
+                const building = BUILDINGS[task.building];
+                if (!building) return false;
+
+                const count = this.game.getBuildingCount(task.building);
+                const inProgress = this.game.state.constructions.filter(c => c.buildingId === task.building).length;
+                const reserved = this.getReservedBuildingCount(task.building);
+                const remaining = building.maxCount - count - inProgress - reserved;
+
+                // Il faut au moins pouvoir construire 1 bâtiment
+                if (remaining < 1) return false;
+            }
+
+            return true;
+        });
+
+        if (possibleTasks.length === 0) {
+            this.game.notifications.warning("Aucune tâche réalisable disponible !");
+            console.warn("[forceNewTask] Aucune tâche réalisable trouvée");
+            return false;
+        }
+
+        // Choisir une tâche aléatoire parmi les possibles
+        const taskTemplate = possibleTasks[Math.floor(Math.random() * possibleTasks.length)];
+
+        // Utiliser assignSpecificTask pour l'ajouter
+        return this.assignSpecificTask(taskTemplate.id);
     }
 
     /**
      * Modifie l'humeur de Cléopâtre
-     * @param {number} amount - Valeur positive ou négative
+     * Gère les animations du sprite et vérifie le game over à 0%
+     * @param {number} amount - Valeur positive (bonus) ou négative (pénalité)
      */
     changeMood(amount) {
         const oldMood = this.game.state.cleopatraMood;
+        // Clamp entre 0 et 100
         this.game.state.cleopatraMood = Math.max(0, Math.min(100, oldMood + amount));
 
-        // Mettre à jour l'affichage
+        // Mettre à jour l'affichage de la jauge
         this.updateMoodDisplay();
 
         // Mettre à jour le sprite selon l'humeur
         if (this.sprite) {
             this.sprite.setMood(this.game.state.cleopatraMood);
 
-            // Animation de réaction
+            // Animations de réaction pour les changements significatifs
             if (amount > 10) {
-                this.sprite.celebrate();
+                this.sprite.celebrate(); // Animation de joie
             } else if (amount < -10) {
-                this.sprite.rage();
+                this.sprite.rage(); // Animation de colère
             }
         }
 
-        // Vérifier si l'humeur est à 0
+        // GAME OVER si l'humeur tombe à 0
         if (this.game.state.cleopatraMood <= 0) {
             if (this.sprite) {
                 this.sprite.rage();
             }
+            // Délai pour voir l'animation avant le game over
             setTimeout(() => {
                 this.game.gameOver("Cléopâtre est furieuse ! Elle vous fait exécuter pour votre incompétence.");
             }, 1000);
@@ -711,7 +1044,8 @@ class CleopatraSystem {
     }
 
     /**
-     * Met à jour l'affichage de l'humeur
+     * Met à jour l'affichage visuel de l'humeur (pourcentage et barre de progression)
+     * La couleur de la barre change selon le niveau: vert > 50%, orange 20-50%, rouge < 20%
      */
     updateMoodDisplay() {
         const mood = this.game.state.cleopatraMood;
@@ -727,47 +1061,75 @@ class CleopatraSystem {
 
             // Couleur selon l'humeur
             if (mood <= 20) {
-                moodBar.style.background = 'linear-gradient(90deg, #ff4444, #ff6b6b)';
+                moodBar.style.background = 'linear-gradient(90deg, #ff4444, #ff6b6b)'; // Rouge critique
             } else if (mood <= 50) {
-                moodBar.style.background = 'linear-gradient(90deg, #ffaa00, #ffd700)';
+                moodBar.style.background = 'linear-gradient(90deg, #ffaa00, #ffd700)'; // Orange attention
             } else {
-                moodBar.style.background = 'linear-gradient(90deg, #4ade80, #22c55e)';
+                moodBar.style.background = 'linear-gradient(90deg, #4ade80, #22c55e)'; // Vert OK
             }
         }
     }
 
     /**
-     * Obtient l'humeur actuelle
+     * Retourne l'humeur actuelle de Cléopâtre
+     * @returns {number} Humeur entre 0 et 100
      */
     getMood() {
         return this.game.state.cleopatraMood;
     }
 
     /**
-     * Assigne une tâche spécifique par ID (pour les cheats)
+     * Assigne une tâche spécifique par son ID (pour les cheats/tests)
+     * Vérifie les prérequis et configure la tâche avec des valeurs concrètes
+     * @param {string} taskId - ID de la tâche (ex: 'build_house', 'send_message')
+     * @returns {boolean} true si la tâche a été créée avec succès
      */
     assignSpecificTask(taskId) {
         // Trouver la tâche par ID
         const taskTemplate = CLEOPATRA_TASKS.find(t => t.id === taskId);
         if (!taskTemplate) {
             this.game.notifications.error(`Tâche inconnue: ${taskId}`);
-            return;
+            return false;
         }
 
-        // Vérifier si le bâtiment requis est construit
+        // Vérifier si le bâtiment requis est construit (pour message)
         if (taskTemplate.requiresBuilding && !this.game.hasBuilding(taskTemplate.requiresBuilding)) {
             this.game.notifications.warning(`Cette tâche nécessite: ${taskTemplate.requiresBuilding}`);
+            return false;
         }
 
-        // Copier le template
+        // Créer une copie profonde du template
         const task = JSON.parse(JSON.stringify(taskTemplate));
 
-        // Initialiser les valeurs si nécessaire
+        // Initialiser les valeurs spécifiques selon le type
         if (task.type === 'build') {
-            task.targetCount = Array.isArray(task.count)
-                ? task.count[Math.floor(Math.random() * task.count.length)]
-                : task.count;
+            // Vérifier s'il reste de la place pour ce bâtiment
+            const building = BUILDINGS[task.building];
+            if (!building) {
+                this.game.notifications.error(`Bâtiment inconnu: ${task.building}`);
+                return false;
+            }
+
+            const count = this.game.getBuildingCount(task.building);
+            const inProgress = this.game.state.constructions.filter(c => c.buildingId === task.building).length;
+            const reserved = this.getReservedBuildingCount(task.building);
+            const remaining = building.maxCount - count - inProgress - reserved;
+
+            if (remaining <= 0) {
+                this.game.notifications.warning(`Max atteint pour ${building.name} !`);
+                console.warn(`[Cheat] Impossible de créer la tâche: plus de place pour ${building.name} (max atteint)`);
+                return false;
+            }
+
+            // Limiter le targetCount au nombre restant
+            const possibleCounts = (Array.isArray(task.count) ? task.count : [task.count]).filter(c => c <= remaining);
+            if (possibleCounts.length > 0) {
+                task.targetCount = possibleCounts[Math.floor(Math.random() * possibleCounts.length)];
+            } else {
+                task.targetCount = remaining;
+            }
         } else if (task.type === 'gather' && task.resources) {
+            // Choisir une ressource aléatoire
             task.targetResource = task.resources[Math.floor(Math.random() * task.resources.length)];
             task.targetCount = Array.isArray(task.count)
                 ? task.count[Math.floor(Math.random() * task.count.length)]
@@ -778,7 +1140,7 @@ class CleopatraSystem {
                 : task.count;
         }
 
-        // Remplacer les variables dans les messages
+        // Fonction helper pour remplacer les variables dans les textes
         const replaceVars = (text) => {
             if (!text) return text;
             return text
@@ -786,6 +1148,7 @@ class CleopatraSystem {
                 .replace(/{resource}/g, task.targetResource ? RESOURCES[task.targetResource]?.name : '');
         };
 
+        // Appliquer les remplacements aux messages
         task.messages = {
             start: replaceVars(task.messages.start),
             reminder: replaceVars(task.messages.reminder),
@@ -798,7 +1161,7 @@ class CleopatraSystem {
         // Stocker l'état initial pour vérification
         task.initialState = this.captureRelevantState(task);
 
-        // Ajouter la tâche à la liste des tâches actives
+        // Initialiser les métadonnées de la tâche
         task.startTime = Date.now();
         task.timeRemaining = task.timeLimit;
         task.id = Date.now() + Math.random(); // ID unique
@@ -807,12 +1170,14 @@ class CleopatraSystem {
         // Mettre à jour le dernier temps d'ajout de tâche
         this.lastTaskTime = Date.now();
 
-        // Afficher le message
+        // Afficher le message de démarrage
         this.setMessage(task.messages.start);
         this.game.notifications.cleopatra(task.name);
 
         // Afficher le panneau de tâches
         this.showTaskPanel();
+
+        return true;
     }
 }
 

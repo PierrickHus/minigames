@@ -177,7 +177,7 @@ const BUILDINGS = {
         name: 'Volière',
         icon: '🕊️',
         tier: 1,
-        description: 'Permet d\'envoyer des messages à César',
+        description: 'Produit 1 oiseau/30s (max 5). Nécessaire pour les messages à César.',
         cost: {
             money: 150,
             wood: 20,
@@ -185,10 +185,11 @@ const BUILDINGS = {
         },
         buildTime: 35,
         effects: {
-            enableMessages: true
+            enableMessages: true,
+            birdsPerMinute: 2
         },
         reward: 200,
-        maxCount: 1
+        maxCount: 3
     },
 
     bakery: {

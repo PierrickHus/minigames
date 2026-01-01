@@ -1,9 +1,29 @@
 // ==========================================
 // SYSTÈME DE SPRITE DE CLÉOPÂTRE
-// Style égyptien authentique
+// ==========================================
+// Ce module gère le rendu animé du sprite de Cléopâtre dans le portrait.
+// Fonctionnalités principales:
+// - Rendu Canvas 2D avec style égyptien authentique
+// - Animations multiples (idle, speaking, happy, angry, disappointed)
+// - Système de phonèmes pour l'animation des lèvres
+// - Changement d'humeur visuel (expressions faciales)
+// - Effets visuels selon l'émotion (éclairs de colère, étoiles de joie)
 // ==========================================
 
+/**
+ * Sprite animé de Cléopâtre dessiné en Canvas 2D
+ * Gère les animations, les expressions faciales et les effets visuels
+ */
 class CleopatraSprite {
+    /**
+     * Crée une nouvelle instance du sprite de Cléopâtre
+     * @param {HTMLElement} container - Élément DOM conteneur du canvas
+     * @param {object} options - Options de configuration
+     * @param {number} [options.width=80] - Largeur du canvas
+     * @param {number} [options.height=100] - Hauteur du canvas
+     * @param {number} [options.scale=1] - Facteur d'échelle du sprite
+     * @param {boolean} [options.persistentEffects=false] - Si true, les effets (éclairs, étoiles) restent visibles
+     */
     constructor(container, options = {}) {
         this.container = container;
         this.canvas = null;
@@ -97,6 +117,9 @@ class CleopatraSprite {
         this.init();
     }
 
+    /**
+     * Initialise le canvas et lance la boucle d'animation
+     */
     init() {
         this.canvas = document.createElement('canvas');
         this.canvas.width = this.width;
@@ -113,6 +136,10 @@ class CleopatraSprite {
         this.animate();
     }
 
+    /**
+     * Boucle d'animation principale (requestAnimationFrame)
+     * Calcule le delta time et appelle update/render à chaque frame
+     */
     animate() {
         const now = performance.now();
         const deltaTime = now - this.lastTime;
@@ -124,6 +151,11 @@ class CleopatraSprite {
         requestAnimationFrame(() => this.animate());
     }
 
+    /**
+     * Met à jour l'état de l'animation
+     * Gère les timers de frame, les animations temporaires et le changement d'idle
+     * @param {number} deltaTime - Temps écoulé depuis la dernière frame (ms)
+     */
     update(deltaTime) {
         this.frameTimer += deltaTime;
 
@@ -148,6 +180,10 @@ class CleopatraSprite {
         }
     }
 
+    /**
+     * Passe à la frame suivante de l'animation courante
+     * Gère le bouclage et la fin des animations non-bouclées
+     */
     nextFrame() {
         const animName = this.tempAnimation || this.currentAnimation;
         const anim = this.animations[animName];
@@ -167,6 +203,10 @@ class CleopatraSprite {
         }
     }
 
+    /**
+     * Change aléatoirement l'animation idle courante
+     * Appelé périodiquement pour varier les poses de repos
+     */
     changeIdleAnimation() {
         const newIdle = this.idleAnimations[Math.floor(Math.random() * this.idleAnimations.length)];
         if (newIdle !== this.currentAnimation) {
@@ -175,6 +215,11 @@ class CleopatraSprite {
         }
     }
 
+    /**
+     * Définit l'humeur du sprite selon une valeur numérique
+     * Change l'expression faciale et les animations associées
+     * @param {number} mood - Valeur d'humeur (0-100): ≤20=angry, ≤40=disappointed, ≥80=happy, sinon neutral
+     */
     setMood(mood) {
         if (mood <= 20) {
             this.currentMood = 'angry';
@@ -187,6 +232,12 @@ class CleopatraSprite {
         }
     }
 
+    /**
+     * Joue une animation temporaire pendant une durée spécifiée
+     * L'animation reprend l'idle après expiration du timer
+     * @param {string} animName - Nom de l'animation (idle1-4, speaking, happy, angry, thinking, disappointed)
+     * @param {number} [duration=2000] - Durée en millisecondes
+     */
     playAnimation(animName, duration = 2000) {
         if (this.animations[animName]) {
             this.tempAnimation = animName;
@@ -195,10 +246,19 @@ class CleopatraSprite {
         }
     }
 
+    /** Déclenche l'animation de parole (3 secondes) */
     speak() { this.playAnimation('speaking', 3000); }
+
+    /** Déclenche l'animation de célébration (2.5 secondes) */
     celebrate() { this.playAnimation('happy', 2500); }
+
+    /** Déclenche l'animation de colère (3 secondes) */
     rage() { this.playAnimation('angry', 3000); }
 
+    /**
+     * Effectue le rendu complet du sprite sur le canvas
+     * Dessine tous les éléments dans l'ordre: corps, cou, collier, tête, perruque, coiffe, boucles d'oreilles, effets
+     */
     render() {
         const ctx = this.ctx;
         if (!ctx) return;
@@ -241,7 +301,10 @@ class CleopatraSprite {
     }
 
     /**
-     * Corps et robe
+     * Dessine le corps et la robe blanche égyptienne
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu
+     * @param {string} anim - Animation courante
+     * @param {number} frame - Frame courante
      */
     drawBody(ctx, anim, frame) {
         const c = this.colors;
@@ -282,7 +345,10 @@ class CleopatraSprite {
     }
 
     /**
-     * Cou
+     * Dessine le cou avec ombrages
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu
+     * @param {string} anim - Animation courante
+     * @param {number} frame - Frame courante
      */
     drawNeck(ctx, anim, frame) {
         const c = this.colors;
@@ -308,7 +374,11 @@ class CleopatraSprite {
     }
 
     /**
-     * Collier Ousekh (large collier égyptien)
+     * Dessine le collier Ousekh (large collier égyptien traditionnel)
+     * Composé de plusieurs rangées colorées avec perles et pendentif scarabée
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu
+     * @param {string} anim - Animation courante
+     * @param {number} frame - Frame courante
      */
     drawCollar(ctx, anim, frame) {
         const c = this.colors;
@@ -352,7 +422,12 @@ class CleopatraSprite {
     }
 
     /**
-     * Tête et visage
+     * Dessine la tête et le visage avec expressions
+     * Applique un léger mouvement de tête selon l'animation
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu
+     * @param {string} anim - Animation courante
+     * @param {number} frame - Frame courante
+     * @param {boolean} blink - Si true, dessine les yeux fermés (clignement)
      */
     drawHead(ctx, anim, frame, blink) {
         const c = this.colors;
@@ -395,7 +470,12 @@ class CleopatraSprite {
     }
 
     /**
-     * Yeux avec maquillage khôl
+     * Dessine les yeux avec maquillage khôl égyptien
+     * Inclut le regard dynamique, les sourcils et l'eye-liner allongé
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu
+     * @param {string} anim - Animation courante
+     * @param {number} frame - Frame courante
+     * @param {boolean} blink - Si true, yeux fermés
      */
     drawEyes(ctx, anim, frame, blink) {
         const c = this.colors;
@@ -502,7 +582,10 @@ class CleopatraSprite {
     }
 
     /**
-     * Nez aquilin
+     * Dessine le nez aquilin caractéristique
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu
+     * @param {string} anim - Animation courante
+     * @param {number} frame - Frame courante
      */
     drawNose(ctx, anim, frame) {
         const c = this.colors;
@@ -524,7 +607,10 @@ class CleopatraSprite {
     }
 
     /**
-     * Bouche
+     * Dessine la bouche avec différentes expressions selon l'humeur et l'animation
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu
+     * @param {string} anim - Animation courante
+     * @param {number} frame - Frame courante
      */
     drawMouth(ctx, anim, frame) {
         const c = this.colors;
@@ -591,6 +677,10 @@ class CleopatraSprite {
 
     /**
      * Dessine la bouche pendant l'animation de parole avec différents phonèmes
+     * Simule la forme de la bouche pour différents sons (lip-sync basique)
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu
+     * @param {number} mouthY - Position Y de la bouche
+     * @param {number} phoneme - Index du phonème (0-5): 0=fermé, 1=légèrement ouvert, 2="o", 3="a", 4="i/e", 5="ou"
      */
     drawSpeakingMouth(ctx, mouthY, phoneme) {
         const c = this.colors;
@@ -735,7 +825,10 @@ class CleopatraSprite {
     }
 
     /**
-     * Perruque égyptienne
+     * Dessine la perruque égyptienne noire avec stries dorées
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu
+     * @param {string} anim - Animation courante
+     * @param {number} frame - Frame courante
      */
     drawWig(ctx, anim, frame) {
         const c = this.colors;
@@ -799,7 +892,11 @@ class CleopatraSprite {
     }
 
     /**
-     * Coiffe royale avec uraeus et disque solaire
+     * Dessine la coiffe royale avec uraeus (cobra) et disque solaire
+     * Inclut le diadème doré et les décorations en lapis-lazuli
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu
+     * @param {string} anim - Animation courante
+     * @param {number} frame - Frame courante
      */
     drawHeaddress(ctx, anim, frame) {
         const c = this.colors;
@@ -891,7 +988,10 @@ class CleopatraSprite {
     }
 
     /**
-     * Boucles d'oreilles
+     * Dessine les boucles d'oreilles pendantes en lapis-lazuli et or
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu
+     * @param {string} anim - Animation courante
+     * @param {number} frame - Frame courante
      */
     drawEarrings(ctx, anim, frame) {
         const c = this.colors;
@@ -927,7 +1027,10 @@ class CleopatraSprite {
     }
 
     /**
-     * Effets selon l'humeur
+     * Dessine les effets visuels selon l'humeur (éclairs de colère, étoiles de joie, blush)
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu
+     * @param {string} anim - Animation courante
+     * @param {number} frame - Frame courante
      */
     drawMoodEffects(ctx, anim, frame) {
         const c = this.colors;
@@ -983,6 +1086,15 @@ class CleopatraSprite {
         }
     }
 
+    /**
+     * Dessine une étoile à plusieurs branches
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu
+     * @param {number} x - Position X du centre
+     * @param {number} y - Position Y du centre
+     * @param {number} points - Nombre de branches
+     * @param {number} outer - Rayon externe (pointes)
+     * @param {number} inner - Rayon interne (creux)
+     */
     drawStar(ctx, x, y, points, outer, inner) {
         ctx.beginPath();
         for (let i = 0; i < points * 2; i++) {

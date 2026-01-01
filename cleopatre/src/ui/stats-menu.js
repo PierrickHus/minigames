@@ -1,15 +1,44 @@
 // ==========================================
 // MÉGA MENU STATISTIQUES AVEC GRAPHIQUES
 // ==========================================
+// Ce module gère le menu détaillé des statistiques accessible via le bouton stats.
+// Fonctionnalités principales:
+// - Graphique d'évolution temporelle des ressources (Canvas 2D)
+// - Graphique camembert de répartition des bâtiments par tier
+// - Statistiques de production en temps réel
+// - Alertes et prévisions d'épuisement
+// - Sélection de périodes (1min, 5min, 10min, 30min, 1h)
+// ==========================================
 
 import { BUILDINGS } from '../data/index.js';
 
+/**
+ * Menu de statistiques détaillé avec graphiques interactifs
+ * Permet de visualiser l'évolution des ressources et la composition du village
+ */
 class StatsMenu {
+    /**
+     * Crée une nouvelle instance du menu de statistiques
+     * @param {Game} game - Instance du jeu principal
+     */
     constructor(game) {
+        /** @type {Game} Référence au jeu principal */
         this.game = game;
+
+        /** @type {boolean} État d'ouverture du menu */
         this.isOpen = false;
+
+        /** @type {string} Ressource actuellement sélectionnée pour le graphique */
         this.selectedResource = 'money';
-        this.selectedPeriod = 300; // Période sélectionnée en secondes (défaut: 5 minutes)
+
+        /** @type {number} Période affichée en secondes (défaut: 5 minutes) */
+        this.selectedPeriod = 300;
+
+        /**
+         * Historique des valeurs pour les graphiques
+         * Chaque ressource a un tableau de { time: timestamp, value: number }
+         * @type {Object<string, Array<{time: number, value: number}>>}
+         */
         this.graphHistory = {
             money: [],
             food: [],
@@ -18,30 +47,33 @@ class StatsMenu {
             wood: [],
             stone: []
         };
-        // 720 points = 1 heure à 5s d'intervalle (3600/5 = 720)
+
+        /** @type {number} Nombre maximum de points dans l'historique (1h à 5s d'intervalle = 720) */
         this.maxHistoryPoints = 720;
 
+        // Initialiser les événements et le tracking
         this.setupEventListeners();
         this.startHistoryTracking();
     }
 
     /**
-     * Configure les événements
+     * Configure tous les écouteurs d'événements du menu
+     * Boutons, tabs, overlay et raccourcis clavier
      */
     setupEventListeners() {
-        // Bouton ouvrir
+        // Bouton pour ouvrir le menu
         const openBtn = document.getElementById('openStatsMenu');
         if (openBtn) {
             openBtn.addEventListener('click', () => this.open());
         }
 
-        // Bouton fermer
+        // Bouton pour fermer le menu
         const closeBtn = document.getElementById('closeStatsMenu');
         if (closeBtn) {
             closeBtn.addEventListener('click', () => this.close());
         }
 
-        // Overlay click pour fermer
+        // Clic sur l'overlay (fond sombre) pour fermer
         const overlay = document.getElementById('statsOverlay');
         if (overlay) {
             overlay.addEventListener('click', (e) => {
@@ -49,21 +81,21 @@ class StatsMenu {
             });
         }
 
-        // Tabs des graphiques
+        // Onglets de sélection de ressource pour le graphique
         document.querySelectorAll('.graph-tab').forEach(tab => {
             tab.addEventListener('click', () => {
                 this.selectResource(tab.dataset.resource);
             });
         });
 
-        // Boutons de période (zoom temporel)
+        // Boutons de sélection de période (zoom temporel)
         document.querySelectorAll('.zoom-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 this.selectPeriod(parseInt(btn.dataset.zoom));
             });
         });
 
-        // Touche Escape pour fermer
+        // Touche Escape pour fermer le menu
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.isOpen) {
                 this.close();
@@ -72,10 +104,10 @@ class StatsMenu {
     }
 
     /**
-     * Démarre le tracking de l'historique pour les graphiques
+     * Démarre l'enregistrement périodique des données pour les graphiques
+     * Enregistre un snapshot toutes les 5 secondes
      */
     startHistoryTracking() {
-        // Enregistrer toutes les 5 secondes
         setInterval(() => {
             if (this.game.isRunning) {
                 this.recordHistory();
@@ -84,12 +116,14 @@ class StatsMenu {
     }
 
     /**
-     * Enregistre l'état actuel dans l'historique
+     * Enregistre l'état actuel de toutes les ressources dans l'historique
+     * Limite automatiquement la taille de l'historique
      */
     recordHistory() {
         const state = this.game.state;
         const now = Date.now();
 
+        // Ressources à tracker
         const resources = {
             money: state.money,
             food: state.food,
@@ -99,10 +133,11 @@ class StatsMenu {
             stone: state.resources.stone
         };
 
+        // Ajouter chaque valeur à l'historique correspondant
         for (const [key, value] of Object.entries(resources)) {
             this.graphHistory[key].push({ time: now, value });
 
-            // Limiter la taille
+            // Limiter la taille de l'historique
             while (this.graphHistory[key].length > this.maxHistoryPoints) {
                 this.graphHistory[key].shift();
             }
@@ -110,7 +145,7 @@ class StatsMenu {
     }
 
     /**
-     * Ouvre le méga menu
+     * Ouvre le menu de statistiques et rafraîchit son contenu
      */
     open() {
         const overlay = document.getElementById('statsOverlay');
@@ -122,7 +157,7 @@ class StatsMenu {
     }
 
     /**
-     * Ferme le méga menu
+     * Ferme le menu de statistiques
      */
     close() {
         const overlay = document.getElementById('statsOverlay');
@@ -133,37 +168,40 @@ class StatsMenu {
     }
 
     /**
-     * Sélectionne une ressource pour le graphique
+     * Sélectionne une ressource pour l'affichage dans le graphique
+     * @param {string} resource - Clé de la ressource (money, food, water, etc.)
      */
     selectResource(resource) {
         this.selectedResource = resource;
 
-        // Mettre à jour les tabs
+        // Mettre à jour l'état visuel des onglets
         document.querySelectorAll('.graph-tab').forEach(tab => {
             tab.classList.toggle('active', tab.dataset.resource === resource);
         });
 
-        // Redessiner le graphique
+        // Redessiner le graphique avec la nouvelle ressource
         this.drawResourceGraph();
     }
 
     /**
-     * Sélectionne une période pour le graphique
+     * Sélectionne une période pour l'affichage du graphique
+     * @param {number} periodSeconds - Période en secondes (60, 300, 600, 1800, 3600)
      */
     selectPeriod(periodSeconds) {
         this.selectedPeriod = periodSeconds;
 
-        // Mettre à jour les boutons
+        // Mettre à jour l'état visuel des boutons
         document.querySelectorAll('.zoom-btn').forEach(btn => {
             btn.classList.toggle('active', parseInt(btn.dataset.zoom) === periodSeconds);
         });
 
-        // Redessiner le graphique
+        // Redessiner le graphique avec la nouvelle période
         this.drawResourceGraph();
     }
 
     /**
-     * Rafraîchit tout le menu
+     * Rafraîchit tout le contenu du menu
+     * Appelé à l'ouverture et périodiquement si le menu est ouvert
      */
     refresh() {
         if (!this.isOpen) return;
@@ -177,7 +215,8 @@ class StatsMenu {
     }
 
     /**
-     * Dessine le graphique d'évolution des ressources
+     * Dessine le graphique d'évolution temporelle de la ressource sélectionnée
+     * Utilise Canvas 2D pour le rendu avec courbe lissée et remplissage
      */
     drawResourceGraph() {
         const canvas = document.getElementById('resourceGraph');
@@ -186,7 +225,7 @@ class StatsMenu {
         const ctx = canvas.getContext('2d');
         const rect = canvas.parentElement.getBoundingClientRect();
 
-        // Ajuster la taille du canvas
+        // Ajuster la taille du canvas au conteneur
         canvas.width = rect.width - 20;
         canvas.height = 200;
 
@@ -194,7 +233,7 @@ class StatsMenu {
         const height = canvas.height;
         const padding = { top: 20, right: 20, bottom: 30, left: 60 };
 
-        // Effacer
+        // Effacer le canvas
         ctx.fillStyle = '#1a1a2e';
         ctx.fillRect(0, 0, width, height);
 
@@ -206,6 +245,7 @@ class StatsMenu {
 
         const history = fullHistory.filter(point => point.time >= cutoffTime);
 
+        // Afficher un message si pas assez de données
         if (history.length < 2) {
             ctx.fillStyle = '#666';
             ctx.font = '14px Arial';
@@ -216,12 +256,12 @@ class StatsMenu {
             return;
         }
 
-        // Calculer min/max
+        // Calculer les valeurs min/max pour l'échelle
         const values = history.map(h => h.value);
         let minVal = Math.min(...values);
         let maxVal = Math.max(...values);
 
-        // Ajouter une marge de 10%
+        // Ajouter une marge de 10% pour l'espace visuel
         const range = maxVal - minVal || 1;
         minVal = Math.max(0, minVal - range * 0.1);
         maxVal = maxVal + range * 0.1;
@@ -229,7 +269,7 @@ class StatsMenu {
         const graphWidth = width - padding.left - padding.right;
         const graphHeight = height - padding.top - padding.bottom;
 
-        // Couleurs selon la ressource
+        // Palette de couleurs par ressource
         const colors = {
             money: { line: '#ffd700', fill: 'rgba(255, 215, 0, 0.2)' },
             food: { line: '#4ade80', fill: 'rgba(74, 222, 128, 0.2)' },
@@ -240,11 +280,11 @@ class StatsMenu {
         };
         const color = colors[this.selectedResource] || colors.money;
 
-        // Dessiner la grille
+        // Dessiner la grille de fond
         ctx.strokeStyle = '#333';
         ctx.lineWidth = 1;
 
-        // Lignes horizontales + labels
+        // Lignes horizontales avec labels de valeur
         const ySteps = 5;
         ctx.font = '11px Arial';
         ctx.fillStyle = '#888';
@@ -262,13 +302,11 @@ class StatsMenu {
             ctx.fillText(this.formatNumber(value), padding.left - 5, y + 4);
         }
 
-        // Dessiner la courbe avec remplissage
-        // Positionner les points en fonction de leur timestamp réel dans la période
+        // Dessiner la zone de remplissage sous la courbe
         ctx.beginPath();
         ctx.moveTo(padding.left, padding.top + graphHeight);
 
         history.forEach((point, i) => {
-            // Position X basée sur le temps relatif dans la période
             const timeRatio = (point.time - cutoffTime) / periodMs;
             const x = padding.left + timeRatio * graphWidth;
             const y = padding.top + graphHeight - ((point.value - minVal) / (maxVal - minVal)) * graphHeight;
@@ -280,17 +318,15 @@ class StatsMenu {
             }
         });
 
-        // Fermer le path pour le remplissage
         ctx.lineTo(padding.left + graphWidth, padding.top + graphHeight);
         ctx.closePath();
 
         ctx.fillStyle = color.fill;
         ctx.fill();
 
-        // Dessiner la ligne
+        // Dessiner la ligne de la courbe
         ctx.beginPath();
         history.forEach((point, i) => {
-            // Position X basée sur le temps relatif dans la période
             const timeRatio = (point.time - cutoffTime) / periodMs;
             const x = padding.left + timeRatio * graphWidth;
             const y = padding.top + graphHeight - ((point.value - minVal) / (maxVal - minVal)) * graphHeight;
@@ -306,7 +342,7 @@ class StatsMenu {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Point actuel (dernier point de l'historique)
+        // Dessiner le point actuel (dernier point)
         const lastPoint = history[history.length - 1];
         const lastTimeRatio = (lastPoint.time - cutoffTime) / periodMs;
         const lastX = padding.left + lastTimeRatio * graphWidth;
@@ -320,7 +356,7 @@ class StatsMenu {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Labels de temps selon la période
+        // Labels de temps en bas du graphique
         ctx.fillStyle = '#666';
         ctx.font = '10px Arial';
         ctx.textAlign = 'center';
@@ -331,24 +367,26 @@ class StatsMenu {
             ctx.fillText(label, x, height - 5);
         });
 
-        // Mettre à jour la légende
+        // Mettre à jour la légende sous le graphique
         this.updateGraphLegend(history, this.selectedPeriod);
     }
 
     /**
-     * Retourne les labels de temps selon la période
+     * Retourne les labels de temps pour l'axe X selon la période
+     * @param {number} periodSeconds - Période en secondes
+     * @returns {string[]} Tableau de labels
      */
     getTimeLabels(periodSeconds) {
         switch (periodSeconds) {
-            case 60: // 1 minute
+            case 60:
                 return ['-1min', '-45s', '-30s', '-15s', 'Maintenant'];
-            case 300: // 5 minutes
+            case 300:
                 return ['-5min', '-4min', '-3min', '-2min', '-1min', 'Maintenant'];
-            case 600: // 10 minutes
+            case 600:
                 return ['-10min', '-8min', '-6min', '-4min', '-2min', 'Maintenant'];
-            case 1800: // 30 minutes
+            case 1800:
                 return ['-30min', '-24min', '-18min', '-12min', '-6min', 'Maintenant'];
-            case 3600: // 1 heure
+            case 3600:
                 return ['-1h', '-48min', '-36min', '-24min', '-12min', 'Maintenant'];
             default:
                 return ['-5min', '-4min', '-3min', '-2min', '-1min', 'Maintenant'];
@@ -357,6 +395,8 @@ class StatsMenu {
 
     /**
      * Retourne le label lisible d'une période
+     * @param {number} periodSeconds - Période en secondes
+     * @returns {string} Label formaté
      */
     getPeriodLabel(periodSeconds) {
         switch (periodSeconds) {
@@ -370,7 +410,10 @@ class StatsMenu {
     }
 
     /**
-     * Met à jour la légende du graphique
+     * Met à jour la légende affichée sous le graphique
+     * Montre la valeur actuelle et la variation sur la période
+     * @param {Array|null} history - Historique des données
+     * @param {number} periodSeconds - Période sélectionnée
      */
     updateGraphLegend(history, periodSeconds) {
         const legend = document.getElementById('graphLegend');
@@ -414,7 +457,8 @@ class StatsMenu {
     }
 
     /**
-     * Dessine le graphique de répartition des bâtiments (camembert)
+     * Dessine le graphique camembert de répartition des bâtiments par tier
+     * Affiche également une légende avec les pourcentages
      */
     drawBuildingsGraph() {
         const canvas = document.getElementById('buildingsGraph');
@@ -432,7 +476,7 @@ class StatsMenu {
         const centerY = height / 2;
         const radius = Math.min(width, height) / 2 - 10;
 
-        // Effacer
+        // Effacer le canvas
         ctx.fillStyle = '#1a1a2e';
         ctx.fillRect(0, 0, width, height);
 
@@ -458,6 +502,7 @@ class StatsMenu {
 
         const total = buildingCounts[1] + buildingCounts[2] + buildingCounts[3];
 
+        // Afficher un message si aucun bâtiment
         if (total === 0) {
             ctx.fillStyle = '#666';
             ctx.font = '14px Arial';
@@ -468,12 +513,12 @@ class StatsMenu {
 
         // Couleurs par tier
         const tierColors = {
-            1: '#4ade80',
-            2: '#60a5fa',
-            3: '#ffd700'
+            1: '#4ade80', // Vert - Basique
+            2: '#60a5fa', // Bleu - Avancé
+            3: '#ffd700'  // Or - Monument
         };
 
-        // Dessiner le camembert
+        // Dessiner les tranches du camembert
         let startAngle = -Math.PI / 2;
 
         [1, 2, 3].forEach(tier => {
@@ -489,11 +534,12 @@ class StatsMenu {
             ctx.fillStyle = tierColors[tier];
             ctx.fill();
 
+            // Bordure entre les tranches
             ctx.strokeStyle = '#1a1a2e';
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Label au centre de la tranche
+            // Label au centre de la tranche (si assez grande)
             if (sliceAngle > 0.3) {
                 const labelAngle = startAngle + sliceAngle / 2;
                 const labelX = centerX + Math.cos(labelAngle) * radius * 0.6;
@@ -509,7 +555,7 @@ class StatsMenu {
             startAngle += sliceAngle;
         });
 
-        // Légende
+        // Mettre à jour la légende HTML
         const legendContainer = document.getElementById('buildingsLegend');
         if (legendContainer) {
             const tierNames = { 1: 'Tier 1 - Basique', 2: 'Tier 2 - Avancé', 3: 'Tier 3 - Monument' };
@@ -533,7 +579,8 @@ class StatsMenu {
     }
 
     /**
-     * Met à jour les stats de production
+     * Met à jour la section des statistiques de production
+     * Affiche le stock actuel et le taux de variation de chaque ressource
      */
     updateProductionStats() {
         const container = document.getElementById('megaStatsProduction');
@@ -573,7 +620,8 @@ class StatsMenu {
     }
 
     /**
-     * Met à jour les stats théoriques
+     * Met à jour la section des statistiques de production théorique
+     * Affiche ce que les bâtiments devraient produire par minute
      */
     updateTheoreticalStats() {
         const container = document.getElementById('megaStatsTheoretical');
@@ -609,7 +657,8 @@ class StatsMenu {
     }
 
     /**
-     * Met à jour les alertes
+     * Met à jour la section des alertes
+     * Affiche les ressources en danger avec leur temps avant épuisement
      */
     updateAlertsStats() {
         const container = document.getElementById('megaStatsAlerts');
@@ -624,6 +673,7 @@ class StatsMenu {
             sand: 'Sable', dirt: 'Terre', clay: 'Argile'
         };
 
+        // Collecter les ressources avec alertes
         for (const [key, stat] of Object.entries(allStats)) {
             if (stat.alertLevel !== 'normal' || stat.depletionText) {
                 alerts.push({
@@ -660,7 +710,8 @@ class StatsMenu {
     }
 
     /**
-     * Met à jour les stats générales
+     * Met à jour la section des statistiques générales
+     * Affiche temps de jeu, nombre de bâtiments, paysans, etc.
      */
     updateGeneralStats() {
         const container = document.getElementById('megaStatsGeneral');
@@ -671,16 +722,13 @@ class StatsMenu {
         const minutes = Math.floor(gameTime / 60);
         const seconds = Math.floor(gameTime % 60);
 
-        // Compter les bâtiments
+        // Compter le total de bâtiments
         let totalBuildings = 0;
         for (const count of Object.values(state.buildings)) {
             totalBuildings += count;
         }
 
-        // Compter les constructions en cours
         const constructionsInProgress = state.constructions.length;
-
-        // Compter les collectes en cours
         const gatheringsInProgress = state.gatheringTasks.length;
 
         const stats = [
@@ -706,7 +754,9 @@ class StatsMenu {
     }
 
     /**
-     * Formate un nombre pour l'affichage
+     * Formate un nombre pour l'affichage (K pour milliers, M pour millions)
+     * @param {number} num - Nombre à formater
+     * @returns {string} Nombre formaté
      */
     formatNumber(num) {
         if (num >= 1000000) {
@@ -718,7 +768,8 @@ class StatsMenu {
     }
 
     /**
-     * Met à jour périodiquement si le menu est ouvert
+     * Met à jour le menu si ouvert
+     * Appelé périodiquement par le game loop
      */
     update() {
         if (this.isOpen) {

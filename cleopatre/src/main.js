@@ -1,11 +1,23 @@
 // ==========================================
 // POINT D'ENTRÉE PRINCIPAL - CLÉOPÂTRE
 // ==========================================
+// Ce fichier est le point d'entrée de l'application.
+// Il gère:
+// - L'écran de chargement initial
+// - L'initialisation du jeu
+// - La configuration des gestionnaires d'événements globaux
+// - Les commandes de triche accessibles via la console développeur
+// ==========================================
 
 import Game from './core/Game.js';
+import SettingsManager from './ui/settings.js';
 
-// Créer l'écran de chargement
+/**
+ * Affiche l'écran de chargement avec une barre de progression animée
+ * Crée dynamiquement le DOM et les styles CSS pour l'écran de chargement
+ */
 function showLoading() {
+    // Créer l'élément de l'écran de chargement
     const loader = document.createElement('div');
     loader.id = 'loadingScreen';
     loader.innerHTML = `
@@ -17,6 +29,8 @@ function showLoading() {
             <p>Préparation du village...</p>
         </div>
     `;
+
+    // Styles inline pour l'écran de chargement (fullscreen, centré)
     loader.style.cssText = `
         position: fixed;
         top: 0;
@@ -30,6 +44,7 @@ function showLoading() {
         z-index: 9999;
     `;
 
+    // Créer les styles CSS pour les éléments internes
     const style = document.createElement('style');
     style.textContent = `
         #loadingScreen .loading-content {
@@ -69,35 +84,51 @@ function showLoading() {
     document.body.appendChild(loader);
 }
 
-// Cacher l'écran de chargement
+/**
+ * Cache l'écran de chargement avec une transition en fondu
+ * L'élément est supprimé du DOM après la transition (500ms)
+ */
 function hideLoading() {
     const loader = document.getElementById('loadingScreen');
     if (loader) {
+        // Transition de fondu
         loader.style.opacity = '0';
         loader.style.transition = 'opacity 0.5s ease';
+        // Supprimer l'élément après la transition
         setTimeout(() => loader.remove(), 500);
     }
 }
 
-// Configurer les gestionnaires d'événements
+/**
+ * Configure tous les gestionnaires d'événements globaux du jeu
+ * Inclut: actions des boutons, sélection de personnage, et commandes de triche
+ * @param {Game} game - Instance du jeu principal
+ */
 function setupEventHandlers(game) {
-    // Mapping des actions
+    // Initialiser le gestionnaire de paramètres (disponible sur tous les écrans)
+    const settings = new SettingsManager(game);
+
+    // Mapping des actions des boutons (attribut data-action)
     const actions = {
-        // Menu
+        // Actions du menu principal
         newGame: () => game.newGame(),
         loadGame: () => game.loadGame(),
         saveGame: () => game.saveGame(),
         showGuide: () => game.showGuide(),
         showMenu: () => game.showMenu(),
+        showSettings: () => settings.open(),
 
-        // Guide
+        // Actions du guide
         closeGuide: () => game.closeGuide(),
 
-        // Panneau latéral
+        // Actions du panneau latéral
         closeSidePanel: () => game.closeSidePanel()
     };
 
-    // Délégation d'événements sur tout le document
+    // Exposer le gestionnaire de paramètres pour usage global
+    window.settings = settings;
+
+    // Délégation d'événements: écoute globale des clics sur les boutons avec data-action
     document.addEventListener('click', (e) => {
         const button = e.target.closest('[data-action]');
         if (button) {
@@ -110,7 +141,7 @@ function setupEventHandlers(game) {
         }
     });
 
-    // Gestion de la sélection de personnage
+    // Gestion de la sélection de personnage (écran de démarrage)
     document.querySelectorAll('.character-card').forEach(card => {
         card.addEventListener('click', () => {
             const gender = card.dataset.gender;
@@ -118,29 +149,44 @@ function setupEventHandlers(game) {
         });
     });
 
-    // Exposer game globalement pour le debug
+    // Exposer l'instance du jeu globalement pour le débogage
     window.game = game;
 
-    // Commandes de triche (accessibles via la console)
+    // ========================================
+    // COMMANDES DE TRICHE (console développeur)
+    // ========================================
+    // Accessibles via window.cheat.XXX() dans la console du navigateur
+
     window.cheat = {
-        // Déclencher le game over
+        /**
+         * Déclenche le game over manuellement
+         */
         gameOver: () => {
             game.gameOver("Triche: Game Over déclenché manuellement");
         },
 
-        // Déclencher la victoire
+        /**
+         * Déclenche la victoire manuellement
+         * Met la population à 10000 avant de déclencher
+         */
         victory: () => {
             game.state.population = 10000;
             game.victory();
         },
 
-        // Ajouter de l'argent
+        /**
+         * Ajoute de l'argent au joueur
+         * @param {number} amount - Montant à ajouter (défaut: 10000)
+         */
         money: (amount = 10000) => {
             game.state.money += amount;
             game.notifications.success(`+${amount} 💰 (triche)`);
         },
 
-        // Ajouter des ressources
+        /**
+         * Ajoute toutes les ressources en même temps
+         * @param {number} amount - Quantité de chaque ressource (défaut: 100)
+         */
         resources: (amount = 100) => {
             game.state.resources.wood += amount;
             game.state.resources.stone += amount;
@@ -152,13 +198,18 @@ function setupEventHandlers(game) {
             game.notifications.success(`+${amount} de chaque ressource (triche)`);
         },
 
-        // Ajouter de la population
+        /**
+         * Ajoute de la population
+         * @param {number} amount - Population à ajouter (défaut: 1000)
+         */
         population: (amount = 1000) => {
             game.state.population += amount;
             game.notifications.success(`+${amount} 👥 (triche)`);
         },
 
-        // Échouer la tâche de Cléopâtre en cours
+        /**
+         * Fait échouer la tâche de Cléopâtre en cours
+         */
         failTask: () => {
             if (game.cleopatra?.currentTask) {
                 game.cleopatra.failTask();
@@ -167,12 +218,17 @@ function setupEventHandlers(game) {
             }
         },
 
-        // Forcer une nouvelle tâche de Cléopâtre (aléatoire)
+        /**
+         * Force l'assignation d'une nouvelle tâche aléatoire
+         */
         newTask: () => {
             game.cleopatra?.forceNewTask();
         },
 
-        // Forcer une tâche spécifique par ID
+        /**
+         * Force l'assignation d'une tâche spécifique par son ID
+         * @param {string} taskId - ID de la tâche (ex: 'send_message', 'build_house')
+         */
         task: (taskId) => {
             if (!game.cleopatra) {
                 console.log("Système Cléopâtre non initialisé");
@@ -186,13 +242,13 @@ function setupEventHandlers(game) {
                     console.log('Utilisez cheat.tasks() pour voir les tâches disponibles');
                     return;
                 }
-                // Forcer l'assignation de cette tâche
-                game.cleopatra.lastTaskTime = 0;
                 game.cleopatra.assignSpecificTask(taskId);
             });
         },
 
-        // Lister les tâches disponibles
+        /**
+         * Affiche la liste de toutes les tâches disponibles dans la console
+         */
         tasks: () => {
             import('./data/tasks.js').then(module => {
                 const { CLEOPATRA_TASKS } = module;
@@ -205,7 +261,9 @@ function setupEventHandlers(game) {
             });
         },
 
-        // Lister les animations de Cléopâtre
+        /**
+         * Affiche la liste des animations disponibles pour le sprite de Cléopâtre
+         */
         anims: () => {
             if (!game.cleopatra?.sprite) {
                 console.log("Sprite Cléopâtre non initialisé");
@@ -222,7 +280,11 @@ function setupEventHandlers(game) {
             console.log('Ex: cheat.anim("speaking")');
         },
 
-        // Jouer une animation spécifique
+        /**
+         * Joue une animation spécifique sur le sprite de Cléopâtre
+         * @param {string} animName - Nom de l'animation
+         * @param {number} duration - Durée en millisecondes (défaut: 3000)
+         */
         anim: (animName, duration = 3000) => {
             if (!game.cleopatra?.sprite) {
                 console.log("Sprite Cléopâtre non initialisé");
@@ -238,7 +300,10 @@ function setupEventHandlers(game) {
             console.log(`Animation "${animName}" jouée pour ${duration}ms`);
         },
 
-        // Changer l'humeur du sprite
+        /**
+         * Change l'humeur du sprite de Cléopâtre
+         * @param {number} value - Valeur de l'humeur (0-100)
+         */
         mood: (value) => {
             if (!game.cleopatra?.sprite) {
                 console.log("Sprite Cléopâtre non initialisé");
@@ -248,13 +313,18 @@ function setupEventHandlers(game) {
             console.log(`Humeur du sprite: ${game.cleopatra.sprite.currentMood} (valeur: ${value})`);
         },
 
-        // Construire un bâtiment instantanément (sans coût)
+        /**
+         * Construit un bâtiment instantanément sans coût
+         * Le bâtiment est placé sur la grille et ses effets sont appliqués
+         * @param {string} buildingId - ID du bâtiment (ex: 'house', 'farm')
+         * @param {number} count - Nombre à construire (défaut: 1)
+         */
         build: (buildingId, count = 1) => {
             const { BUILDINGS } = game.constructor.prototype.constructor.name === 'Game'
                 ? { BUILDINGS: window.BUILDINGS }
                 : {};
 
-            // Accéder aux bâtiments via l'import
+            // Charger les données des bâtiments dynamiquement
             import('./data/buildings.js').then(module => {
                 const BUILDINGS = module.default;
                 const building = BUILDINGS[buildingId];
@@ -276,15 +346,15 @@ function setupEventHandlers(game) {
 
                 let builtCount = 0;
                 for (let i = 0; i < actualCount; i++) {
-                    // D'abord essayer de placer sur la grille
+                    // Essayer de placer sur la grille du village
                     let placed = null;
                     if (game.villageRenderer) {
                         placed = game.villageRenderer.placeBuilding(buildingId);
                         if (!placed) {
                             console.log(`Pas de place pour ${building.name} sur la grille`);
-                            continue; // Passer au suivant
+                            continue;
                         }
-                        // Marquer comme terminé immédiatement (utiliser UID pour les formes complexes)
+                        // Marquer comme terminé immédiatement
                         game.villageRenderer.finishBuilding(placed.uid);
                     }
 
@@ -296,7 +366,7 @@ function setupEventHandlers(game) {
                     game.state.buildingsBuilt++;
                     builtCount++;
 
-                    // Appliquer les effets
+                    // Appliquer les effets du bâtiment
                     if (building.effects.population) {
                         game.state.population += building.effects.population;
                     }
@@ -319,23 +389,35 @@ function setupEventHandlers(game) {
             });
         },
 
-        // Ajouter une ressource spécifique
+        // Raccourcis pour ajouter des ressources individuelles
+        /** @param {number} n - Quantité de bois à ajouter */
         wood: (n = 100) => { game.state.resources.wood += n; game.notifications.success(`+${n} 🪵`); },
+        /** @param {number} n - Quantité de pierre à ajouter */
         stone: (n = 100) => { game.state.resources.stone += n; game.notifications.success(`+${n} 🪨`); },
+        /** @param {number} n - Quantité de sable à ajouter */
         sand: (n = 100) => { game.state.resources.sand += n; game.notifications.success(`+${n} 🏜️`); },
+        /** @param {number} n - Quantité de terre à ajouter */
         dirt: (n = 100) => { game.state.resources.dirt += n; game.notifications.success(`+${n} 🟤`); },
+        /** @param {number} n - Quantité d'argile à ajouter */
         clay: (n = 100) => { game.state.resources.clay += n; game.notifications.success(`+${n} 🧱`); },
+        /** @param {number} n - Quantité de nourriture à ajouter */
         food: (n = 100) => { game.state.food += n; game.notifications.success(`+${n} 🍞`); },
+        /** @param {number} n - Quantité d'eau à ajouter */
         water: (n = 100) => { game.state.water += n; game.notifications.success(`+${n} 💧`); },
 
-        // Ajouter des paysans
+        /**
+         * Ajoute des paysans (ouvriers)
+         * @param {number} n - Nombre de paysans à ajouter (défaut: 10)
+         */
         peasants: (n = 10) => {
             game.state.totalPeasants += n;
             game.state.availablePeasants += n;
             game.notifications.success(`+${n} 🧑‍🌾 paysans`);
         },
 
-        // Lister les bâtiments disponibles
+        /**
+         * Affiche la liste de tous les bâtiments disponibles avec leur nombre actuel
+         */
         buildings: () => {
             import('./data/buildings.js').then(module => {
                 const BUILDINGS = module.default;
@@ -347,11 +429,15 @@ function setupEventHandlers(game) {
             });
         },
 
-        // Lister les tiers et leur statut
+        /**
+         * Affiche l'état des tiers de bâtiments (verrouillé/débloqué)
+         */
         tiers: () => {
             import('./data/tasks.js').then(module => {
                 const { BUILDING_TIER_UNLOCK } = module;
                 const gameTime = game.state.gameTime || 0;
+
+                // Fonction locale pour formater le temps
                 const formatTime = (s) => {
                     if (s >= 3600) return `${Math.floor(s/3600)}h${Math.floor((s%3600)/60)}m`;
                     if (s >= 60) return `${Math.floor(s/60)}m${Math.ceil(s%60)}s`;
@@ -378,7 +464,10 @@ function setupEventHandlers(game) {
             });
         },
 
-        // Débloquer un tier spécifique
+        /**
+         * Débloque un tier spécifique en avançant le temps de jeu
+         * @param {number} tier - Numéro du tier (1, 2 ou 3)
+         */
         unlockTier: (tier) => {
             if (tier < 1 || tier > 3) {
                 console.log('Tier invalide. Utilisez 1, 2 ou 3.');
@@ -395,7 +484,7 @@ function setupEventHandlers(game) {
                     return;
                 }
 
-                // Mettre le temps de jeu au minimum requis pour ce tier
+                // Avancer le temps de jeu au minimum requis
                 game.state.gameTime = requiredTime;
                 game.notifications.success(`${config.icon} Tier ${tier} débloqué !`);
                 console.log(`Tier ${tier} (${config.name}) débloqué !`);
@@ -403,7 +492,11 @@ function setupEventHandlers(game) {
             });
         },
 
-        // Verrouiller un tier spécifique
+        /**
+         * Verrouille un tier spécifique en reculant le temps de jeu
+         * Note: Le tier 1 ne peut pas être verrouillé
+         * @param {number} tier - Numéro du tier (2 ou 3)
+         */
         lockTier: (tier) => {
             if (tier < 2 || tier > 3) {
                 console.log('Seuls les tiers 2 et 3 peuvent être verrouillés (tier 1 toujours disponible).');
@@ -413,7 +506,7 @@ function setupEventHandlers(game) {
             import('./data/tasks.js').then(module => {
                 const { BUILDING_TIER_UNLOCK } = module;
                 const prevTierConfig = BUILDING_TIER_UNLOCK[tier - 1];
-                const targetTime = prevTierConfig.time + 1; // Juste après le tier précédent
+                const targetTime = prevTierConfig.time + 1;
 
                 if (game.state.gameTime < BUILDING_TIER_UNLOCK[tier].time) {
                     console.log(`Tier ${tier} déjà verrouillé !`);
@@ -427,7 +520,9 @@ function setupEventHandlers(game) {
             });
         },
 
-        // Débloquer tous les tiers
+        /**
+         * Débloque tous les tiers en avançant le temps au maximum
+         */
         unlockAllTiers: () => {
             import('./data/tasks.js').then(module => {
                 const { BUILDING_TIER_UNLOCK } = module;
@@ -440,7 +535,10 @@ function setupEventHandlers(game) {
             });
         },
 
-        // Lister les bâtiments par tier
+        /**
+         * Affiche les bâtiments d'un tier spécifique
+         * @param {number} tier - Numéro du tier (1, 2 ou 3)
+         */
         tierBuildings: (tier) => {
             if (!tier || tier < 1 || tier > 3) {
                 console.log('Usage: cheat.tierBuildings(1), cheat.tierBuildings(2), ou cheat.tierBuildings(3)');
@@ -460,7 +558,11 @@ function setupEventHandlers(game) {
             });
         },
 
-        // Construire un bâtiment aléatoire instantanément
+        /**
+         * Construit des bâtiments aléatoires parmi ceux disponibles
+         * Respecte les tiers débloqués et les limites de construction
+         * @param {number} count - Nombre de bâtiments à construire (défaut: 1)
+         */
         randomBuild: (count = 1) => {
             import('./data/buildings.js').then(buildingsModule => {
                 import('./data/tasks.js').then(tasksModule => {
@@ -496,18 +598,17 @@ function setupEventHandlers(game) {
                         // Choisir un bâtiment aléatoire
                         const building = stillAvailable[Math.floor(Math.random() * stillAvailable.length)];
 
-                        // D'abord essayer de placer sur la grille
+                        // Essayer de placer sur la grille
                         let placed = null;
                         if (game.villageRenderer) {
                             placed = game.villageRenderer.placeBuilding(building.id);
                             if (!placed) {
                                 console.log(`Pas de place pour ${building.name} sur la grille`);
-                                // Retirer ce bâtiment des disponibles pour cette session
+                                // Retirer ce bâtiment des disponibles
                                 const idx = availableBuildings.findIndex(b => b.id === building.id);
                                 if (idx !== -1) availableBuildings.splice(idx, 1);
-                                continue; // Passer au suivant
+                                continue;
                             }
-                            // Marquer comme terminé immédiatement (utiliser UID pour les formes complexes)
                             game.villageRenderer.finishBuilding(placed.uid);
                         }
 
@@ -533,7 +634,6 @@ function setupEventHandlers(game) {
 
                     if (built > 0) {
                         game.notifications.success(`+${built} bâtiment(s) aléatoire(s) (triche)`);
-                        // Rafraîchir l'interface
                         if (game.panelManager) {
                             game.panelManager.refresh();
                         }
@@ -542,7 +642,10 @@ function setupEventHandlers(game) {
             });
         },
 
-        // Avancer le temps de jeu
+        /**
+         * Avance le temps de jeu
+         * @param {number} seconds - Nombre de secondes à ajouter
+         */
         time: (seconds) => {
             if (typeof seconds !== 'number' || seconds <= 0) {
                 console.log('Usage: cheat.time(300) - Avance le temps de 300 secondes (5 minutes)');
@@ -557,7 +660,9 @@ function setupEventHandlers(game) {
             console.log(`Nouveau temps: ${Math.floor(totalTime / 60)}m${Math.floor(totalTime % 60)}s`);
         },
 
-        // Afficher l'aide
+        /**
+         * Affiche l'aide des commandes de triche dans la console
+         */
         help: () => {
             console.log(`
 === COMMANDES DE TRICHE ===
@@ -615,22 +720,33 @@ cheat.help()          - Afficher cette aide
     console.log("💡 Tapez cheat.help() dans la console pour voir les commandes de triche");
 }
 
-// Initialisation
+/**
+ * Point d'entrée principal de l'application
+ * Affiche l'écran de chargement, initialise le jeu et configure les événements
+ */
 function init() {
+    // Afficher l'écran de chargement
     showLoading();
 
-    // Simuler un temps de chargement minimum pour l'effet visuel
+    // Simuler un temps de chargement minimum pour l'effet visuel (1.5s)
     setTimeout(() => {
+        // Créer l'instance du jeu
         const game = new Game();
+        // Configurer tous les gestionnaires d'événements
         setupEventHandlers(game);
+        // Cacher l'écran de chargement
         hideLoading();
         console.log('Cléopâtre - Le Village du Nil chargé!');
     }, 1500);
 }
 
-// Attendre que le DOM soit prêt
+// ========================================
+// DÉMARRAGE DE L'APPLICATION
+// ========================================
+// Attendre que le DOM soit prêt avant d'initialiser
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
 } else {
+    // DOM déjà prêt (script chargé en defer ou fin de body)
     init();
 }
