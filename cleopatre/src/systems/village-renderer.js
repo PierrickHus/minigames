@@ -20,9 +20,22 @@ class VillageRenderer {
         this.gridWidth = 48;
         this.gridHeight = 28;
 
-        // Décalage de la vue (position de la grille dans le canvas)
+        // Décalage de base de la vue (calculé par resize)
         this.offsetX = 0;
         this.offsetY = 0;
+
+        // Système de pan/zoom
+        this.viewX = 0;  // Décalage horizontal par le joueur
+        this.viewY = 0;  // Décalage vertical par le joueur
+        this.zoom = 1;   // Niveau de zoom (1 = normal)
+        this.minZoom = 1;
+        this.maxZoom = 2;
+        this.isMouseDown = false;
+        this.isDragging = false;
+        this.dragStartX = 0;
+        this.dragStartY = 0;
+        this.viewStartX = 0;
+        this.viewStartY = 0;
 
         // État de sélection
         this.selectedTile = null;
@@ -103,40 +116,150 @@ class VillageRenderer {
         // Les 3 dernières rangées de la grille sont réservées pour la zone d'eau
         const riverHeight = 80;
         this.offsetY = this.canvas.height - riverHeight - (this.gridHeight - 3) * this.tileSize;
+
+        // Recalculer les limites de pan après resize
+        this.clampView();
+    }
+
+    /**
+     * Contraint la vue pour ne pas sortir des limites de la grille
+     * Limites simples: pas de déplacement au-delà de la position de base
+     */
+    clampView() {
+        // Limiter le déplacement à 0 maximum (pas de dépassement à droite/bas)
+        // et permettre un déplacement négatif limité pour les petits écrans
+        const gridWidthPx = this.gridWidth * this.tileSize * this.zoom;
+        const gridHeightPx = this.gridHeight * this.tileSize * this.zoom;
+
+        // On peut aller vers la gauche/haut si la grille zoomée dépasse l'écran
+        const minX = Math.min(0, this.canvas.width - this.offsetX - gridWidthPx);
+        const minY = Math.min(0, this.canvas.height - this.offsetY - gridHeightPx);
+
+        this.viewX = Math.max(minX, Math.min(0, this.viewX));
+        this.viewY = Math.max(minY, Math.min(0, this.viewY));
+    }
+
+    /**
+     * Convertit les coordonnées écran en coordonnées grille
+     * @param {number} screenX - Position X sur le canvas
+     * @param {number} screenY - Position Y sur le canvas
+     * @returns {object|null} - Coordonnées {x, y} de la tuile ou null si hors grille
+     */
+    screenToGrid(screenX, screenY) {
+        // Retirer l'offset de base et le pan, puis diviser par zoom et taille tuile
+        const x = (screenX - this.offsetX - this.viewX) / this.zoom;
+        const y = (screenY - this.offsetY - this.viewY) / this.zoom;
+
+        const tileX = Math.floor(x / this.tileSize);
+        const tileY = Math.floor(y / this.tileSize);
+
+        if (tileX >= 0 && tileX < this.gridWidth && tileY >= 0 && tileY < this.gridHeight) {
+            return { x: tileX, y: tileY };
+        }
+        return null;
     }
 
     /**
      * Configure les événements de souris sur le canvas
      */
     setupEvents() {
-        // Détection de la tuile survolée
+        const DRAG_THRESHOLD = 5; // Pixels minimum pour considérer un drag
+
+        // Détection de la tuile survolée et gestion du drag
         this.canvas.addEventListener('mousemove', (e) => {
             const rect = this.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left - this.offsetX;
-            const y = e.clientY - rect.top - this.offsetY;
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
 
-            const tileX = Math.floor(x / this.tileSize);
-            const tileY = Math.floor(y / this.tileSize);
+            // Si bouton gauche enfoncé, vérifier si on dépasse le seuil de drag
+            if (this.isMouseDown && !this.isDragging) {
+                const dx = mouseX - this.dragStartX;
+                const dy = mouseY - this.dragStartY;
+                if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
+                    this.isDragging = true;
+                    this.canvas.style.cursor = 'grabbing';
+                }
+            }
 
-            if (tileX >= 0 && tileX < this.gridWidth && tileY >= 0 && tileY < this.gridHeight) {
-                this.hoveredTile = { x: tileX, y: tileY };
-            } else {
+            // Gestion du drag (pan)
+            if (this.isDragging) {
+                this.viewX = this.viewStartX + (mouseX - this.dragStartX);
+                this.viewY = this.viewStartY + (mouseY - this.dragStartY);
+                this.clampView();
                 this.hoveredTile = null;
+                return;
+            }
+
+            // Détection de la tuile survolée
+            this.hoveredTile = this.screenToGrid(mouseX, mouseY);
+        });
+
+        // Début du drag potentiel (clic gauche)
+        this.canvas.addEventListener('mousedown', (e) => {
+            if (e.button === 0) {
+                const rect = this.canvas.getBoundingClientRect();
+                this.isMouseDown = true;
+                this.dragStartX = e.clientX - rect.left;
+                this.dragStartY = e.clientY - rect.top;
+                this.viewStartX = this.viewX;
+                this.viewStartY = this.viewY;
             }
         });
 
-        // Clic sur une tuile
-        this.canvas.addEventListener('click', (e) => {
-            if (this.hoveredTile) {
-                this.handleTileClick(this.hoveredTile.x, this.hoveredTile.y);
-            } else {
-                this.game.closeSidePanel();
+        // Fin du drag ou clic
+        this.canvas.addEventListener('mouseup', (e) => {
+            if (e.button === 0) {
+                const wasDragging = this.isDragging;
+                this.isMouseDown = false;
+                this.isDragging = false;
+                this.canvas.style.cursor = 'default';
+
+                // Si c'était un clic (pas un drag), gérer le clic
+                if (!wasDragging) {
+                    if (this.hoveredTile) {
+                        this.handleTileClick(this.hoveredTile.x, this.hoveredTile.y);
+                    } else {
+                        this.game.closeSidePanel();
+                    }
+                }
             }
         });
+
+        // Zoom avec la molette
+        this.canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+
+            const rect = this.canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // Position du curseur dans le monde avant zoom
+            const worldX = (mouseX - this.offsetX - this.viewX) / this.zoom;
+            const worldY = (mouseY - this.offsetY - this.viewY) / this.zoom;
+
+            // Appliquer le zoom
+            const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
+            const newZoom = Math.max(this.minZoom, Math.min(this.maxZoom, this.zoom * zoomDelta));
+
+            // Ajuster la vue pour zoomer vers le curseur
+            this.viewX = mouseX - this.offsetX - worldX * newZoom;
+            this.viewY = mouseY - this.offsetY - worldY * newZoom;
+            this.zoom = newZoom;
+
+            this.clampView();
+        }, { passive: false });
 
         // Réinitialiser le survol quand la souris quitte le canvas
         this.canvas.addEventListener('mouseleave', () => {
             this.hoveredTile = null;
+            this.isMouseDown = false;
+            this.isDragging = false;
+            this.canvas.style.cursor = 'default';
+        });
+
+        // Empêcher le menu contextuel sur clic droit (pour éventuel usage futur)
+        this.canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
         });
     }
 
@@ -707,11 +830,12 @@ class VillageRenderer {
         ctx.fillStyle = '#c2a668';
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        this.drawNile();
-
+        // Appliquer la transformation de vue (pan + zoom)
         ctx.save();
-        ctx.translate(this.offsetX, this.offsetY);
+        ctx.translate(this.offsetX + this.viewX, this.offsetY + this.viewY);
+        ctx.scale(this.zoom, this.zoom);
 
+        this.drawNile();
         this.drawGrid();
         this.drawBuildings();
         this.drawPeasants();
@@ -721,17 +845,20 @@ class VillageRenderer {
             this.drawHover();
         }
 
-        ctx.restore();
-
         this.drawDecorations();
+
+        ctx.restore();
     }
 
     /**
      * Dessine le Nil avec un gradient, des vagues animées et des roseaux
+     * Coordonnées relatives à la grille (le contexte est déjà transformé)
      */
     drawNile() {
         const ctx = this.ctx;
-        const riverY = this.offsetY + (this.gridHeight - 3) * this.tileSize;
+        const riverY = (this.gridHeight - 3) * this.tileSize;
+        const riverWidth = this.gridWidth * this.tileSize + 1000; // Étendre au-delà de la grille
+        const riverStartX = -500; // Commencer bien avant la grille
 
         // Gradient bleu pour l'eau
         const gradient = ctx.createLinearGradient(0, riverY, 0, riverY + 80);
@@ -739,7 +866,7 @@ class VillageRenderer {
         gradient.addColorStop(1, '#2c5a8a');
 
         ctx.fillStyle = gradient;
-        ctx.fillRect(0, riverY, this.canvas.width, 80);
+        ctx.fillRect(riverStartX, riverY, riverWidth, 80);
 
         // Vagues animées
         ctx.strokeStyle = 'rgba(255,255,255,0.3)';
@@ -748,9 +875,9 @@ class VillageRenderer {
 
         for (let i = 0; i < 4; i++) {
             ctx.beginPath();
-            for (let x = 0; x < this.canvas.width; x += 8) {
+            for (let x = riverStartX; x < riverStartX + riverWidth; x += 8) {
                 const y = riverY + 10 + i * 18 + Math.sin(x * 0.03 + time + i) * 3;
-                if (x === 0) {
+                if (x === riverStartX) {
                     ctx.moveTo(x, y);
                 } else {
                     ctx.lineTo(x, y);
@@ -761,11 +888,11 @@ class VillageRenderer {
 
         // Roseaux sur la berge
         ctx.fillStyle = '#4a7c4e';
-        for (let x = 20; x < this.canvas.width; x += 60) {
+        for (let x = 0; x < riverWidth; x += 60) {
             const height = 25 + Math.sin(x) * 8;
-            ctx.fillRect(x, riverY - height, 2, height + 3);
-            ctx.fillRect(x + 4, riverY - height + 4, 2, height);
-            ctx.fillRect(x + 8, riverY - height + 8, 2, height - 4);
+            ctx.fillRect(riverStartX + x, riverY - height, 2, height + 3);
+            ctx.fillRect(riverStartX + x + 4, riverY - height + 4, 2, height);
+            ctx.fillRect(riverStartX + x + 8, riverY - height + 8, 2, height - 4);
         }
     }
 
@@ -1083,21 +1210,22 @@ class VillageRenderer {
 
     /**
      * Dessine les décorations (palmiers, soleil) autour de la grille
+     * Coordonnées relatives à la grille (le contexte est déjà transformé)
      */
     drawDecorations() {
         const ctx = this.ctx;
-        const gridRight = this.offsetX + this.gridWidth * this.tileSize;
+        const gridRight = this.gridWidth * this.tileSize;
 
         // Palmiers aux quatre coins de la grille
         ctx.font = '30px Arial';
-        ctx.fillText('🌴', this.offsetX - 40, this.offsetY + 30);
-        ctx.fillText('🌴', gridRight + 10, this.offsetY + 50);
-        ctx.fillText('🌴', this.offsetX - 35, this.offsetY + (this.gridHeight - 4) * this.tileSize);
-        ctx.fillText('🌴', gridRight + 15, this.offsetY + (this.gridHeight - 5) * this.tileSize);
+        ctx.fillText('🌴', -40, 30);
+        ctx.fillText('🌴', gridRight + 10, 50);
+        ctx.fillText('🌴', -35, (this.gridHeight - 4) * this.tileSize);
+        ctx.fillText('🌴', gridRight + 15, (this.gridHeight - 5) * this.tileSize);
 
-        // Soleil en haut à droite
+        // Soleil en haut à droite (relatif à la grille)
         ctx.font = '40px Arial';
-        ctx.fillText('☀️', this.canvas.width - 60, 50);
+        ctx.fillText('☀️', gridRight + 50, -20);
     }
 
     /**

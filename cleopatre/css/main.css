@@ -2671,18 +2671,12 @@ body {
 .resource-bar-item.clickable:hover {
     border-color: #ffd700;
     background: linear-gradient(180deg, #4a4a6a 0%, #3a3a5a 100%);
-    transform: scale(1.02);
-    z-index: 10;
 }
 
 .resource-bar-item.clickable:active {
     transform: scale(0.98);
 }
 
-/* Espace pour le premier élément quand il est en hover */
-.resources-list .resource-bar-item:first-child {
-    margin-left: 3px;
-}
 
 .resource-bar-item.gathering {
     border-color: #4ade80;
@@ -2709,10 +2703,26 @@ body {
     min-width: 0;
 }
 
+.resource-bar-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
 .resource-bar-name {
     color: #fff;
     font-weight: bold;
     font-size: 0.75rem;
+}
+
+.resource-bar-yield {
+    color: #4ade80;
+    font-weight: bold;
+    font-size: 0.65rem;
+    white-space: nowrap;
+    padding-left: 6px;
+    border-left: 1px solid rgba(255,255,255,0.3);
+    min-width: 58px;
 }
 
 .resource-bar-stock {
@@ -2725,13 +2735,6 @@ body {
 .resource-bar-stock > span:first-child {
     color: #ffd700;
     font-weight: bold;
-}
-
-.resource-bar-yield {
-    color: #4ade80;
-    font-weight: bold;
-    font-size: 0.7rem;
-    white-space: nowrap;
 }
 
 .resource-bar-pending {

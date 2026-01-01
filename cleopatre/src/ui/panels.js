@@ -132,6 +132,20 @@ class PanelManager {
                     }
                 });
             });
+
+        }
+
+        // Défilement horizontal avec la molette de la souris sur tout le panel
+        const resourcesBar = document.getElementById('resourcesBar');
+        const resourcesListForScroll = document.getElementById('resourcesBarList');
+        if (resourcesBar && resourcesListForScroll) {
+            resourcesBar.addEventListener('wheel', (e) => {
+                // Si le contenu dépasse la largeur visible, convertir le scroll vertical en horizontal
+                if (resourcesListForScroll.scrollWidth > resourcesListForScroll.clientWidth) {
+                    e.preventDefault();
+                    resourcesListForScroll.scrollLeft += e.deltaY;
+                }
+            }, { passive: false });
         }
     }
 
@@ -1013,8 +1027,8 @@ class PanelManager {
             }
             updateTextIfChanged(costTimeEl, timeText);
 
-            // Progression vers le prochain oiseau
-            const newWidth = currentBirds >= maxBirds ? '0%' : `${(currentBirds % 1) * 100}%`;
+            // Progression vers le prochain oiseau (100% si tous récupérés)
+            const newWidth = currentBirds >= maxBirds ? '100%' : `${(currentBirds % 1) * 100}%`;
             updateStyleIfChanged(progressFill, 'width', newWidth);
         }
 
