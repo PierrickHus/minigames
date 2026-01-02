@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cléopâtre - Le Village du Nil</title>
     <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/scenario.css">
 </head>
 <body>
     <a href="../index.html" id="backButton">← Menu</a>
@@ -16,6 +17,8 @@
             <h2>Le Village du Nil</h2>
             <div class="menu-buttons">
                 <button data-action="newGame">Nouvelle Partie</button>
+                <button data-action="startTutorial">Tutoriel</button>
+                <button data-action="showScenarios" id="scenariosBtn" disabled title="Aucun scénario supplémentaire disponible">Scénarios</button>
                 <button data-action="loadGame" id="loadBtn" disabled>Charger</button>
                 <button data-action="showGuide">Guide du Jeu</button>
                 <button data-action="showSettings">Parametres</button>
@@ -24,6 +27,16 @@
         <div class="menu-footer">
             <p>Construisez et gérez votre village pour Cléopâtre</p>
         </div>
+    </div>
+
+    <!-- Sélection du scénario (pour futurs scénarios) -->
+    <div id="scenarioSelect" class="screen">
+        <h1 class="scenario-select-title">Scénarios</h1>
+        <p class="scenario-select-subtitle">Aucun scénario supplémentaire disponible pour le moment</p>
+        <div class="scenario-cards" id="scenarioCards">
+            <!-- Les cartes seront générées quand d'autres scénarios seront ajoutés -->
+        </div>
+        <button class="scenario-back-btn" data-action="showMenu">Retour au Menu</button>
     </div>
 
     <!-- Sélection du personnage -->
@@ -55,9 +68,21 @@
                 <span id="populationDisplay" title="Population">👥 100</span>
                 <span id="peasantsDisplay" title="Paysans disponibles">🧑‍🌾 10</span>
                 <span id="rationTimerDisplay" class="ration-timer" title="Prochaine ration">🍽️ 1:00</span>
+                <span id="growthTimerDisplay" class="growth-timer hidden" title="Prochaine croissance">📈 1:00</span>
             </div>
-            <div class="goal-info">
+            <div class="goal-info" id="goalContainer">
                 <span id="goalDisplay">Objectif: 10 000 habitants</span>
+                <div id="goalTooltip" class="goal-tooltip hidden">
+                    <div class="goal-tooltip-header">Conditions</div>
+                    <div id="goalVictoryConditions" class="goal-section">
+                        <div class="goal-section-title">🏆 Victoire</div>
+                        <ul id="victoryConditionsList"></ul>
+                    </div>
+                    <div id="goalDefeatConditions" class="goal-section">
+                        <div class="goal-section-title">💀 Défaite</div>
+                        <ul id="defeatConditionsList"></ul>
+                    </div>
+                </div>
             </div>
             <div class="actions">
                 <div class="save-group">
@@ -96,7 +121,7 @@
                             <span id="cleopatraMood" class="mood-value">50%</span>
                         </div>
                     </div>
-                    <div id="nextTaskTimer" class="next-task-timer">
+                    <div id="nextTaskTimer" class="next-task-timer hidden">
                         <span class="next-task-label">Prochaine mission:</span>
                         <span id="nextTaskCountdown">--</span>
                     </div>

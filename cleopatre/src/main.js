@@ -113,6 +113,8 @@ function setupEventHandlers(game) {
     const actions = {
         // Actions du menu principal
         newGame: () => game.newGame(),
+        startTutorial: () => game.startTutorial(),
+        showScenarios: () => game.showScenarios(),
         loadGame: () => game.loadGame(),
         saveGame: () => game.saveGame(),
         showGuide: () => game.showGuide(),

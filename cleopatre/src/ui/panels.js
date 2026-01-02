@@ -354,6 +354,12 @@ class PanelManager {
         const unlockConfig = BUILDING_TIER_UNLOCK[tier];
         if (!unlockConfig) return { unlocked: true, timeRemaining: 0 };
 
+        // Si le timer des tiers est désactivé, tous les tiers sont débloqués
+        const tierTimerEnabled = this.game.config?.tierTimerEnabled ?? false;
+        if (!tierTimerEnabled) {
+            return { unlocked: true, timeRemaining: 0, config: unlockConfig };
+        }
+
         const gameTime = this.game.state.gameTime || 0;
         const unlocked = gameTime >= unlockConfig.time;
         const timeRemaining = Math.max(0, unlockConfig.time - gameTime);
@@ -588,7 +594,14 @@ class PanelManager {
                     const progress = ((construction.elapsed / construction.totalTime) * 100).toFixed(0);
                     const remaining = construction.totalTime - construction.elapsed;
                     const suffix = constructions.length > 1 ? ` (+${constructions.length - 1})` : '';
-                    timeDiv.innerHTML = `🏗️ ${progress}% - ${formatTime(remaining)}${suffix}`;
+
+                    // Vérifier si une réduction de temps est appliquée (tutoriel)
+                    const timeReduction = this.game.scenario?.getConstructionTimeReduction?.();
+                    const reductionHtml = timeReduction
+                        ? ` <span class="time-reduction">-${timeReduction}s</span>`
+                        : '';
+
+                    timeDiv.innerHTML = `🏗️ ${progress}% - ${formatTime(remaining)}${reductionHtml}${suffix}`;
                     timeDiv.classList.add('in-progress');
                 } else {
                     // Afficher le temps de construction normal

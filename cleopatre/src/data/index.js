@@ -18,6 +18,9 @@ export { CLEOPATRA_TASKS, CLEOPATRA_IDLE_MESSAGES, REWARD_MESSAGES, DIFFICULTY_C
 // Données des formes de bâtiments (shapes, zones de placement)
 export { BUILDING_SHAPES, PLACEMENT_ZONES } from './building-shapes.js';
 
+// Scénarios du jeu (tutoriel, partie libre, etc.)
+export { default as SCENARIOS, getScenarioList, getScenario, STEP_TYPES } from './scenarios/index.js';
+
 // Constantes globales du jeu
 export * from '../constants.js';
 

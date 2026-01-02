@@ -1,0 +1,450 @@
+/* ==========================================
+   SCENARIO SYSTEM STYLES
+   ==========================================
+   Styles pour le système de scénarios et le tutoriel.
+   Inclut l'overlay, le highlight, les panneaux d'instructions
+   et l'écran de sélection de scénario.
+   ========================================== */
+
+/* ==========================================
+   ÉCRAN DE SÉLECTION DE SCÉNARIO
+   ========================================== */
+
+#scenarioSelect {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 2rem;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+
+.scenario-select-title {
+    font-size: 2.5rem;
+    color: #ffd700;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    margin-bottom: 0.5rem;
+}
+
+.scenario-select-subtitle {
+    font-size: 1.1rem;
+    color: #aaa;
+    margin-bottom: 2rem;
+}
+
+.scenario-cards {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 900px;
+}
+
+.scenario-card {
+    background: linear-gradient(180deg, #2d2d44 0%, #1a1a2e 100%);
+    border: 2px solid #444;
+    border-radius: 16px;
+    padding: 2rem;
+    width: 280px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    position: relative;
+}
+
+.scenario-card:hover {
+    transform: translateY(-8px);
+    border-color: #ffd700;
+    box-shadow: 0 8px 30px rgba(255, 215, 0, 0.2);
+}
+
+.scenario-card.recommended {
+    border-color: #4ade80;
+}
+
+.scenario-card.recommended::before {
+    content: 'Recommandé';
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #4ade80;
+    color: #000;
+    font-size: 0.75rem;
+    font-weight: bold;
+    padding: 4px 12px;
+    border-radius: 10px;
+}
+
+.scenario-card-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.scenario-card-name {
+    font-size: 1.5rem;
+    color: #fff;
+    margin-bottom: 0.5rem;
+}
+
+.scenario-card-description {
+    font-size: 0.95rem;
+    color: #aaa;
+    line-height: 1.4;
+}
+
+.scenario-back-btn {
+    margin-top: 2rem;
+    padding: 0.8rem 2rem;
+    background: transparent;
+    border: 2px solid #666;
+    border-radius: 8px;
+    color: #aaa;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.scenario-back-btn:hover {
+    border-color: #fff;
+    color: #fff;
+}
+
+/* ==========================================
+   OVERLAY TUTORIEL
+   ========================================== */
+
+.scenario-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    pointer-events: none;
+}
+
+.scenario-overlay.hidden {
+    display: none;
+}
+
+/* Fond sombre pour les étapes sans highlight (INTRO, etc.) */
+.scenario-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 9997;
+}
+
+.scenario-backdrop.hidden {
+    display: none;
+}
+
+/* ==========================================
+   HIGHLIGHT (TROU LUMINEUX)
+   ========================================== */
+
+.scenario-highlight {
+    position: fixed;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.75);
+    border: 3px solid #ffd700;
+    border-radius: 8px;
+    z-index: 9999;
+    animation: scenario-pulse-border 1.5s infinite;
+    pointer-events: none;
+}
+
+.scenario-highlight.hidden {
+    display: none;
+}
+
+/* Élément ciblé - style visuel pour indiquer qu'il est cliquable */
+.scenario-target {
+    cursor: pointer;
+}
+
+/* Mode sans backdrop - highlight visible mais sans fond sombre */
+.scenario-highlight.no-backdrop {
+    box-shadow: none;
+    border: 3px solid #ffd700;
+    animation: scenario-pulse-border-no-backdrop 1.5s infinite;
+}
+
+@keyframes scenario-pulse-border-no-backdrop {
+    0%, 100% {
+        border-color: #ffd700;
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+    }
+    50% {
+        border-color: #fff;
+        box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+    }
+}
+
+@keyframes scenario-pulse-border {
+    0%, 100% {
+        border-color: #ffd700;
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.75), 0 0 20px rgba(255, 215, 0, 0.5);
+    }
+    50% {
+        border-color: #fff;
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.75), 0 0 30px rgba(255, 255, 255, 0.5);
+    }
+}
+
+/* ==========================================
+   FLÈCHE INDICATRICE
+   ========================================== */
+
+.scenario-arrow {
+    position: fixed;
+    font-size: 2rem;
+    z-index: 10001;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
+.scenario-arrow.hidden {
+    display: none;
+}
+
+/* Animations selon la direction */
+.scenario-arrow.arrow-top {
+    animation: scenario-bounce-vertical 0.8s infinite;
+}
+
+.scenario-arrow.arrow-bottom {
+    animation: scenario-bounce-vertical-reverse 0.8s infinite;
+}
+
+.scenario-arrow.arrow-left {
+    animation: scenario-bounce-horizontal 0.8s infinite;
+}
+
+.scenario-arrow.arrow-right {
+    animation: scenario-bounce-horizontal-reverse 0.8s infinite;
+}
+
+@keyframes scenario-bounce-vertical {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+}
+
+@keyframes scenario-bounce-vertical-reverse {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(12px); }
+}
+
+@keyframes scenario-bounce-horizontal {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(-12px); }
+}
+
+@keyframes scenario-bounce-horizontal-reverse {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(12px); }
+}
+
+/* ==========================================
+   PANNEAU D'INSTRUCTIONS
+   ========================================== */
+
+.scenario-panel {
+    position: fixed;
+    top: 10%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(180deg, #4a3520 0%, #2d1f10 100%);
+    border: 3px solid #ffd700;
+    border-radius: 16px;
+    padding: 24px 32px;
+    max-width: 520px;
+    min-width: 300px;
+    text-align: center;
+    z-index: 10002;
+    pointer-events: all;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.scenario-message {
+    font-size: 1.15rem;
+    color: #fff;
+    line-height: 1.5;
+    margin: 0 0 1.2rem 0;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    white-space: pre-line;
+}
+
+.scenario-btn {
+    background: linear-gradient(180deg, #ffd700 0%, #b8860b 100%);
+    border: none;
+    border-radius: 8px;
+    padding: 12px 32px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #1a1a2e;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.scenario-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(255, 215, 0, 0.4);
+}
+
+.scenario-btn:active {
+    transform: translateY(0);
+}
+
+.scenario-btn.hidden {
+    display: none;
+}
+
+/* ==========================================
+   PANNEAU EN MODE FREE (SANS BOUTON)
+   ========================================== */
+
+.scenario-panel.free-mode {
+    background: linear-gradient(180deg, #1a4a1a 0%, #0d2d0d 100%);
+    border-color: #4ade80;
+}
+
+/* Position du panneau en bas de l'écran */
+.scenario-panel.position-bottom {
+    top: auto;
+    bottom: 15%;
+}
+
+/* Position du panneau au centre de l'écran */
+.scenario-panel.position-center {
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.scenario-panel.free-mode .scenario-message {
+    margin-bottom: 0;
+}
+
+/* ==========================================
+   NOTIFICATION DE BONUS
+   ========================================== */
+
+.scenario-bonus-notification {
+    position: fixed;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(180deg, #ffd700 0%, #b8860b 100%);
+    color: #1a1a2e;
+    font-size: 1.5rem;
+    font-weight: bold;
+    padding: 16px 32px;
+    border-radius: 12px;
+    z-index: 10003;
+    animation: scenario-bonus-appear 0.5s ease, scenario-bonus-disappear 0.5s ease 2s forwards;
+    box-shadow: 0 8px 30px rgba(255, 215, 0, 0.5);
+}
+
+@keyframes scenario-bonus-appear {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px) scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0) scale(1);
+    }
+}
+
+@keyframes scenario-bonus-disappear {
+    from {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px) scale(0.8);
+    }
+}
+
+/* ==========================================
+   INDICATEUR DE PROGRESSION
+   ========================================== */
+
+.scenario-progress {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid #ffd700;
+    border-radius: 20px;
+    padding: 8px 20px;
+    z-index: 9997;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.scenario-progress.hidden {
+    display: none;
+}
+
+.scenario-progress-text {
+    color: #ffd700;
+    font-size: 0.9rem;
+}
+
+.scenario-progress-dots {
+    display: flex;
+    gap: 4px;
+}
+
+.scenario-progress-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #444;
+}
+
+.scenario-progress-dot.completed {
+    background: #4ade80;
+}
+
+.scenario-progress-dot.current {
+    background: #ffd700;
+    animation: scenario-dot-pulse 1s infinite;
+}
+
+@keyframes scenario-dot-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+}
+
+/* ==========================================
+   RESPONSIVE
+   ========================================== */
+
+@media (max-width: 768px) {
+    .scenario-cards {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .scenario-card {
+        width: 100%;
+        max-width: 320px;
+    }
+
+    .scenario-panel {
+        left: 10px;
+        right: 10px;
+        transform: none;
+        max-width: none;
+        min-width: auto;
+        top: 5%;
+    }
+
+    .scenario-message {
+        font-size: 1rem;
+    }
+}

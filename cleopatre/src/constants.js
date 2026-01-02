@@ -108,8 +108,8 @@ export const UI_CONFIG = {
  * @readonly
  */
 export const MOOD_CONFIG = {
-    /** Humeur de départ */
-    startingMood: 75,
+    /** Humeur de départ (100% par défaut, scenarios peuvent override) */
+    startingMood: 100,
     /** Bonus d'humeur pour tâche réussie */
     taskSuccessBonus: 5,
     /** Pénalité d'humeur pour tâche échouée */

@@ -14,7 +14,7 @@
  * Liste des écrans où le bouton retour vers le menu principal doit être visible
  * @type {Set<string>}
  */
-const MENU_SCREENS = new Set(['mainMenu', 'characterSelect', 'guideScreen']);
+const MENU_SCREENS = new Set(['mainMenu', 'scenarioSelect', 'characterSelect', 'guideScreen']);
 
 /**
  * Gestionnaire des écrans de l'application
@@ -47,7 +47,7 @@ class ScreenManager {
 
         // Liste de tous les écrans disponibles dans l'application
         const allScreens = [
-            'mainMenu', 'characterSelect', 'gameScreen',
+            'mainMenu', 'scenarioSelect', 'characterSelect', 'gameScreen',
             'guideScreen', 'gameOverScreen', 'victoryScreen'
         ];
 

@@ -10,6 +10,9 @@ import VillageRenderer from '../systems/village-renderer.js';
 import CleopatraSystem from '../systems/cleopatra.js';
 import StatisticsSystem from '../systems/statistics.js';
 import StatsMenu from '../ui/stats-menu.js';
+import GameConfig from './game-config.js';
+import ScenarioSystem from '../systems/scenario.js';
+import SCENARIOS, { getScenarioList } from '../data/scenarios/index.js';
 import { BUILDINGS, RESOURCES, CONSUMABLES, RATION_CONFIG, POPULATION_GROWTH_CONFIG } from '../data/index.js';
 
 /**
@@ -31,6 +34,12 @@ class Game {
         // Managers UI
         this.screens = new ScreenManager();
         this.notifications = new NotificationManager();
+
+        // Configuration du jeu (API centralisée)
+        this.config = new GameConfig();
+
+        // Système de scénarios
+        this.scenario = new ScenarioSystem(this);
 
         // État du jeu
         this.state = this.getInitialState();
@@ -195,9 +204,78 @@ class Game {
     }
 
     /**
-     * Démarre une nouvelle partie (affiche l'écran de sélection de personnage)
+     * Démarre une nouvelle partie libre (mode freeplay)
      */
     newGame() {
+        this.selectScenario('freeplay');
+    }
+
+    /**
+     * Démarre le tutoriel
+     */
+    startTutorial() {
+        this.selectScenario('tutorial');
+    }
+
+    /**
+     * Affiche l'écran de sélection de scénarios
+     * (Pour le moment, aucun scénario supplémentaire n'est disponible)
+     */
+    showScenarios() {
+        this.renderScenarioSelect();
+        this.screens.show('scenarioSelect');
+    }
+
+    /**
+     * Génère le HTML des cartes de scénarios (exclut freeplay et tutorial)
+     */
+    renderScenarioSelect() {
+        const container = document.getElementById('scenarioCards');
+        if (!container) return;
+
+        // Filtrer les scénarios pour n'afficher que les "bonus" (pas freeplay ni tutorial)
+        const scenarios = getScenarioList().filter(s => s.id !== 'freeplay' && s.id !== 'tutorial');
+
+        if (scenarios.length === 0) {
+            container.innerHTML = '<p style="color: #888; text-align: center;">Aucun scénario supplémentaire disponible pour le moment.</p>';
+            return;
+        }
+
+        container.innerHTML = scenarios.map(scenario => `
+            <div class="scenario-card ${scenario.recommended ? 'recommended' : ''}"
+                 data-scenario="${scenario.id}">
+                <div class="scenario-card-icon">${scenario.icon}</div>
+                <div class="scenario-card-name">${scenario.name}</div>
+                <div class="scenario-card-description">${scenario.description}</div>
+            </div>
+        `).join('');
+
+        // Ajouter les event listeners
+        container.querySelectorAll('.scenario-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const scenarioId = card.dataset.scenario;
+                this.selectScenario(scenarioId);
+            });
+        });
+    }
+
+    /**
+     * Sélectionne un scénario et passe à la sélection de personnage
+     * @param {string} scenarioId - ID du scénario sélectionné
+     */
+    selectScenario(scenarioId) {
+        this.playClickSound();
+
+        // Charger le scénario dans le système
+        if (!this.scenario.loadScenario(scenarioId)) {
+            this.notifications.error('Scénario non trouvé !');
+            return;
+        }
+
+        // Stocker l'ID pour utilisation après sélection personnage
+        this.pendingScenarioId = scenarioId;
+
+        // Passer à la sélection de personnage
         this.screens.show('characterSelect');
     }
 
@@ -210,6 +288,7 @@ class Game {
         this.state = this.getInitialState();
         this.state.playerGender = gender;
         this.state.startTime = Date.now();
+        this.state.scenarioId = this.pendingScenarioId || 'freeplay';
         this.startGame();
     }
 
@@ -320,6 +399,12 @@ class Game {
         this.initAutoSave();
         this.cleopatra.updateMoodDisplay();
 
+        // Mettre à jour l'affichage de l'objectif selon la config
+        this.updateGoalDisplay();
+
+        // Démarrer le scénario
+        this.scenario.start();
+
         // Démarrer la boucle de jeu
         this.isRunning = true;
         this.lastTime = performance.now();
@@ -330,6 +415,291 @@ class Game {
         // Transition audio: menu -> jeu
         this.stopMenuMusic();
         this.startGameMusic();
+    }
+
+    /**
+     * Met à jour l'affichage de l'objectif dans la barre supérieure
+     */
+    updateGoalDisplay() {
+        const goalEl = document.getElementById('goalDisplay');
+        if (!goalEl) return;
+
+        const victory = this.config.victory;
+        const goalText = this.getGoalSummaryText(victory);
+        goalEl.textContent = goalText;
+
+        // Mettre à jour le tooltip détaillé
+        this.updateGoalTooltip();
+
+        // Setup des événements du tooltip (une seule fois)
+        this.setupGoalTooltipEvents();
+    }
+
+    /**
+     * Génère le texte résumé de l'objectif principal
+     * @param {object} victory - Conditions de victoire
+     * @returns {string}
+     */
+    getGoalSummaryText(victory) {
+        if (!victory) return 'Mode libre';
+
+        // Compter les conditions simples (format plat)
+        const simpleConditions = this.countSimpleConditions(victory);
+
+        if (simpleConditions === 0) return 'Mode libre';
+        if (simpleConditions === 1) {
+            // Une seule condition : afficher directement
+            return this.formatSingleCondition(victory);
+        }
+
+        // Plusieurs conditions : afficher un résumé
+        return `Objectifs (${simpleConditions} conditions)`;
+    }
+
+    /**
+     * Compte les conditions simples dans un objet de conditions
+     */
+    countSimpleConditions(conditions) {
+        if (!conditions) return 0;
+        let count = 0;
+        for (const [key, value] of Object.entries(conditions)) {
+            if (key === '$and' || key === '$or') {
+                value.forEach(sub => count += this.countSimpleConditions(sub));
+            } else {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Formate une condition unique pour l'affichage
+     */
+    formatSingleCondition(victory) {
+        for (const [key, value] of Object.entries(victory)) {
+            if (key === '$and' || key === '$or') continue;
+            const label = this.getConditionLabel(key);
+            const target = typeof value === 'number' ? value : (value.min || value.max || value);
+            return `Objectif: ${target.toLocaleString()} ${label}`;
+        }
+        return 'Mode libre';
+    }
+
+    /**
+     * Configure les événements du tooltip d'objectifs
+     */
+    setupGoalTooltipEvents() {
+        if (this._goalTooltipEventsSetup) return;
+
+        const container = document.getElementById('goalContainer');
+        const tooltip = document.getElementById('goalTooltip');
+        if (!container || !tooltip) return;
+
+        // Fonction pour cacher le tooltip avec délai (permet de passer au tooltip)
+        const hideTooltipDelayed = () => {
+            // Ne pas cacher si force-visible est actif (tutoriel)
+            if (tooltip.classList.contains('force-visible')) return;
+
+            // Petit délai pour permettre de passer au tooltip
+            this._goalTooltipHideTimeout = setTimeout(() => {
+                tooltip.classList.add('hidden');
+            }, 100);
+        };
+
+        // Fonction pour annuler le hide
+        const cancelHide = () => {
+            if (this._goalTooltipHideTimeout) {
+                clearTimeout(this._goalTooltipHideTimeout);
+                this._goalTooltipHideTimeout = null;
+            }
+        };
+
+        // Événements sur le container (bouton objectif)
+        container.addEventListener('mouseenter', () => {
+            cancelHide();
+            this.updateGoalTooltip();
+            tooltip.classList.remove('hidden');
+        });
+
+        container.addEventListener('mouseleave', hideTooltipDelayed);
+
+        // Événements sur le tooltip lui-même
+        tooltip.addEventListener('mouseenter', cancelHide);
+        tooltip.addEventListener('mouseleave', hideTooltipDelayed);
+
+        this._goalTooltipEventsSetup = true;
+    }
+
+    /**
+     * Met à jour le contenu du tooltip des objectifs
+     */
+    updateGoalTooltip() {
+        const victoryList = document.getElementById('victoryConditionsList');
+        const defeatList = document.getElementById('defeatConditionsList');
+        const victorySection = document.getElementById('goalVictoryConditions');
+        const defeatSection = document.getElementById('goalDefeatConditions');
+
+        if (!victoryList || !defeatList) return;
+
+        const victory = this.config.victory;
+        const defeat = this.config.defeat;
+
+        // Conditions de victoire
+        if (victory && Object.keys(victory).length > 0) {
+            victoryList.innerHTML = this.renderConditionsHTML(victory, 'victory');
+            victorySection?.classList.remove('hidden');
+        } else {
+            victoryList.innerHTML = '<li><span class="condition-label">Aucune condition</span></li>';
+            victorySection?.classList.add('hidden');
+        }
+
+        // Conditions de défaite
+        if (defeat && Object.keys(defeat).length > 0) {
+            defeatList.innerHTML = this.renderConditionsHTML(defeat, 'defeat');
+            defeatSection?.classList.remove('hidden');
+        } else {
+            defeatList.innerHTML = '<li><span class="condition-label">Aucune condition</span></li>';
+            defeatSection?.classList.add('hidden');
+        }
+    }
+
+    /**
+     * Génère le HTML pour afficher les conditions (supporte $and/$or récursif)
+     * @param {object} conditions - Objet de conditions
+     * @param {string} type - 'victory' ou 'defeat'
+     * @returns {string} HTML
+     */
+    renderConditionsHTML(conditions, type) {
+        if (!conditions) return '';
+
+        let html = '';
+
+        for (const [key, value] of Object.entries(conditions)) {
+            if (key === '$and') {
+                // Groupe ET
+                html += `<li class="condition-group condition-and">
+                    <span class="group-label">Toutes ces conditions (ET):</span>
+                    <ul>${value.map(sub => this.renderConditionsHTML(sub, type, 'and')).join('')}</ul>
+                </li>`;
+            } else if (key === '$or') {
+                // Groupe OU
+                html += `<li class="condition-group condition-or">
+                    <span class="group-label">Une de ces conditions (OU):</span>
+                    <ul>${value.map(sub => this.renderConditionsHTML(sub, type, 'or')).join('')}</ul>
+                </li>`;
+            } else {
+                // Condition simple
+                html += this.renderSimpleCondition(key, value, type);
+            }
+        }
+
+        return html;
+    }
+
+    /**
+     * Génère le HTML pour une condition simple
+     */
+    renderSimpleCondition(key, value, type) {
+        const label = this.getConditionLabel(key);
+        const current = this.getConditionCurrentValue(key);
+        const { target, comparison } = this.parseConditionValue(value, type);
+        const status = this.getConditionStatus(current, target, comparison, type);
+
+        return `<li>
+            <span class="condition-label">${label}</span>
+            <span class="condition-value ${status}">${current.toLocaleString()} / ${target.toLocaleString()} ${comparison}</span>
+        </li>`;
+    }
+
+    /**
+     * Retourne le libellé lisible d'une condition
+     */
+    getConditionLabel(key) {
+        const labels = {
+            population: '👥 Population',
+            money: '💰 Argent',
+            birds: '🐦 Oiseaux',
+            mood: '😊 Humeur',
+            peasants: '🧑‍🌾 Paysans',
+            food: '🍞 Nourriture',
+            water: '💧 Eau',
+            wood: '🪵 Bois',
+            stone: '🪨 Pierre',
+            sand: '🏖️ Sable',
+            dirt: '🟤 Terre',
+            clay: '🧱 Argile',
+            hut: '🛖 Huttes',
+            house: '🏠 Maisons',
+            well: '🪣 Puits',
+            field: '🌾 Champs',
+            aviary: '🕊️ Volières',
+            farm: '🏡 Fermes'
+        };
+        return labels[key] || key;
+    }
+
+    /**
+     * Récupère la valeur actuelle d'une condition
+     */
+    getConditionCurrentValue(key) {
+        if (!this.state) return 0;
+
+        if (key === 'population') return this.state.population || 0;
+        if (key === 'money') return this.state.money || 0;
+        if (key === 'birds') return this.state.birds || 0;
+        if (key === 'mood') return this.state.mood || 0;
+        if (key === 'peasants') return this.state.availablePeasants || 0;
+        if (this.state.resources?.[key] !== undefined) return this.state.resources[key];
+        if (this.state.consumables?.[key] !== undefined) return this.state.consumables[key];
+        if (this.state.buildings?.[key] !== undefined) return this.state.buildings[key];
+
+        return 0;
+    }
+
+    /**
+     * Parse la valeur d'une condition pour extraire la cible et le type de comparaison
+     */
+    parseConditionValue(value, type) {
+        // Format simple: { population: 10000 }
+        if (typeof value === 'number') {
+            return {
+                target: value,
+                comparison: type === 'victory' ? '≥' : '≤'
+            };
+        }
+
+        // Format objet: { min: X } ou { max: X }
+        if (typeof value === 'object') {
+            if (value.min !== undefined) {
+                return { target: value.min, comparison: '≥' };
+            }
+            if (value.max !== undefined) {
+                return { target: value.max, comparison: '≤' };
+            }
+        }
+
+        return { target: 0, comparison: '=' };
+    }
+
+    /**
+     * Détermine le statut CSS d'une condition
+     */
+    getConditionStatus(current, target, comparison, type) {
+        if (type === 'victory') {
+            // Victoire : on veut atteindre/dépasser
+            if (comparison === '≥' && current >= target) return 'completed';
+            if (comparison === '≤' && current <= target) return 'completed';
+            // Proche de l'objectif (80%+)
+            if (comparison === '≥' && current >= target * 0.8) return 'pending';
+            return 'pending';
+        } else {
+            // Défaite : on veut éviter
+            if (comparison === '≤' && current <= target) return 'danger';
+            if (comparison === '≥' && current >= target) return 'danger';
+            // Zone dangereuse (proche de la limite)
+            if (comparison === '≤' && current <= target * 1.5) return 'pending';
+            return 'completed';
+        }
     }
 
     /**
@@ -555,6 +925,9 @@ class Game {
             }
         }
 
+        // Reset complet du scénario (cache l'overlay et réinitialise l'état)
+        this.scenario?.reset();
+
         this.stopMusic();
         this.startMenuMusic();
         this.screens.show('mainMenu');
@@ -778,11 +1151,20 @@ class Game {
             this.villageRenderer.render();
         }
 
+        // Mise à jour du système de scénarios
+        if (this.scenario) {
+            this.scenario.update(dt);
+        }
+
         // Envoi automatique de messages à César si conditions réunies
         this.autoSendMessages();
 
         this.updateUI();
-        this.checkVictory();
+
+        // Vérifier victoire seulement si le scénario ne gère pas
+        if (!this.scenario?.isActive) {
+            this.checkVictory();
+        }
 
         this.gameLoop = requestAnimationFrame((t) => this.update(t));
     }
@@ -793,6 +1175,9 @@ class Game {
      * @param {number} dt - Delta time en secondes
      */
     updateProduction(dt) {
+        // Ne pas mettre à jour si la production est en pause
+        if (this.scenario?.isSystemPaused('production')) return;
+
         const perSecondFactor = dt / 60;
 
         for (const [buildingId, count] of Object.entries(this.state.buildings)) {
@@ -837,6 +1222,9 @@ class Game {
      * @param {number} dt - Delta time en secondes
      */
     updateConsumption(dt) {
+        // Ne pas mettre à jour si la consommation est en pause
+        if (this.scenario?.isSystemPaused('consumption')) return;
+
         this.state.rationTimer -= dt;
 
         // Avertissement proche de la distribution
@@ -897,6 +1285,9 @@ class Game {
      * @param {number} dt - Delta time en secondes
      */
     updatePopulationGrowth(dt) {
+        // Ne pas mettre à jour si la croissance est en pause
+        if (this.scenario?.isSystemPaused('growth')) return;
+
         this.state.growthTimer -= dt;
 
         if (this.state.growthTimer <= 0) {
@@ -941,6 +1332,9 @@ class Game {
      * @param {number} dt - Delta time en secondes
      */
     updateConstructions(dt) {
+        // Ne pas mettre à jour si les constructions sont en pause
+        if (this.scenario?.isSystemPaused('constructions')) return;
+
         const completedIndices = [];
 
         this.state.constructions.forEach((construction, index) => {
@@ -1004,6 +1398,9 @@ class Game {
      * @param {number} dt - Delta time en secondes
      */
     updateGathering(dt) {
+        // Ne pas mettre à jour si les collectes sont en pause
+        if (this.scenario?.isSystemPaused('gathering')) return;
+
         const completedIndices = [];
 
         this.state.gatheringTasks.forEach((task, index) => {
@@ -1046,7 +1443,8 @@ class Game {
                 water: document.getElementById('waterDisplay'),
                 population: document.getElementById('populationDisplay'),
                 peasants: document.getElementById('peasantsDisplay'),
-                rationTimer: document.getElementById('rationTimerDisplay')
+                rationTimer: document.getElementById('rationTimerDisplay'),
+                growthTimer: document.getElementById('growthTimerDisplay')
             };
         }
 
@@ -1094,6 +1492,17 @@ class Game {
             }
         }
 
+        // Timer de croissance de la population
+        if (els.growthTimer) {
+            const growthTime = Math.max(0, this.state.growthTimer);
+            const growthMinutes = Math.floor(growthTime / 60);
+            const growthSeconds = Math.floor(growthTime % 60);
+            const newGrowthTimer = `📈 ${growthMinutes}:${growthSeconds.toString().padStart(2, '0')}`;
+            if (els.growthTimer.textContent !== newGrowthTimer) {
+                els.growthTimer.textContent = newGrowthTimer;
+            }
+        }
+
         if (this.panels) {
             this.panels.refresh();
         }
@@ -1103,9 +1512,26 @@ class Game {
      * Vérifie les conditions de victoire
      */
     checkVictory() {
-        if (this.state.population >= 10000) {
+        const victoryConfig = this.config.victory;
+        if (!victoryConfig) return;
+
+        if (victoryConfig.population && this.state.population >= victoryConfig.population) {
             this.victory();
         }
+    }
+
+    /**
+     * Callback appelé quand le scénario se termine en victoire
+     */
+    onScenarioVictory() {
+        this.victory();
+    }
+
+    /**
+     * Callback appelé quand le scénario se termine en défaite
+     */
+    onScenarioDefeat() {
+        this.gameOver("Vous avez échoué dans votre mission...");
     }
 
     /**
@@ -1240,7 +1666,7 @@ class Game {
 
         this.state.constructions.push({
             buildingId: buildingId,
-            totalTime: building.buildTime,
+            totalTime: Math.ceil(building.buildTime * this.config.constructionTimeMultiplier),
             elapsed: 0,
             peasantsUsed: 1,
             position: position

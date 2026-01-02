@@ -119,16 +119,23 @@ class CleopatraSystem {
      * @param {number} deltaTime - Temps écoulé depuis la dernière frame (en secondes)
      */
     update(deltaTime) {
+        // Ne pas mettre à jour si les tâches sont en pause
+        if (this.game.scenario?.isSystemPaused('tasks')) return;
+
         const now = Date.now();
 
         // Mettre à jour toutes les tâches actives (itération inverse pour suppression sûre)
         for (let i = this.activeTasks.length - 1; i >= 0; i--) {
             const task = this.activeTasks[i];
-            // Calculer le temps restant
-            task.timeRemaining = task.timeLimit - ((now - task.startTime) / 1000);
+
+            // Calculer le temps restant (sauf si timer gelé pour tâche de tutoriel)
+            if (!task.freezeTimer) {
+                task.timeRemaining = task.timeLimit - ((now - task.startTime) / 1000);
+            }
 
             // Vérifier si le temps est écoulé → échec de la tâche
-            if (task.timeRemaining <= 0) {
+            // Les tâches de tutoriel avec timer gelé ne peuvent pas échouer par timeout
+            if (task.timeRemaining <= 0 && !task.isTutorialTask) {
                 this.failTask(task);
                 continue;
             }
@@ -154,16 +161,20 @@ class CleopatraSystem {
         // Mettre à jour l'affichage des tâches
         this.updateTasksDisplay();
 
-        // Vérifier si on peut ajouter une nouvelle tâche
-        const timeSinceLastTask = (now - this.lastTaskTime) / 1000;
-        const timeUntilNextTask = this.taskCooldown - timeSinceLastTask;
+        // Vérifier si on peut ajouter une nouvelle tâche (seulement si autoTasks est activé)
+        const autoTasksEnabled = this.game.config?.autoTasks ?? false;
 
-        // Mettre à jour le timer de prochaine mission dans l'UI
-        this.updateNextTaskTimer(timeUntilNextTask);
+        if (autoTasksEnabled) {
+            const timeSinceLastTask = (now - this.lastTaskTime) / 1000;
+            const timeUntilNextTask = this.taskCooldown - timeSinceLastTask;
 
-        // Ajouter une nouvelle tâche si le cooldown est passé et qu'on n'a pas atteint le max
-        if (timeSinceLastTask > this.taskCooldown && this.activeTasks.length < this.maxActiveTasks) {
-            this.assignNewTask();
+            // Mettre à jour le timer de prochaine mission dans l'UI
+            this.updateNextTaskTimer(timeUntilNextTask);
+
+            // Ajouter une nouvelle tâche si le cooldown est passé et qu'on n'a pas atteint le max
+            if (timeSinceLastTask > this.taskCooldown && this.activeTasks.length < this.maxActiveTasks) {
+                this.assignNewTask();
+            }
         }
 
         // Messages idle aléatoires (uniquement si aucune tâche active)
@@ -173,11 +184,14 @@ class CleopatraSystem {
         }
 
         // Timer séparé et invisible pour les tâches de messages (ex: message à César)
-        this.messageTaskTimer += deltaTime;
-        if (this.messageTaskTimer >= this.nextMessageTaskTime) {
-            this.tryAssignMessageTask();
-            this.messageTaskTimer = 0;
-            this.nextMessageTaskTime = this.getRandomMessageTaskDelay();
+        // Ne pas mettre à jour si en pause (tutoriel)
+        if (!this.game.scenario?.isSystemPaused('messageTask')) {
+            this.messageTaskTimer += deltaTime;
+            if (this.messageTaskTimer >= this.nextMessageTaskTime) {
+                this.tryAssignMessageTask();
+                this.messageTaskTimer = 0;
+                this.nextMessageTaskTime = this.getRandomMessageTaskDelay();
+            }
         }
     }
 
@@ -944,10 +958,12 @@ class CleopatraSystem {
             }
         }
 
-        // Cacher le timer de prochaine mission si max atteint
+        // Cacher le timer de prochaine mission si max atteint ou si désactivé par config
         const nextTaskTimer = document.getElementById('nextTaskTimer');
-        if (nextTaskTimer && this.activeTasks.length >= this.maxActiveTasks) {
-            updateStyleIfChanged(nextTaskTimer, 'display', 'none');
+        if (nextTaskTimer) {
+            const shouldHide = !this.game.config.showNextTaskTimer ||
+                               this.activeTasks.length >= this.maxActiveTasks;
+            nextTaskTimer.classList.toggle('hidden', shouldHide);
         }
     }
 
@@ -962,7 +978,13 @@ class CleopatraSystem {
 
         if (!nextTaskTimer || !countdown) return;
 
-        updateStyleIfChanged(nextTaskTimer, 'display', 'flex');
+        // Ne pas afficher si désactivé par la config
+        if (!this.game.config.showNextTaskTimer) {
+            nextTaskTimer.classList.add('hidden');
+            return;
+        }
+
+        nextTaskTimer.classList.remove('hidden');
 
         let newText;
         let newColor;

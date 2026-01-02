@@ -246,6 +246,12 @@ body {
     animation: pulse 1s infinite;
 }
 
+.growth-timer {
+    background: rgba(74, 222, 128, 0.2) !important;
+    border-color: #4ade80 !important;
+    transition: all 0.3s ease;
+}
+
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }
@@ -254,6 +260,130 @@ body {
 .goal-info {
     color: #ffd700;
     font-weight: bold;
+    position: relative;
+    cursor: pointer;
+}
+
+.goal-info:hover #goalDisplay {
+    text-decoration: underline;
+}
+
+/* Tooltip des objectifs */
+.goal-tooltip {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 10px;
+    background: linear-gradient(180deg, #3d2e1f 0%, #2a1f14 100%);
+    border: 2px solid #ffd700;
+    border-radius: 10px;
+    padding: 12px 16px;
+    min-width: 280px;
+    max-width: 350px;
+    z-index: 10005;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    pointer-events: auto;
+}
+
+.goal-tooltip.hidden {
+    display: none;
+}
+
+.goal-tooltip-header {
+    font-size: 1.1rem;
+    color: #ffd700;
+    text-align: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+.goal-section {
+    margin-bottom: 10px;
+}
+
+.goal-section:last-child {
+    margin-bottom: 0;
+}
+
+.goal-section-title {
+    font-size: 0.9rem;
+    color: #ccc;
+    margin-bottom: 6px;
+}
+
+.goal-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.goal-section li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+    margin: 2px 0;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.goal-section li .condition-label {
+    color: #ddd;
+}
+
+.goal-section li .condition-value {
+    font-weight: bold;
+}
+
+.goal-section li .condition-value.completed {
+    color: #4ade80;
+}
+
+.goal-section li .condition-value.pending {
+    color: #fbbf24;
+}
+
+.goal-section li .condition-value.danger {
+    color: #f87171;
+}
+
+/* Groupes de conditions (ET/OU) */
+.goal-section li.condition-group {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 8px;
+}
+
+.goal-section li.condition-group .group-label {
+    font-size: 0.85rem;
+    color: #aaa;
+    margin-bottom: 6px;
+    font-style: italic;
+}
+
+.goal-section li.condition-group.condition-and .group-label {
+    color: #60a5fa;
+}
+
+.goal-section li.condition-group.condition-or .group-label {
+    color: #c084fc;
+}
+
+.goal-section li.condition-group ul {
+    width: 100%;
+    padding-left: 12px;
+    border-left: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.goal-section li.condition-group.condition-and ul {
+    border-left-color: rgba(96, 165, 250, 0.4);
+}
+
+.goal-section li.condition-group.condition-or ul {
+    border-left-color: rgba(192, 132, 252, 0.4);
 }
 
 .actions {
@@ -738,6 +868,20 @@ body {
 .building-item .building-time.in-progress {
     color: #ffd700;
     font-weight: bold;
+}
+
+/* Indicateur de réduction de temps de construction */
+.building-item .building-time .time-reduction {
+    color: #ef4444;
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-left: 4px;
+    animation: time-reduction-pulse 1s ease-in-out infinite;
+}
+
+@keyframes time-reduction-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
 }
 
 .building-item.building {
