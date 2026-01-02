@@ -16,13 +16,14 @@ import SCENARIOS, { getScenarioList } from '../data/scenarios/index.js';
 import { BUILDINGS, RESOURCES, CONSUMABLES, RATION_CONFIG, POPULATION_GROWTH_CONFIG } from '../data/index.js';
 
 /**
- * Configuration du scaling logarithmique pour les coûts
- * Augmente progressivement les coûts des bâtiments et messages
+ * Configuration du scaling pour les coûts
+ * - Bâtiments : scaling exponentiel (+15% par bâtiment)
+ * - Messages : scaling logarithmique (formule : C₀ + a × ln(n+1))
  */
 const SCALING_CONFIG = {
-    buildingCostFactor: 1.15,  // +15% par bâtiment existant
-    messageCostFactor: 1.8,    // +80% par message envoyé
-    baseMessageCost: 150       // Coût de base pour un message à César
+    buildingCostFactor: 1.15,        // +15% par bâtiment existant
+    baseMessageCost: 150,            // C₀ : Coût de base pour le premier message
+    messageLogGrowthFactor: 4500     // a : Coefficient de croissance logarithmique
 };
 
 class Game {
@@ -1842,12 +1843,15 @@ class Game {
 
     /**
      * Calcule le coût en or pour envoyer un message à César
-     * Augmente exponentiellement avec le nombre de messages envoyés
+     * Utilise une croissance logarithmique : coût(n) = C₀ + a × ln(n+1)
+     * où n = nombre de messages déjà envoyés
      * @returns {number} Coût en or
      */
     getMessageCost() {
         const messagesSent = this.state.messagesSentToCaesar || 0;
-        return Math.ceil(SCALING_CONFIG.baseMessageCost * Math.pow(SCALING_CONFIG.messageCostFactor, messagesSent));
+        const baseCost = SCALING_CONFIG.baseMessageCost;
+        const growthFactor = SCALING_CONFIG.messageLogGrowthFactor;
+        return Math.ceil(baseCost + growthFactor * Math.log(messagesSent + 1));
     }
 
     /**
