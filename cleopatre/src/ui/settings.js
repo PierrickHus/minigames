@@ -42,11 +42,16 @@ class SettingsManager {
             /** @type {number} Volume de la musique (0-1) */
             musicVolume: 1.0,
             /** @type {number} Volume des effets sonores (0-1) */
-            sfxVolume: 1.0
+            sfxVolume: 1.0,
+            /** @type {boolean} Sprites BETA pour les bâtiments (OFF par défaut) */
+            betaSprites: false
         };
 
         /** @type {boolean} Indique si le panneau des paramètres est ouvert */
         this.isOpen = false;
+
+        /** @type {object|null} Copie des paramètres avant modification (pour annulation) */
+        this.previousSettings = null;
 
         // Charger les paramètres sauvegardés
         this.loadSettings();
@@ -168,6 +173,29 @@ class SettingsManager {
                             Tester le son
                         </button>
                     </div>
+
+                    <!-- Section Graphismes -->
+                    <div class="settings-section">
+                        <h3>Graphismes</h3>
+
+                        <!-- Sprites BETA -->
+                        <div class="settings-row">
+                            <label class="settings-label">
+                                Sprites batiments
+                                <span class="beta-tag">BETA</span>
+                            </label>
+                            <div class="settings-control">
+                                <label class="settings-toggle">
+                                    <input type="checkbox" id="betaSpritesToggle"
+                                        ${this.settings.betaSprites ? 'checked' : ''}>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="settings-row sub-row">
+                            <p class="settings-hint">Remplace les icones par des sprites detailles (experimental)</p>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="settings-footer">
@@ -203,7 +231,7 @@ class SettingsManager {
             const value = e.target.value / 100;
             this.settings.masterVolume = value;
             document.getElementById('masterVolumeValue').textContent = `${Math.round(value * 100)}%`;
-            this.applySettings(true);
+            this.applySettings(); // Appliquer sans sauvegarder
         });
 
         // Toggle musique
@@ -212,7 +240,7 @@ class SettingsManager {
             this.settings.musicEnabled = e.target.checked;
             const musicSlider = document.getElementById('musicVolumeSlider');
             if (musicSlider) musicSlider.disabled = !e.target.checked;
-            this.applySettings(true);
+            this.applySettings(); // Appliquer sans sauvegarder
         });
 
         // Volume musique
@@ -221,7 +249,7 @@ class SettingsManager {
             const value = e.target.value / 100;
             this.settings.musicVolume = value;
             document.getElementById('musicVolumeValue').textContent = `${Math.round(value * 100)}%`;
-            this.applySettings(true);
+            this.applySettings(); // Appliquer sans sauvegarder
         });
 
         // Toggle SFX
@@ -230,7 +258,7 @@ class SettingsManager {
             this.settings.sfxEnabled = e.target.checked;
             const sfxSlider = document.getElementById('sfxVolumeSlider');
             if (sfxSlider) sfxSlider.disabled = !e.target.checked;
-            this.applySettings(true);
+            this.applySettings(); // Appliquer sans sauvegarder
         });
 
         // Volume SFX
@@ -239,19 +267,25 @@ class SettingsManager {
             const value = e.target.value / 100;
             this.settings.sfxVolume = value;
             document.getElementById('sfxVolumeValue').textContent = `${Math.round(value * 100)}%`;
-            this.applySettings(true);
+            this.applySettings(); // Appliquer sans sauvegarder
         });
 
         // Bouton test audio
         document.getElementById('testAudioBtn')?.addEventListener('click', () => this.testAudio());
 
+        // Toggle sprites BETA
+        const betaSpritesToggle = document.getElementById('betaSpritesToggle');
+        betaSpritesToggle?.addEventListener('change', (e) => {
+            this.settings.betaSprites = e.target.checked;
+            // Pas besoin d'appliquer pour les sprites, effet immédiat au rendu
+        });
+
         // Bouton réinitialiser
         document.getElementById('resetSettingsBtn')?.addEventListener('click', () => this.resetSettings());
 
-        // Bouton appliquer (ferme le panneau)
+        // Bouton appliquer (sauvegarde et ferme le panneau)
         document.getElementById('applySettingsBtn')?.addEventListener('click', () => {
-            this.saveSettings();
-            this.close();
+            this.applyAndClose();
         });
     }
 
@@ -349,7 +383,8 @@ class SettingsManager {
             sfxEnabled: true,
             masterVolume: 1.0,
             musicVolume: 1.0,
-            sfxVolume: 1.0
+            sfxVolume: 1.0,
+            betaSprites: false
         };
 
         // Mettre à jour l'interface
@@ -369,6 +404,7 @@ class SettingsManager {
         const sfxToggle = document.getElementById('sfxEnabledToggle');
         const sfxSlider = document.getElementById('sfxVolumeSlider');
         const sfxValue = document.getElementById('sfxVolumeValue');
+        const betaSpritesToggle = document.getElementById('betaSpritesToggle');
 
         if (masterSlider) masterSlider.value = this.settings.masterVolume * 100;
         if (masterValue) masterValue.textContent = `${Math.round(this.settings.masterVolume * 100)}%`;
@@ -386,23 +422,49 @@ class SettingsManager {
             sfxSlider.disabled = !this.settings.sfxEnabled;
         }
         if (sfxValue) sfxValue.textContent = `${Math.round(this.settings.sfxVolume * 100)}%`;
+
+        if (betaSpritesToggle) betaSpritesToggle.checked = this.settings.betaSprites;
     }
 
     /**
      * Ouvre le panneau des paramètres
+     * Sauvegarde l'état actuel pour pouvoir annuler les changements
      */
     open() {
         const overlay = document.getElementById('settingsOverlay');
         if (overlay) {
+            // Sauvegarder les paramètres actuels pour annulation
+            this.previousSettings = { ...this.settings };
             overlay.classList.remove('hidden');
             this.isOpen = true;
         }
     }
 
     /**
-     * Ferme le panneau des paramètres
+     * Ferme le panneau des paramètres sans sauvegarder
+     * Restaure les paramètres précédents si non appliqués
      */
     close() {
+        const overlay = document.getElementById('settingsOverlay');
+        if (overlay) {
+            // Restaurer les paramètres précédents (annulation)
+            if (this.previousSettings) {
+                this.settings = { ...this.previousSettings };
+                this.applySettings();
+                this.updateUI();
+                this.previousSettings = null;
+            }
+            overlay.classList.add('hidden');
+            this.isOpen = false;
+        }
+    }
+
+    /**
+     * Applique et sauvegarde les paramètres, puis ferme le panneau
+     */
+    applyAndClose() {
+        this.previousSettings = null; // Ne pas restaurer
+        this.saveSettings();
         const overlay = document.getElementById('settingsOverlay');
         if (overlay) {
             overlay.classList.add('hidden');

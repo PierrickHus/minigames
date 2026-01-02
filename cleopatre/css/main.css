@@ -2995,6 +2995,28 @@ body {
 .settings-label {
     color: #ddd;
     font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.beta-tag {
+    background: linear-gradient(90deg, #ff6b35, #f72585);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(247, 37, 133, 0.3);
+}
+
+.settings-hint {
+    color: #888;
+    font-size: 0.8rem;
+    font-style: italic;
+    margin: 0;
 }
 
 .settings-control {

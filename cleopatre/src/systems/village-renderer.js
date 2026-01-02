@@ -4,6 +4,7 @@
  */
 
 import { BUILDINGS, BUILDING_SHAPES } from '../data/index.js';
+import BuildingSprites from './building-sprites.js';
 
 class VillageRenderer {
     /**
@@ -64,6 +65,9 @@ class VillageRenderer {
             houses: [],
             markets: []
         };
+
+        // Système de sprites pour les bâtiments
+        this.buildingSprites = new BuildingSprites(this.tileSize);
 
         this.setupCanvas();
         this.setupEvents();
@@ -925,10 +929,59 @@ class VillageRenderer {
     }
 
     /**
+     * Vérifie si un voisin dans une direction donnée est un bâtiment du même type
+     * Utilisé pour la fusion visuelle des bâtiments identiques
+     * @param {number} gx - Position X dans la grille
+     * @param {number} gy - Position Y dans la grille
+     * @param {string} direction - Direction ('top', 'right', 'bottom', 'left')
+     * @param {string} buildingId - ID du type de bâtiment à comparer
+     * @returns {boolean} True si le voisin est du même type
+     */
+    hasSameTypeNeighbor(gx, gy, direction, buildingId) {
+        const offsets = {
+            top: { dx: 0, dy: -1 },
+            right: { dx: 1, dy: 0 },
+            bottom: { dx: 0, dy: 1 },
+            left: { dx: -1, dy: 0 }
+        };
+
+        const offset = offsets[direction];
+        const nx = gx + offset.dx;
+        const ny = gy + offset.dy;
+
+        // Vérifier les limites de la grille
+        if (ny < 0 || ny >= this.gridHeight || nx < 0 || nx >= this.gridWidth) {
+            return false;
+        }
+
+        const cell = this.grid[ny][nx];
+        if (cell === null) {
+            return false;
+        }
+
+        // Récupérer le bâtiment voisin et comparer les types
+        const neighborBuilding = this.placedBuildings[cell.buildingUid];
+        if (!neighborBuilding) {
+            return false;
+        }
+
+        return neighborBuilding.buildingId === buildingId;
+    }
+
+    /**
      * Dessine tous les bâtiments placés
+     * Utilise les sprites BETA si activé dans les paramètres, sinon les icônes classiques
      */
     drawBuildings() {
         const ctx = this.ctx;
+
+        // Vérifier si les sprites BETA sont activés
+        const useBetaSprites = window.settings?.settings?.betaSprites || false;
+
+        // Créer une fonction de callback pour vérifier les voisins du même type
+        const getGlobalNeighbor = (gx, gy, direction, buildingId) => {
+            return this.hasSameTypeNeighbor(gx, gy, direction, buildingId);
+        };
 
         for (const uid in this.placedBuildings) {
             const placed = this.placedBuildings[uid];
@@ -950,49 +1003,66 @@ class VillageRenderer {
                 );
                 const progress = construction ? construction.elapsed / construction.totalTime : 0;
 
-                // Fond semi-transparent
-                this.drawBuildingShape(px, py, shapeData.shape, 'rgba(255,215,0,0.3)');
+                if (useBetaSprites) {
+                    // Mode BETA: Dessiner le sprite en construction (semi-transparent)
+                    this.buildingSprites.drawBuilding(
+                        ctx, placed.buildingId, px, py, shapeData.shape, true,
+                        getGlobalNeighbor, placed.x, placed.y
+                    );
+                } else {
+                    // Mode classique: Fond grisé avec icône
+                    this.drawBuildingShape(px, py, shapeData.shape, 'rgba(100,100,100,0.5)');
+                    ctx.strokeStyle = '#666';
+                    ctx.lineWidth = 1;
+                    this.strokeBuildingShape(px, py, shapeData.shape);
+                }
 
-                // Barre de progression
+                // Barre de progression par-dessus
                 const barY = py + ph - 8;
                 ctx.fillStyle = '#333';
                 ctx.fillRect(px + 2, barY, pw - 4, 6);
                 ctx.fillStyle = '#4ade80';
                 ctx.fillRect(px + 2, barY, (pw - 4) * progress, 6);
 
-                // Icône du bâtiment (semi-transparente)
-                ctx.globalAlpha = 0.5;
-                const iconSize = Math.min(pw, ph) * 0.6;
-                ctx.font = `${iconSize}px Arial`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(building.icon, px + pw / 2, py + ph / 2 - 5);
-                ctx.globalAlpha = 1;
-
                 // Icône de chantier
                 ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
                 ctx.fillText('🏗️', px + pw - 10, py + 10);
             } else {
                 // Bâtiment terminé
+                if (useBetaSprites) {
+                    // Mode BETA: Dessiner le sprite complet
 
-                // Ombre portée
-                ctx.fillStyle = 'rgba(0,0,0,0.15)';
-                this.drawBuildingShape(px + 3, py + 3, shapeData.shape, 'rgba(0,0,0,0.15)');
+                    // Ombre portée
+                    this.drawBuildingShape(px + 2, py + 2, shapeData.shape, 'rgba(0,0,0,0.12)');
 
-                // Fond du bâtiment
-                this.drawBuildingShape(px, py, shapeData.shape, '#8b7355');
+                    // Dessiner le sprite du bâtiment avec fusion visuelle des bâtiments identiques
+                    this.buildingSprites.drawBuilding(
+                        ctx, placed.buildingId, px, py, shapeData.shape, false,
+                        getGlobalNeighbor, placed.x, placed.y
+                    );
+                } else {
+                    // Mode classique: Icônes emoji
 
-                // Bordure
-                ctx.strokeStyle = '#6b5335';
-                ctx.lineWidth = 1;
-                this.strokeBuildingShape(px, py, shapeData.shape);
+                    // Ombre portée
+                    this.drawBuildingShape(px + 3, py + 3, shapeData.shape, 'rgba(0,0,0,0.15)');
 
-                // Icône centrale
-                const iconSize = Math.min(pw, ph) * 0.7;
-                ctx.font = `${iconSize}px Arial`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(building.icon, px + pw / 2, py + ph / 2);
+                    // Fond du bâtiment
+                    this.drawBuildingShape(px, py, shapeData.shape, '#8b7355');
+
+                    // Bordure
+                    ctx.strokeStyle = '#6b5335';
+                    ctx.lineWidth = 1;
+                    this.strokeBuildingShape(px, py, shapeData.shape);
+
+                    // Icône centrale
+                    const iconSize = Math.min(pw, ph) * 0.7;
+                    ctx.font = `${iconSize}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(building.icon, px + pw / 2, py + ph / 2);
+                }
             }
         }
     }
