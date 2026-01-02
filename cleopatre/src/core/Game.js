@@ -1547,6 +1547,17 @@ class Game {
         const minutes = Math.floor(duration / 60);
         const seconds = duration % 60;
 
+        // Message de victoire dynamique selon l'objectif du scénario
+        const victoryMessage = document.getElementById('victoryMessage');
+        if (victoryMessage) {
+            const victory = this.config.victory;
+            if (victory?.population) {
+                victoryMessage.textContent = `Félicitations ! Votre village compte maintenant ${victory.population.toLocaleString('fr-FR')} habitants !`;
+            } else {
+                victoryMessage.textContent = 'Félicitations ! Vous avez atteint l\'objectif !';
+            }
+        }
+
         document.getElementById('victoryStats').innerHTML = `
             <p>Temps de jeu: ${minutes}m ${seconds}s</p>
             <p>Bâtiments construits: ${this.state.buildingsBuilt}</p>

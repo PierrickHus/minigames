@@ -54,6 +54,12 @@ class ScenarioSystem {
 
         // Flag pour savoir si la cible a déjà été cliquée (empêche les clics multiples)
         this._targetClicked = false;
+
+        // Référence à la tâche contrôlée par le scénario (pour manipulation de timer)
+        this._scenarioTask = null;
+
+        // Animation de timer en cours
+        this._timerAnimationId = null;
     }
 
     // ==========================================
@@ -71,6 +77,9 @@ class ScenarioSystem {
             console.error(`ScenarioSystem: Scénario '${scenarioId}' non trouvé`);
             return false;
         }
+
+        // Réinitialiser l'état des pauses avant de charger un nouveau scénario
+        this.resumeAll();
 
         this.currentScenario = scenario;
         this.currentStepIndex = -1;
@@ -124,6 +133,9 @@ class ScenarioSystem {
         this._currentTargetSelector = null;
         this._targetClicked = false;
 
+        // Réinitialiser l'état des pauses
+        this.resumeAll();
+
         // Cacher l'overlay et désactiver le blocage
         this.hideOverlay();
 
@@ -132,9 +144,8 @@ class ScenarioSystem {
 
     /**
      * Met à jour le système (appelé chaque frame)
-     * @param {number} deltaTime - Temps écoulé depuis la dernière frame
      */
-    update(deltaTime) {
+    update() {
         if (!this.isActive || this.isComplete) return;
 
         // Vérifier les conditions de l'étape actuelle
@@ -320,62 +331,53 @@ class ScenarioSystem {
             }, delay);
         }
 
-        // Geler le timer de la tâche tutoriel
+        // Geler le timer de la tâche contrôlée par le scénario
         if (actions.freezeTaskTimer) {
             const delay = actions.freezeTaskTimerDelay ?? defaultDelay;
             this.executeWithDelay(() => {
-                if (this._tutorialTask) {
-                    this._tutorialTask.freezeTimer = true;
-                }
+                this.freezeScenarioTask();
             }, delay);
         }
 
-        // Dégeler le timer de la tâche tutoriel
+        // Dégeler le timer de la tâche contrôlée par le scénario
         if (actions.unfreezeTaskTimer) {
             const delay = actions.unfreezeTaskTimerDelay ?? defaultDelay;
             this.executeWithDelay(() => {
-                if (this._tutorialTask) {
-                    const task = this._tutorialTask;
-                    // Ajuster startTime pour que le calcul naturel donne la valeur actuelle de timeRemaining
-                    // Formule: timeRemaining = timeLimit - ((now - startTime) / 1000)
-                    // Donc: startTime = now - (timeLimit - timeRemaining) * 1000
-                    task.startTime = Date.now() - (task.timeLimit - task.timeRemaining) * 1000;
-                    task.freezeTimer = false;
-                }
+                this.unfreezeScenarioTask();
             }, delay);
         }
 
-        // Modifier le temps restant de la tâche tutoriel (valeur absolue) avec animation
+        // Modifier le temps restant de la tâche (valeur absolue) avec animation
         if (actions.setTaskTime !== undefined) {
             const delay = actions.setTaskTimeDelay ?? defaultDelay;
             const duration = actions.setTaskTimeDuration ?? 1000;
             this.executeWithDelay(() => {
-                if (this._tutorialTask) {
-                    this.animateTaskTime(actions.setTaskTime, duration);
-                }
+                this.animateScenarioTaskTime(actions.setTaskTime, duration);
             }, delay);
         }
 
-        // Ajouter du temps à la tâche tutoriel avec animation
+        // Ajouter du temps à la tâche avec animation
         if (actions.addTaskTime !== undefined) {
             const delay = actions.addTaskTimeDelay ?? defaultDelay;
             const duration = actions.addTaskTimeDuration ?? 1000;
             this.executeWithDelay(() => {
-                if (this._tutorialTask) {
-                    const targetTime = this._tutorialTask.timeRemaining + actions.addTaskTime;
-                    this.animateTaskTime(targetTime, duration);
+                const task = this._scenarioTask;
+                if (task) {
+                    const targetTime = task.timeRemaining + actions.addTaskTime;
+                    this.animateScenarioTaskTime(targetTime, duration);
                 }
             }, delay);
         }
 
-        // Retirer du temps à la tâche tutoriel avec animation
+        // Retirer du temps à la tâche avec animation
         if (actions.subtractTaskTime !== undefined) {
             const delay = actions.subtractTaskTimeDelay ?? defaultDelay;
             const duration = actions.subtractTaskTimeDuration ?? 1000;
             this.executeWithDelay(() => {
-                if (this._tutorialTask) {
-                    const targetTime = Math.max(1, this._tutorialTask.timeRemaining - actions.subtractTaskTime);
-                    this.animateTaskTime(targetTime, duration);
+                const task = this._scenarioTask;
+                if (task) {
+                    const targetTime = Math.max(0, task.timeRemaining - actions.subtractTaskTime);
+                    this.animateScenarioTaskTime(targetTime, duration);
                 }
             }, delay);
         }
@@ -411,59 +413,6 @@ class ScenarioSystem {
     }
 
     /**
-     * Anime la transition du timer de tâche tutoriel vers une nouvelle valeur
-     * Utilise une courbe ease-out pour un effet naturel
-     * Gèle le timer pendant l'animation et ajuste startTime à la fin
-     * @param {number} targetTime - Temps cible en secondes
-     * @param {number} duration - Durée de l'animation en millisecondes
-     */
-    animateTaskTime(targetTime, duration = 1000) {
-        if (!this._tutorialTask) return;
-
-        // Annuler l'animation précédente si elle existe
-        if (this._taskTimeAnimationId) {
-            cancelAnimationFrame(this._taskTimeAnimationId);
-            this._taskTimeAnimationId = null;
-        }
-
-        const task = this._tutorialTask;
-        const startTimeValue = task.timeRemaining;
-        const startTimestamp = performance.now();
-        const difference = targetTime - startTimeValue;
-
-        // Geler le timer pendant l'animation
-        const wasFreeze = task.freezeTimer;
-        task.freezeTimer = true;
-
-        // Fonction d'easing (ease-out cubic)
-        const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
-
-        const animate = (currentTimestamp) => {
-            if (!this._tutorialTask) return;
-
-            const elapsed = currentTimestamp - startTimestamp;
-            const progress = Math.min(elapsed / duration, 1);
-            const easedProgress = easeOutCubic(progress);
-
-            task.timeRemaining = startTimeValue + (difference * easedProgress);
-
-            if (progress < 1) {
-                this._taskTimeAnimationId = requestAnimationFrame(animate);
-            } else {
-                // Animation terminée: ajuster startTime pour que le calcul naturel soit correct
-                task.timeRemaining = targetTime;
-                task.startTime = Date.now() - (task.timeLimit - targetTime) * 1000;
-
-                // Restaurer l'état de freeze d'origine
-                task.freezeTimer = wasFreeze;
-                this._taskTimeAnimationId = null;
-            }
-        };
-
-        this._taskTimeAnimationId = requestAnimationFrame(animate);
-    }
-
-    /**
      * Exécute une fonction avec un délai optionnel
      * @param {Function} fn - Fonction à exécuter
      * @param {number} delay - Délai en millisecondes (0 = immédiat)
@@ -487,10 +436,7 @@ class ScenarioSystem {
         }
 
         // Annuler l'animation du timer de tâche
-        if (this._taskTimeAnimationId) {
-            cancelAnimationFrame(this._taskTimeAnimationId);
-            this._taskTimeAnimationId = null;
-        }
+        this.cancelTimerAnimation();
     }
 
     /**
@@ -531,43 +477,114 @@ class ScenarioSystem {
         }
     }
 
+    // ==========================================
+    // MANIPULATION DES TIMERS DE TÂCHES
+    // ==========================================
+
     /**
-     * Crée une tâche forcée pour le tutoriel avec timer contrôlé
+     * Gèle le timer de la tâche contrôlée par le scénario
+     */
+    freezeScenarioTask() {
+        const task = this._scenarioTask;
+        if (!task) return;
+        task.freezeTimer = true;
+    }
+
+    /**
+     * Dégèle le timer de la tâche contrôlée par le scénario
+     */
+    unfreezeScenarioTask() {
+        const task = this._scenarioTask;
+        if (!task) return;
+        task.freezeTimer = false;
+        task.startTime = Date.now() - (task.timeLimit - task.timeRemaining) * 1000;
+    }
+
+    /**
+     * Anime le timer de la tâche vers une valeur cible
+     * @param {number} targetTime - Temps cible en secondes
+     * @param {number} duration - Durée de l'animation en ms
+     */
+    animateScenarioTaskTime(targetTime, duration = 1000) {
+        const task = this._scenarioTask;
+        if (!task) return;
+
+        this.cancelTimerAnimation();
+
+        const startTime = task.timeRemaining;
+        const startTimestamp = performance.now();
+        const difference = targetTime - startTime;
+
+        const wasFrozen = task.freezeTimer;
+        task.freezeTimer = true;
+
+        const animate = (currentTimestamp) => {
+            const elapsed = currentTimestamp - startTimestamp;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+
+            task.timeRemaining = startTime + (difference * eased);
+
+            if (progress < 1) {
+                this._timerAnimationId = requestAnimationFrame(animate);
+            } else {
+                task.timeRemaining = targetTime;
+                task.timeLimit = targetTime;
+                this._timerAnimationId = null;
+
+                if (!wasFrozen) {
+                    task.freezeTimer = false;
+                    task.startTime = Date.now();
+                }
+            }
+        };
+
+        this._timerAnimationId = requestAnimationFrame(animate);
+    }
+
+    /**
+     * Annule l'animation de timer en cours
+     */
+    cancelTimerAnimation() {
+        if (this._timerAnimationId) {
+            cancelAnimationFrame(this._timerAnimationId);
+            this._timerAnimationId = null;
+        }
+    }
+
+    /**
+     * Crée une tâche forcée avec timer contrôlé par le scénario
      * @param {object} taskConfig - Configuration de la tâche
      * @param {string} taskConfig.taskId - ID de la tâche à forcer
-     * @param {boolean} taskConfig.freezeTimer - Si true, le timer ne décompte pas
-     * @param {number} taskConfig.initialTime - Temps initial du timer (optionnel)
+     * @param {boolean} [taskConfig.freezeTimer] - Si true, le timer ne décompte pas
+     * @param {number} [taskConfig.initialTime] - Temps initial du timer (optionnel)
      */
     createForcedTask(taskConfig) {
         if (!this.game.cleopatra) return;
 
-        // Créer la tâche
         const success = this.game.cleopatra.assignSpecificTask(taskConfig.taskId);
         if (!success) {
             console.warn(`ScenarioSystem: Impossible de créer la tâche forcée '${taskConfig.taskId}'`);
             return;
         }
 
-        // Récupérer la tâche créée (la dernière ajoutée)
         const task = this.game.cleopatra.activeTasks[this.game.cleopatra.activeTasks.length - 1];
         if (!task) return;
 
-        // Marquer comme tâche de tutoriel
-        task.isTutorialTask = true;
-        task.freezeTimer = taskConfig.freezeTimer || false;
+        task.isScenarioTask = true;
 
-        // Définir le temps initial si spécifié
-        // Ajuster aussi startTime pour que le calcul naturel soit cohérent
         if (taskConfig.initialTime !== undefined) {
             task.timeRemaining = taskConfig.initialTime;
             task.timeLimit = taskConfig.initialTime;
             task.startTime = Date.now();
         }
 
-        // Stocker la référence pour contrôle ultérieur
-        this._tutorialTask = task;
+        this._scenarioTask = task;
 
-        // Forcer la mise à jour de l'affichage des tâches pour créer l'élément DOM immédiatement
+        if (taskConfig.freezeTimer) {
+            this.freezeScenarioTask();
+        }
+
         this.game.cleopatra.updateTasksDisplay?.();
     }
 
@@ -699,7 +716,7 @@ class ScenarioSystem {
             }
 
             case 'task_timer_low': {
-                const task = this._tutorialTask;
+                const task = this._scenarioTask;
                 if (!task) return false;
                 return task.timeRemaining <= condition.seconds;
             }
