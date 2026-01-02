@@ -6,7 +6,7 @@
 // ==========================================
 
 import FREEPLAY_SCENARIO from './freeplay.js';
-import TUTORIAL_SCENARIO, { STEP_TYPES } from './tutorial.js';
+import TUTORIAL_SCENARIO from './tutorial.js';
 
 /**
  * Tous les scénarios disponibles
@@ -41,4 +41,5 @@ export function getScenario(scenarioId) {
 }
 
 export default SCENARIOS;
-export { STEP_TYPES };
+export { SCENARIOS };
+export { STEP_TYPES } from './tutorial.js';

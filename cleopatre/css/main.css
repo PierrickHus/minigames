@@ -3222,6 +3222,7 @@ body {
 /* Slider de volume */
 .volume-slider {
     -webkit-appearance: none;
+    appearance: none;
     width: 150px;
     height: 8px;
     background: #333;

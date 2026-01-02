@@ -241,148 +241,104 @@ class ScenarioSystem {
 
         const defaultDelay = actions.delay || 0;
 
-        // Reprendre des systèmes
+        this.executeSystemActions(actions, defaultDelay);
+        this.executeTimerActions(actions, defaultDelay);
+        this.executeGameActions(actions, defaultDelay);
+    }
+
+    /**
+     * Exécute les actions liées aux systèmes (pause/resume)
+     */
+    executeSystemActions(actions, defaultDelay) {
         if (actions.resumeSystems) {
             const delay = actions.resumeSystemsDelay ?? defaultDelay;
             this.executeWithDelay(() => {
-                actions.resumeSystems.forEach(system => {
-                    this.setPaused(false, system);
-                });
+                actions.resumeSystems.forEach(system => this.setPaused(false, system));
             }, delay);
         }
 
-        // Mettre en pause des systèmes
         if (actions.pauseSystems) {
             const delay = actions.pauseSystemsDelay ?? defaultDelay;
             this.executeWithDelay(() => {
-                actions.pauseSystems.forEach(system => {
-                    this.setPaused(true, system);
-                });
+                actions.pauseSystems.forEach(system => this.setPaused(true, system));
             }, delay);
         }
 
-        // Mettre en pause TOUS les systèmes
         if (actions.pauseAll) {
-            const delay = actions.pauseAllDelay ?? defaultDelay;
-            this.executeWithDelay(() => {
-                this.pauseAll();
-            }, delay);
+            this.executeWithDelay(() => this.pauseAll(), actions.pauseAllDelay ?? defaultDelay);
         }
 
-        // Reprendre TOUS les systèmes
         if (actions.resumeAll) {
-            const delay = actions.resumeAllDelay ?? defaultDelay;
-            this.executeWithDelay(() => {
-                this.resumeAll();
-            }, delay);
+            this.executeWithDelay(() => this.resumeAll(), actions.resumeAllDelay ?? defaultDelay);
         }
+    }
 
-        // Donner un bonus
-        if (actions.bonus) {
-            const delay = actions.bonusDelay ?? defaultDelay;
-            this.executeWithDelay(() => {
-                this.giveBonus(actions.bonus);
-            }, delay);
-        }
-
-        // Créer une tâche forcée
-        if (actions.task) {
-            const delay = actions.taskDelay ?? defaultDelay;
-            this.executeWithDelay(() => {
-                this.createForcedTask(actions.task);
-            }, delay);
-        }
-
-        // Modifier le temps des constructions en cours
+    /**
+     * Exécute les actions liées aux timers (tâches, constructions, oiseaux)
+     */
+    executeTimerActions(actions, defaultDelay) {
         if (actions.modifyConstructionTime !== undefined) {
-            const delay = actions.modifyConstructionTimeDelay ?? 2000;
-
-            if (this._constructionTimeReductionTimeout) {
-                clearTimeout(this._constructionTimeReductionTimeout);
-            }
-
-            this._constructionTimeReductionTimeout = setTimeout(() => {
-                const constructions = this.game.state?.constructions || [];
-                constructions.forEach(c => {
-                    const originalTime = c.totalTime;
-                    const newTime = Math.max(c.elapsed + 1, actions.modifyConstructionTime);
-                    const reduction = originalTime - newTime;
-                    if (reduction > 0) {
-                        this._constructionTimeReduction = reduction;
-                    }
-                    c.totalTime = newTime;
-                });
-            }, delay);
+            this.handleConstructionTimeModification(actions);
         }
 
-        // Modifier le temps de production d'oiseaux
         if (actions.modifyBirdProductionTime !== undefined) {
             const delay = actions.modifyBirdProductionTimeDelay ?? defaultDelay;
-            this.executeWithDelay(() => {
-                this.modifyBirdProductionTime(actions.modifyBirdProductionTime);
-            }, delay);
+            this.executeWithDelay(() => this.modifyBirdProductionTime(actions.modifyBirdProductionTime), delay);
         }
 
-        // Accélérer la production d'oiseaux
         if (actions.accelerateBirdProduction !== undefined) {
             const delay = actions.accelerateBirdProductionDelay ?? defaultDelay;
-            this.executeWithDelay(() => {
-                this.accelerateBirdProduction(actions.accelerateBirdProduction);
-            }, delay);
+            this.executeWithDelay(() => this.accelerateBirdProduction(actions.accelerateBirdProduction), delay);
         }
 
-        // Geler le timer de la tâche contrôlée par le scénario
         if (actions.freezeTaskTimer) {
-            const delay = actions.freezeTaskTimerDelay ?? defaultDelay;
-            this.executeWithDelay(() => {
-                this.freezeScenarioTask();
-            }, delay);
+            this.executeWithDelay(() => this.freezeScenarioTask(), actions.freezeTaskTimerDelay ?? defaultDelay);
         }
 
-        // Dégeler le timer de la tâche contrôlée par le scénario
         if (actions.unfreezeTaskTimer) {
-            const delay = actions.unfreezeTaskTimerDelay ?? defaultDelay;
-            this.executeWithDelay(() => {
-                this.unfreezeScenarioTask();
-            }, delay);
+            this.executeWithDelay(() => this.unfreezeScenarioTask(), actions.unfreezeTaskTimerDelay ?? defaultDelay);
         }
 
-        // Modifier le temps restant de la tâche (valeur absolue) avec animation
         if (actions.setTaskTime !== undefined) {
             const delay = actions.setTaskTimeDelay ?? defaultDelay;
             const duration = actions.setTaskTimeDuration ?? 1000;
-            this.executeWithDelay(() => {
-                this.animateScenarioTaskTime(actions.setTaskTime, duration);
-            }, delay);
+            this.executeWithDelay(() => this.animateScenarioTaskTime(actions.setTaskTime, duration), delay);
         }
 
-        // Ajouter du temps à la tâche avec animation
         if (actions.addTaskTime !== undefined) {
             const delay = actions.addTaskTimeDelay ?? defaultDelay;
             const duration = actions.addTaskTimeDuration ?? 1000;
             this.executeWithDelay(() => {
-                const task = this._scenarioTask;
-                if (task) {
-                    const targetTime = task.timeRemaining + actions.addTaskTime;
-                    this.animateScenarioTaskTime(targetTime, duration);
+                if (this._scenarioTask) {
+                    this.animateScenarioTaskTime(this._scenarioTask.timeRemaining + actions.addTaskTime, duration);
                 }
             }, delay);
         }
 
-        // Retirer du temps à la tâche avec animation
         if (actions.subtractTaskTime !== undefined) {
             const delay = actions.subtractTaskTimeDelay ?? defaultDelay;
             const duration = actions.subtractTaskTimeDuration ?? 1000;
             this.executeWithDelay(() => {
-                const task = this._scenarioTask;
-                if (task) {
-                    const targetTime = Math.max(0, task.timeRemaining - actions.subtractTaskTime);
+                if (this._scenarioTask) {
+                    const targetTime = Math.max(0, this._scenarioTask.timeRemaining - actions.subtractTaskTime);
                     this.animateScenarioTaskTime(targetTime, duration);
                 }
             }, delay);
         }
+    }
 
-        // Forcer l'ajout de plusieurs tâches aléatoires
+    /**
+     * Exécute les actions de jeu (bonus, tâches, config)
+     */
+    executeGameActions(actions, defaultDelay) {
+        if (actions.bonus) {
+            this.executeWithDelay(() => this.giveBonus(actions.bonus), actions.bonusDelay ?? defaultDelay);
+        }
+
+        if (actions.task) {
+            this.executeWithDelay(() => this.createForcedTask(actions.task), actions.taskDelay ?? defaultDelay);
+        }
+
         if (actions.forceTasks !== undefined) {
             const delay = actions.forceTasksDelay ?? defaultDelay;
             const count = actions.forceTasks;
@@ -391,13 +347,11 @@ class ScenarioSystem {
                     for (let i = 0; i < count; i++) {
                         this.game.cleopatra.forceNewTask();
                     }
-                    // Forcer la mise à jour de l'affichage des tâches
                     this.game.cleopatra.updateTasksDisplay?.();
                 }
             }, delay);
         }
 
-        // Modifier la config du jeu dynamiquement
         if (actions.setConfig) {
             const delay = actions.setConfigDelay ?? defaultDelay;
             this.executeWithDelay(() => {
@@ -410,6 +364,30 @@ class ScenarioSystem {
                 }
             }, delay);
         }
+    }
+
+    /**
+     * Gère la modification du temps des constructions
+     */
+    handleConstructionTimeModification(actions) {
+        const delay = actions.modifyConstructionTimeDelay ?? 2000;
+
+        if (this._constructionTimeReductionTimeout) {
+            clearTimeout(this._constructionTimeReductionTimeout);
+        }
+
+        this._constructionTimeReductionTimeout = setTimeout(() => {
+            const constructions = this.game.state?.constructions || [];
+            constructions.forEach(c => {
+                const originalTime = c.totalTime;
+                const newTime = Math.max(c.elapsed + 1, actions.modifyConstructionTime);
+                const reduction = originalTime - newTime;
+                if (reduction > 0) {
+                    this._constructionTimeReduction = reduction;
+                }
+                c.totalTime = newTime;
+            });
+        }, delay);
     }
 
     /**
@@ -629,11 +607,10 @@ class ScenarioSystem {
         }
 
         // Passer à l'étape suivante (sauf pour FREE qui attend la victoire)
-        if (step.type !== STEP_TYPES.FREE) {
-            this.nextStep();
-        } else {
-            // Mode libre terminé = victoire
+        if (step.type === STEP_TYPES.FREE) {
             this.end(true);
+        } else {
+            this.nextStep();
         }
     }
 
@@ -837,26 +814,21 @@ class ScenarioSystem {
 
         for (const [key, value] of Object.entries(conditions)) {
             if (key === '$and') {
-                // Groupe ET : toutes les sous-conditions doivent être vraies
                 const subResults = value.map(sub => this.evaluateConditions(sub, type, 'and'));
-                results.push(subResults.every(r => r));
+                results.push(subResults.every(Boolean));
             } else if (key === '$or') {
-                // Groupe OU : au moins une sous-condition doit être vraie
                 const subResults = value.map(sub => this.evaluateConditions(sub, type, 'or'));
-                results.push(subResults.some(r => r));
+                results.push(subResults.some(Boolean));
             } else {
-                // Condition simple
                 const currentValue = this.getVictoryConditionValue(key, state);
                 results.push(this.evaluateSimpleCondition(currentValue, value, type));
             }
         }
 
-        // Appliquer l'opérateur par défaut au niveau racine
         if (operator === 'and') {
-            return results.every(r => r);
-        } else {
-            return results.some(r => r);
+            return results.every(Boolean);
         }
+        return results.some(Boolean);
     }
 
     /**
@@ -1193,7 +1165,7 @@ class ScenarioSystem {
                 break;
         }
 
-        if (!timers || !timers[index]) return;
+        if (!timers?.[index]) return;
 
         const timer = timers[index];
         const current = timer[timeKey] || 0;
@@ -1479,25 +1451,7 @@ class ScenarioSystem {
 
         // Mode FREE : pas de blocage, panneau discret en bas
         if (step.type === STEP_TYPES.FREE) {
-            this.disableClickBlocking();
-            this.overlayElement.classList.add('hidden');
-            this.backdropElement.classList.add('hidden');
-            this.hideHighlight();
-
-            // Afficher le panneau en mode libre (fond vert, sans bouton)
-            this.panelElement.classList.add('free-mode', 'position-bottom');
-            this.panelElement.classList.remove('position-center');
-
-            const messageEl = this.panelElement.querySelector('.scenario-message');
-            if (messageEl) {
-                messageEl.textContent = step.message;
-            }
-
-            const btnEl = this.panelElement.querySelector('.scenario-btn');
-            if (btnEl) {
-                btnEl.classList.add('hidden');
-            }
-
+            this.showFreeStepUI(step);
             return;
         }
 
@@ -1508,31 +1462,77 @@ class ScenarioSystem {
         this.enableClickBlocking();
         this.overlayElement.classList.remove('hidden');
 
-        // Appliquer la position du panneau (top par défaut, center ou bottom si spécifié)
+        this.applyPanelPosition(step);
+        this.updatePanelContent(step);
+        this.handleForceShowElement(step);
+        this.handleBackdropAndHighlight(step);
+    }
+
+    /**
+     * Affiche l'UI pour une étape de type FREE (mode libre)
+     * @param {object} step - L'étape FREE
+     */
+    showFreeStepUI(step) {
+        this.disableClickBlocking();
+        this.overlayElement.classList.add('hidden');
+        this.backdropElement.classList.add('hidden');
+        this.hideHighlight();
+
+        // Afficher le panneau en mode libre (fond vert, sans bouton)
+        this.panelElement.classList.add('free-mode', 'position-bottom');
+        this.panelElement.classList.remove('position-center');
+
+        const messageEl = this.panelElement.querySelector('.scenario-message');
+        if (messageEl) {
+            messageEl.textContent = step.message;
+        }
+
+        const btnEl = this.panelElement.querySelector('.scenario-btn');
+        if (btnEl) {
+            btnEl.classList.add('hidden');
+        }
+    }
+
+    /**
+     * Applique la position du panneau selon la configuration de l'étape
+     * @param {object} step - L'étape courante
+     */
+    applyPanelPosition(step) {
         this.panelElement.classList.remove('position-bottom', 'position-center');
         if (step.panelPosition === 'bottom') {
             this.panelElement.classList.add('position-bottom');
         } else if (step.panelPosition === 'center') {
             this.panelElement.classList.add('position-center');
         }
+    }
 
-        // Configurer le message
+    /**
+     * Met à jour le contenu du panneau (message et bouton)
+     * @param {object} step - L'étape courante
+     */
+    updatePanelContent(step) {
         const messageEl = this.panelElement.querySelector('.scenario-message');
         if (messageEl) {
             messageEl.textContent = step.message;
         }
 
-        // Configurer le bouton
         const btnEl = this.panelElement.querySelector('.scenario-btn');
         if (btnEl) {
-            if (step.type === STEP_TYPES.INTRO || step.type === STEP_TYPES.EXPLAIN) {
+            const showButton = step.type === STEP_TYPES.INTRO || step.type === STEP_TYPES.EXPLAIN;
+            if (showButton) {
                 btnEl.textContent = step.buttonText || 'Continuer';
                 btnEl.classList.remove('hidden');
             } else {
                 btnEl.classList.add('hidden');
             }
         }
+    }
 
+    /**
+     * Gère l'affichage forcé d'éléments (ex: tooltip)
+     * @param {object} step - L'étape courante
+     */
+    handleForceShowElement(step) {
         // Nettoyer l'élément forcé de l'étape précédente
         if (this._forceShownElement) {
             this._forceShownElement.classList.remove('force-visible');
@@ -1540,7 +1540,7 @@ class ScenarioSystem {
             this._forceShownElement = null;
         }
 
-        // Forcer l'affichage d'un élément (ex: tooltip) pendant cette étape
+        // Forcer l'affichage d'un élément pendant cette étape
         if (step.forceShowElement) {
             const element = document.querySelector(step.forceShowElement);
             if (element) {
@@ -1549,9 +1549,18 @@ class ScenarioSystem {
                 this._forceShownElement = element;
             }
         }
+    }
 
-        // Gérer le backdrop vs highlight selon le type d'étape
-        const hasTarget = step.target && (step.type === STEP_TYPES.HIGHLIGHT || step.type === STEP_TYPES.EXPLAIN || step.type === STEP_TYPES.WAIT);
+    /**
+     * Gère l'affichage du backdrop ou du highlight selon le type d'étape
+     * @param {object} step - L'étape courante
+     */
+    handleBackdropAndHighlight(step) {
+        const hasTarget = step.target && (
+            step.type === STEP_TYPES.HIGHLIGHT ||
+            step.type === STEP_TYPES.EXPLAIN ||
+            step.type === STEP_TYPES.WAIT
+        );
 
         if (hasTarget) {
             // Étape avec cible : afficher le highlight (trou lumineux), cacher le backdrop
@@ -1668,7 +1677,7 @@ class ScenarioSystem {
     findScrollableParent(element) {
         let parent = element.parentElement;
         while (parent) {
-            const style = window.getComputedStyle(parent);
+            const style = globalThis.getComputedStyle(parent);
             const overflowY = style.overflowY;
             const overflowX = style.overflowX;
 
@@ -1988,4 +1997,4 @@ class ScenarioSystem {
 }
 
 export default ScenarioSystem;
-export { SCENARIOS };
+export { SCENARIOS } from '../data/scenarios/index.js';
