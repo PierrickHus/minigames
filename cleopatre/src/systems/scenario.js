@@ -1604,9 +1604,12 @@ class ScenarioSystem {
         // Scroll automatique vers le premier élément cible
         this.scrollToTarget(targets[0]);
 
-        // Bloquer le scroll du container si demandé
+        // Bloquer le scroll du container si demandé (avec délai pour laisser l'animation se faire)
         if (step?.blockScroll) {
-            this.blockContainerScroll(targets[0]);
+            // Délai de 100ms pour laisser le scroll s'initier sur Firefox
+            setTimeout(() => {
+                this.blockContainerScroll(targets[0]);
+            }, 100);
         }
 
         // Positionner le highlight
@@ -1640,32 +1643,67 @@ class ScenarioSystem {
         const isHorizontalScroll = scrollableParent.scrollWidth > scrollableParent.clientWidth;
         const isVerticalScroll = scrollableParent.scrollHeight > scrollableParent.clientHeight;
 
+        // Préparer les valeurs de scroll
+        let targetScrollLeft = null;
+        let targetScrollTop = null;
+
         if (isHorizontalScroll) {
-            // Position actuelle de la cible par rapport au container
             const targetLeftInContainer = targetRect.left - containerRect.left + scrollableParent.scrollLeft;
-            // Position pour centrer horizontalement
             const targetCenterX = targetLeftInContainer + targetRect.width / 2;
             const containerCenterX = scrollableParent.clientWidth / 2;
-            const scrollLeft = targetCenterX - containerCenterX;
-
-            scrollableParent.scrollTo({
-                left: Math.max(0, scrollLeft),
-                behavior: 'smooth'
-            });
+            targetScrollLeft = Math.max(0, targetCenterX - containerCenterX);
         }
 
         if (isVerticalScroll) {
-            // Position actuelle de la cible par rapport au container
             const targetTopInContainer = targetRect.top - containerRect.top + scrollableParent.scrollTop;
-            // Position pour centrer verticalement
             const targetCenterY = targetTopInContainer + targetRect.height / 2;
             const containerCenterY = scrollableParent.clientHeight / 2;
-            const scrollTop = targetCenterY - containerCenterY;
+            targetScrollTop = Math.max(0, targetCenterY - containerCenterY);
+        }
 
-            scrollableParent.scrollTo({
-                top: Math.max(0, scrollTop),
-                behavior: 'smooth'
-            });
+        // Appliquer le scroll avec méthode compatible Firefox
+        if (targetScrollLeft !== null || targetScrollTop !== null) {
+            const finalScrollLeft = targetScrollLeft !== null ? targetScrollLeft : scrollableParent.scrollLeft;
+            const finalScrollTop = targetScrollTop !== null ? targetScrollTop : scrollableParent.scrollTop;
+
+            // Sur Firefox, scrollTo avec behavior: 'smooth' peut échouer silencieusement
+            // Utiliser une animation manuelle pour garantir le fonctionnement
+            const startLeft = scrollableParent.scrollLeft;
+            const startTop = scrollableParent.scrollTop;
+            const deltaLeft = finalScrollLeft - startLeft;
+            const deltaTop = finalScrollTop - startTop;
+
+            // Si les deltas sont petits, scroll instantané
+            if (Math.abs(deltaLeft) < 5 && Math.abs(deltaTop) < 5) {
+                if (targetScrollLeft !== null) scrollableParent.scrollLeft = finalScrollLeft;
+                if (targetScrollTop !== null) scrollableParent.scrollTop = finalScrollTop;
+                return;
+            }
+
+            // Animation manuelle pour compatibilité maximale
+            const duration = 300; // ms
+            const startTime = performance.now();
+
+            const animateScroll = (currentTime) => {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Ease out quad pour un mouvement fluide
+                const easeProgress = 1 - Math.pow(1 - progress, 2);
+
+                if (targetScrollLeft !== null) {
+                    scrollableParent.scrollLeft = startLeft + (deltaLeft * easeProgress);
+                }
+                if (targetScrollTop !== null) {
+                    scrollableParent.scrollTop = startTop + (deltaTop * easeProgress);
+                }
+
+                if (progress < 1) {
+                    requestAnimationFrame(animateScroll);
+                }
+            };
+
+            requestAnimationFrame(animateScroll);
         }
     }
 
