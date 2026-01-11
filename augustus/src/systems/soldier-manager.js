@@ -118,12 +118,18 @@ class SoldierManager {
         };
 
         // Déterminer les positions du leader et du porte-drapeau
-        // Leader: centre de la première rangée (position de commandement)
-        // Porte-drapeau: juste derrière le leader
+        // IMPORTANT: Avec la nouvelle orientation des formations:
+        // - row 0 = premier rang (devant)
+        // - col = position latérale (gauche à droite)
+        // Leader: centre de la première rangée (row 0, colonne centrale)
+        // Porte-drapeau: deuxième rangée, même colonne
         const config = formationSystem.getFormationConfig(unit);
-        const leaderCol = Math.floor(config.columns / 2);
-        const leaderIndex = leaderCol; // Première rangée, colonne centrale
-        const standardBearerIndex = config.columns + leaderCol; // Deuxième rangée, même colonne
+        const centerCol = Math.floor(config.columns / 2);
+
+        // Leader à row=0, col=centre
+        const leaderIndex = 0 * config.columns + centerCol;
+        // Porte-drapeau à row=1, col=centre (si assez de soldats)
+        const standardBearerIndex = 1 * config.columns + centerCol;
 
         for (let i = 0; i < positions.length && i < unit.currentMen; i++) {
             const pos = positions[i];
@@ -170,6 +176,7 @@ class SoldierManager {
         return {
             index: index,
             unitId: unit.id,
+            unit: unit, // Référence directe à l'unité parente
             x: position.x,
             y: position.y,
 
@@ -259,6 +266,15 @@ class SoldierManager {
         for (const unit of allUnits) {
             if (!unit.soldiers) continue;
 
+            // Vérifier si l'unité doit fuir (moral à 0)
+            this.checkUnitRouting(unit);
+
+            // Vérifier si l'unité est interceptée par des ennemis
+            this.checkFormationInterception(unit);
+
+            // Vérifier si l'unité était en combat et que le combat est terminé
+            this.checkCombatEnd(unit);
+
             for (const soldier of unit.soldiers) {
                 if (!soldier.isAlive) continue;
 
@@ -268,6 +284,9 @@ class SoldierManager {
 
                 // Mettre à jour selon l'état du soldat
                 switch (soldier.state) {
+                    case 'routing':
+                        this.updateRoutingSoldier(soldier, unit, deltaTime);
+                        break;
                     case 'fighting':
                         this.updateFightingSoldier(soldier, unit, shouldProcessCombat);
                         break;
@@ -294,6 +313,231 @@ class SoldierManager {
         if (shouldProcessCombat) {
             this.findAndEngageCombats();
         }
+    }
+
+    /**
+     * Vérifie si une unité doit fuir en fonction de son moral
+     * Gère aussi la régénération du moral et le retour au combat
+     */
+    checkUnitRouting(unit) {
+        const currentMorale = unit.morale || 100;
+
+        // Si le moral est à 0 ou moins, l'unité fuit
+        if (currentMorale <= 0 && unit.state !== 'routing') {
+            unit.state = 'routing';
+
+            // Déterminer la direction de fuite (opposée au centre de masse des ennemis)
+            const enemies = unit.side === 'attacker' ? this.battle.defenderUnits : this.battle.attackerUnits;
+            const aliveEnemies = enemies.filter(e => e.currentMen > 0);
+
+            if (aliveEnemies.length > 0) {
+                // Calculer le centre de masse des ennemis
+                let enemyCenterX = 0;
+                let enemyCenterY = 0;
+                aliveEnemies.forEach(e => {
+                    enemyCenterX += e.x;
+                    enemyCenterY += e.y;
+                });
+                enemyCenterX /= aliveEnemies.length;
+                enemyCenterY /= aliveEnemies.length;
+
+                // Direction de fuite = opposée au centre des ennemis
+                const dx = unit.x - enemyCenterX;
+                const dy = unit.y - enemyCenterY;
+                unit.routingAngle = Math.atan2(dy, dx);
+            } else {
+                // Pas d'ennemi, fuir vers le bord de la carte
+                unit.routingAngle = unit.side === 'attacker' ? Math.PI : 0; // Gauche ou droite
+            }
+
+            // Tous les soldats passent en état routing
+            if (unit.soldiers) {
+                for (const soldier of unit.soldiers) {
+                    if (soldier.isAlive && soldier.state !== 'fighting') {
+                        soldier.state = 'routing';
+                    }
+                }
+            }
+        }
+        // Si l'unité est en fuite, régénérer progressivement le moral
+        else if (unit.state === 'routing') {
+            // Régénération du moral quand l'unité fuit
+            // Plus l'unité est loin des ennemis, plus elle récupère vite
+            const enemies = unit.side === 'attacker' ? this.battle.defenderUnits : this.battle.attackerUnits;
+            const aliveEnemies = enemies.filter(e => e.currentMen > 0);
+
+            let minEnemyDist = Infinity;
+            if (aliveEnemies.length > 0) {
+                aliveEnemies.forEach(e => {
+                    const dist = Math.hypot(e.x - unit.x, e.y - unit.y);
+                    if (dist < minEnemyDist) minEnemyDist = dist;
+                });
+            }
+
+            // Bonus de régénération si loin des ennemis (> 200 pixels)
+            const distanceBonus = minEnemyDist > 200 ? 2 : 1;
+            const moraleRegen = 0.5 * distanceBonus; // 0.5 à 1 point de moral par tick
+
+            unit.morale = Math.min(100, (unit.morale || 0) + moraleRegen);
+
+            // Si le moral remonte au-dessus de 30, l'unité se rallie
+            if (unit.morale >= 30) {
+                unit.state = 'idle';
+
+                // Les soldats sortent de l'état routing et retournent en formation
+                if (unit.soldiers) {
+                    for (const soldier of unit.soldiers) {
+                        if (soldier.isAlive && soldier.state === 'routing') {
+                            soldier.state = 'returning';
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Vérifie si une formation en déplacement est interceptée par des ennemis
+     * Si interceptée, la formation se réoriente pour faire face aux attaquants
+     * @param {Object} unit - L'unité à vérifier
+     */
+    checkFormationInterception(unit) {
+        // Ne vérifier que les unités en mouvement qui ne sont pas déjà en combat
+        if (unit.state !== 'moving' && unit.state !== 'attacking') return;
+        if (!unit.soldiers) return;
+
+        const enemies = unit.side === 'attacker' ? this.battle.defenderUnits : this.battle.attackerUnits;
+        const aliveEnemies = enemies.filter(e => e.currentMen > 0);
+
+        // Vérifier si des soldats ennemis sont à portée d'engagement
+        let closestThreat = null;
+        let closestThreatDist = Infinity;
+        let engagedSoldiersCount = 0;
+
+        for (const enemyUnit of aliveEnemies) {
+            if (!enemyUnit.soldiers) continue;
+
+            const unitDist = Math.hypot(enemyUnit.x - unit.x, enemyUnit.y - unit.y);
+
+            // Si une unité ennemie est très proche (< 100 pixels)
+            if (unitDist < 100 && unitDist < closestThreatDist) {
+                closestThreat = enemyUnit;
+                closestThreatDist = unitDist;
+            }
+        }
+
+        // Compter les soldats déjà engagés en combat
+        if (unit.soldiers) {
+            engagedSoldiersCount = unit.soldiers.filter(s =>
+                s.isAlive && s.state === 'fighting' && s.combatTarget?.isAlive
+            ).length;
+        }
+
+        // Si intercepté et des soldats sont en combat, réorienter la formation
+        if (closestThreat && engagedSoldiersCount > 0) {
+            // Marquer l'unité comme interceptée
+            unit.isIntercepted = true;
+            unit.interceptingEnemy = closestThreat;
+
+            // Si l'unité était en train d'attaquer une autre cible, continuer
+            // Sinon, se réorienter pour faire face à l'intercepteur
+            if (unit.state === 'moving') {
+                // Calculer l'angle vers l'ennemi intercepteur
+                const angleToThreat = Math.atan2(
+                    closestThreat.y - unit.y,
+                    closestThreat.x - unit.x
+                );
+
+                // Réorienter progressivement la formation vers la menace
+                unit.facing = angleToThreat;
+
+                // Mettre l'unité en mode défensif
+                unit.state = 'defending';
+
+                // Recalculer les positions de formation avec la nouvelle orientation
+                if (this.battle.formationSystem) {
+                    this.battle.formationSystem.updateFormationFacing(unit, angleToThreat);
+                }
+            }
+        } else if (unit.isIntercepted && engagedSoldiersCount === 0) {
+            // Plus de soldats en combat, l'interception est terminée
+            unit.isIntercepted = false;
+            unit.interceptingEnemy = null;
+
+            // Compacter la formation après le combat
+            if (this.battle.formationSystem) {
+                this.battle.formationSystem.compactFormationAfterCombat(unit);
+            }
+
+            // Si l'unité était en mode défensif, revenir à l'état précédent
+            if (unit.state === 'defending') {
+                // Reprendre le mouvement ou l'attaque initiale
+                if (unit.targetX !== null && unit.targetY !== null) {
+                    unit.state = 'moving';
+                } else if (unit.target) {
+                    unit.state = 'attacking';
+                } else {
+                    unit.state = 'idle';
+                }
+            }
+        }
+    }
+
+    /**
+     * Vérifie si une unité a terminé son combat et doit se réorganiser
+     * @param {Object} unit - L'unité à vérifier
+     */
+    checkCombatEnd(unit) {
+        // Ne vérifier que les unités qui étaient en combat/attaque
+        if (unit.state !== 'attacking' && unit.state !== 'defending') return;
+
+        // Compter les soldats encore en combat
+        const fightingSoldiers = unit.soldiers.filter(s =>
+            s.isAlive && (s.state === 'fighting' || s.state === 'charging')
+        ).length;
+
+        // Si aucun soldat n'est en combat et que l'unité a un marqueur de combat terminé
+        if (fightingSoldiers === 0) {
+            // Vérifier si l'unité a déjà été compactée récemment
+            if (!unit.lastCompactionTime || Date.now() - unit.lastCompactionTime > 2000) {
+                // Compacter la formation
+                if (this.battle.formationSystem) {
+                    this.battle.formationSystem.compactFormationAfterCombat(unit);
+                    unit.lastCompactionTime = Date.now();
+                }
+            }
+        }
+    }
+
+    /**
+     * Met à jour un soldat en fuite
+     * Les soldats en fuite courent dans la direction opposée aux ennemis
+     * Mais se défendent s'ils sont attaqués
+     */
+    updateRoutingSoldier(soldier, unit, deltaTime) {
+        // Si le soldat est attaqué, il se défend brièvement
+        if (soldier.combatTarget?.isAlive) {
+            // Continuer le combat défensif
+            this.updateFightingSoldier(soldier, unit, false);
+            return;
+        }
+
+        // Fuir dans la direction de fuite de l'unité
+        const routingAngle = unit.routingAngle || 0;
+        const routingSpeed = soldier.moveSpeed * 1.5 * deltaTime * 0.1; // 50% plus rapide que la marche normale
+
+        const dx = Math.cos(routingAngle) * routingSpeed;
+        const dy = Math.sin(routingAngle) * routingSpeed;
+
+        soldier.x += dx;
+        soldier.y += dy;
+
+        // Mettre à jour la direction visuelle
+        soldier.direction = this.battle.battleSpriteManager?.angleToDirection(routingAngle) || soldier.direction;
+
+        // Les soldats en fuite ne maintiennent pas la formation
+        soldier.formationX = soldier.x;
+        soldier.formationY = soldier.y;
     }
 
     /**
@@ -327,51 +571,81 @@ class SoldierManager {
     findAndEngageCombats() {
         const attackerUnits = this.battle.attackerUnits || [];
         const defenderUnits = this.battle.defenderUnits || [];
+        const playerFaction = this.battle.game?.playerFaction;
 
-        // Pour chaque unité attaquante
-        for (const attackerUnit of attackerUnits) {
-            if (!attackerUnit.soldiers) continue;
+        // Traiter les combats pour les deux camps
+        const processCombatForUnits = (ourUnits, enemyUnits) => {
+            for (const ourUnit of ourUnits) {
+                if (!ourUnit.soldiers) continue;
 
-            // Chercher des ennemis proches
-            for (const defenderUnit of defenderUnits) {
-                if (!defenderUnit.soldiers) continue;
+                // IMPORTANT: Les unités du joueur ne doivent PAS attaquer automatiquement
+                // SAUF si le joueur leur a donné l'ordre (state='attacking' avec une cible)
+                const isPlayerUnit = ourUnit.faction === playerFaction;
+                if (isPlayerUnit) {
+                    // L'unité du joueur ne peut attaquer QUE si elle a reçu un ordre explicite
+                    if (ourUnit.state !== 'attacking' || !ourUnit.target) {
+                        continue;
+                    }
+                }
 
-                // Vérifier si les unités sont assez proches pour combattre
-                const unitDist = Math.hypot(defenderUnit.x - attackerUnit.x, defenderUnit.y - attackerUnit.y);
-                if (unitDist > 150) continue; // Trop loin
+                // Chercher des ennemis proches
+                for (const enemyUnit of enemyUnits) {
+                    if (!enemyUnit.soldiers) continue;
 
-                // Chercher des paires de soldats pour combattre
-                for (const attacker of attackerUnit.soldiers) {
-                    if (!attacker.isAlive || attacker.state === 'fighting' || attacker.state === 'charging') continue;
-
-                    // Le porte-drapeau évite le combat sauf s'il est directement attaqué
-                    if (attacker.avoidsCombat) continue;
-
-                    // Trouver le défenseur le plus proche qui peut être attaqué
-                    let closestDefender = null;
-                    let closestDist = Infinity;
-
-                    for (const defender of defenderUnit.soldiers) {
-                        if (!defender.isAlive) continue;
-
-                        const dist = Math.hypot(defender.x - attacker.x, defender.y - attacker.y);
-                        const engageRange = Math.max(attacker.attackRange, defender.attackRange);
-
-                        if (dist <= engageRange && dist < closestDist) {
-                            // Vérifier la limite d'attaquants
-                            if (this.canAttackTarget(defender)) {
-                                closestDist = dist;
-                                closestDefender = defender;
-                            }
-                        }
+                    // Pour les unités du joueur, ne combattre QUE la cible désignée
+                    if (isPlayerUnit && enemyUnit !== ourUnit.target) {
+                        continue;
                     }
 
-                    if (closestDefender) {
-                        this.engageCombat(attacker, closestDefender);
+                    // Vérifier si les unités sont assez proches pour combattre
+                    const unitDist = Math.hypot(enemyUnit.x - ourUnit.x, enemyUnit.y - ourUnit.y);
+                    if (unitDist > 150) continue; // Trop loin
+
+                    // Chercher des paires de soldats pour combattre
+                    for (const ourSoldier of ourUnit.soldiers) {
+                        if (!ourSoldier.isAlive || ourSoldier.state === 'fighting' || ourSoldier.state === 'charging') continue;
+
+                        // IMPORTANT: Les soldats en fuite ne cherchent PAS à combattre
+                        // Ils ne combattent que s'ils sont attaqués (géré dans updateRoutingSoldier)
+                        if (ourSoldier.state === 'routing') continue;
+
+                        // Le porte-drapeau évite le combat sauf s'il est directement attaqué
+                        if (ourSoldier.avoidsCombat) continue;
+
+                        // Trouver l'ennemi le plus proche qui peut être attaqué
+                        let closestEnemy = null;
+                        let closestDist = Infinity;
+
+                        for (const enemySoldier of enemyUnit.soldiers) {
+                            if (!enemySoldier.isAlive) continue;
+
+                            // IMPORTANT: Ne pas cibler les soldats en fuite
+                            // Laissez-les fuir, sauf s'ils se défendent activement
+                            if (enemySoldier.state === 'routing' && !enemySoldier.combatTarget) continue;
+
+                            const dist = Math.hypot(enemySoldier.x - ourSoldier.x, enemySoldier.y - ourSoldier.y);
+                            const engageRange = Math.max(ourSoldier.attackRange, enemySoldier.attackRange);
+
+                            if (dist <= engageRange && dist < closestDist) {
+                                // Vérifier la limite d'attaquants
+                                if (this.canAttackTarget(enemySoldier)) {
+                                    closestDist = dist;
+                                    closestEnemy = enemySoldier;
+                                }
+                            }
+                        }
+
+                        if (closestEnemy) {
+                            this.engageCombat(ourSoldier, closestEnemy);
+                        }
                     }
                 }
             }
-        }
+        };
+
+        // Traiter les combats dans les deux sens
+        processCombatForUnits(attackerUnits, defenderUnits);
+        processCombatForUnits(defenderUnits, attackerUnits);
 
         // Mettre à jour le bonus de moral du porte-drapeau
         this.updateStandardBearerMorale();
@@ -403,19 +677,46 @@ class SoldierManager {
      * Engage deux soldats en combat
      */
     engageCombat(soldier1, soldier2) {
-        soldier1.state = 'fighting';
-        soldier1.combatTarget = soldier2;
-        soldier1.isEngaged = true;
-        soldier1.isMoving = false;
-        soldier1.isRepositioning = false;
+        // IMPORTANT: Un soldat en fuite ne se bat PAS activement
+        // On ne force pas soldier1 à combattre s'il fuit
+        if (soldier1.state !== 'routing') {
+            soldier1.state = 'fighting';
+            soldier1.combatTarget = soldier2;
+            soldier1.isEngaged = true;
+            soldier1.isMoving = false;
+            soldier1.isRepositioning = false;
+        }
 
         // Le défenseur ne change de cible que s'il n'en a pas déjà une
+        // IMPORTANT: Si soldier2 est en fuite et se fait attaquer, il se défend
         if (!soldier2.combatTarget || !soldier2.combatTarget.isAlive) {
             soldier2.state = 'fighting';
             soldier2.combatTarget = soldier1;
             soldier2.isEngaged = true;
             soldier2.isMoving = false;
             soldier2.isRepositioning = false;
+        }
+
+        // IMPORTANT: Si une unité du joueur est attaquée, elle doit automatiquement
+        // contre-attaquer l'unité ennemie (passer en mode 'attacking')
+        const playerFaction = this.battle.game?.playerFaction;
+        const unit1 = soldier1.unit;
+        const unit2 = soldier2.unit;
+
+        if (unit2 && unit2.faction === playerFaction) {
+            // L'unité du joueur est attaquée, elle doit contre-attaquer
+            if (unit2.state !== 'attacking' || !unit2.target) {
+                unit2.state = 'attacking';
+                unit2.target = unit1;
+            }
+        }
+
+        if (unit1 && unit1.faction === playerFaction) {
+            // L'unité du joueur attaque, s'assurer qu'elle a la bonne cible
+            if (unit1.state !== 'attacking' || !unit1.target) {
+                unit1.state = 'attacking';
+                unit1.target = unit2;
+            }
         }
 
         // Faire face à l'ennemi
@@ -678,10 +979,181 @@ class SoldierManager {
         // Mettre à jour le compteur de l'unité
         unit.currentMen = unit.soldiers.filter(s => s.isAlive).length;
 
+        // IMPORTANT: Repositionner immédiatement les soldats vivants de cette unité
+        // pour combler les trous dans la formation
+        this.repositionSoldiersAfterDeath(unit);
+
         // Créer un corps
         setTimeout(() => {
             this.createDeadBody(unit, soldier);
         }, 600);
+    }
+
+    /**
+     * Repositionne les soldats vivants pour combler les trous après une mort
+     * Mouvement naturel: seuls les soldats de la même colonne avancent d'un rang
+     */
+    repositionSoldiersAfterDeath(unit) {
+        if (!unit.soldiers || !this.battle.formationSystem) return;
+
+        const aliveSoldiers = unit.soldiers.filter(s => s.isAlive);
+        if (aliveSoldiers.length === 0) return;
+
+        // Pour chaque colonne, détecter les trous et faire avancer les soldats
+        const config = this.battle.formationSystem.getFormationConfig(unit);
+        const maxRows = config.rows;
+        const maxCols = config.columns;
+
+        // Pour chaque colonne
+        for (let col = 0; col < maxCols; col++) {
+            // Récupérer tous les soldats vivants de cette colonne, triés par row
+            const soldiersInColumn = aliveSoldiers
+                .filter(s => s.col === col)
+                .sort((a, b) => a.row - b.row);
+
+            // Si la colonne a des soldats, les repositionner pour combler les trous
+            if (soldiersInColumn.length > 0) {
+                // Réassigner les rows pour qu'ils soient consécutifs (0, 1, 2...)
+                soldiersInColumn.forEach((soldier, index) => {
+                    const oldRow = soldier.row;
+                    const newRow = index; // Row consécutif
+
+                    if (oldRow !== newRow) {
+                        // Le soldat doit avancer
+                        soldier.row = newRow;
+
+                        // Recalculer sa position de formation
+                        const formationSystem = this.battle.formationSystem;
+                        const spacing = config.spacing;
+                        const cos = Math.cos(unit.facing || 0);
+                        const sin = Math.sin(unit.facing || 0);
+
+                        // Calculer la nouvelle position dans la grille
+                        // Utiliser le même calcul que dans calculateGridPositions
+                        const localX = ((maxRows - 1) / 2 - newRow) * spacing;
+                        const localY = (col - (maxCols - 1) / 2) * spacing;
+
+                        const rotatedX = localX * cos - localY * sin;
+                        const rotatedY = localX * sin + localY * cos;
+
+                        soldier.formationX = unit.x + rotatedX;
+                        soldier.formationY = unit.y + rotatedY;
+
+                        // Mettre à jour le statut de bordure
+                        const totalRowsInColumn = soldiersInColumn.length;
+                        soldier.isBorder = newRow === 0 || newRow === totalRowsInColumn - 1 ||
+                                         col === 0 || col === maxCols - 1;
+
+                        // Ne marquer comme "repositioning" que si le soldat n'est pas en combat
+                        if (soldier.state !== 'fighting' && soldier.state !== 'charging') {
+                            soldier.isRepositioning = true;
+                        }
+                    }
+                });
+            }
+        }
+
+        // Après avoir repositionné dans les colonnes, équilibrer latéralement
+        // si l'unité est en combat
+        if (unit.state === 'attacking' || unit.state === 'defending' || unit.state === 'fighting') {
+            this.balanceColumnsLaterally(unit);
+        }
+    }
+
+    /**
+     * Équilibre les colonnes pendant le combat en faisant glisser les soldats
+     * des colonnes pleines vers les colonnes vides
+     * S'active uniquement si l'écart entre colonnes voisines est >= 3 soldats
+     * @param {Object} unit - L'unité
+     */
+    balanceColumnsLaterally(unit) {
+        if (!unit.soldiers || !this.battle.formationSystem) return;
+
+        const aliveSoldiers = unit.soldiers.filter(s => s.isAlive);
+        if (aliveSoldiers.length === 0) return;
+
+        const config = this.battle.formationSystem.getFormationConfig(unit);
+        const maxCols = config.columns;
+        const spacing = config.spacing;
+        const cos = Math.cos(unit.facing || 0);
+        const sin = Math.sin(unit.facing || 0);
+
+        // Calculer la hauteur de chaque colonne
+        const columnHeights = [];
+        for (let col = 0; col < maxCols; col++) {
+            const soldiersInColumn = aliveSoldiers.filter(s => s.col === col);
+            columnHeights[col] = soldiersInColumn.length;
+        }
+
+        // Parcourir les colonnes adjacentes pour détecter les déséquilibres
+        for (let col = 0; col < maxCols - 1; col++) {
+            const currentHeight = columnHeights[col];
+            const nextHeight = columnHeights[col + 1];
+            const gap = Math.abs(currentHeight - nextHeight);
+
+            // Si l'écart est >= 3, faire glisser des soldats
+            if (gap >= 3) {
+                const sourceCol = currentHeight > nextHeight ? col : col + 1;
+                const targetCol = currentHeight > nextHeight ? col + 1 : col;
+                const soldiersToMove = Math.floor(gap / 2); // Déplacer la moitié de l'écart
+
+                // Récupérer les soldats de l'arrière de la colonne source
+                const sourceSoldiers = aliveSoldiers
+                    .filter(s => s.col === sourceCol)
+                    .sort((a, b) => b.row - a.row); // Trier par row décroissant (arrière vers avant)
+
+                // Déplacer les soldats de l'arrière qui ne sont PAS en combat
+                let movedCount = 0;
+                for (const soldier of sourceSoldiers) {
+                    if (movedCount >= soldiersToMove) break;
+
+                    // Ne déplacer que les soldats qui ne sont pas en combat
+                    if (soldier.state !== 'fighting' && soldier.state !== 'charging') {
+                        // Changer la colonne du soldat
+                        soldier.col = targetCol;
+                        movedCount++;
+                    }
+                }
+
+                // Mettre à jour les hauteurs après le déplacement
+                if (movedCount > 0) {
+                    columnHeights[sourceCol] -= movedCount;
+                    columnHeights[targetCol] += movedCount;
+                }
+            }
+        }
+
+        // Recalculer les positions de tous les soldats après l'équilibrage
+        for (let col = 0; col < maxCols; col++) {
+            const soldiersInColumn = aliveSoldiers
+                .filter(s => s.col === col)
+                .sort((a, b) => a.row - b.row);
+
+            soldiersInColumn.forEach((soldier, index) => {
+                const newRow = index;
+                soldier.row = newRow;
+
+                // Recalculer la position de formation
+                const maxRows = Math.max(...columnHeights);
+                const localX = ((maxRows - 1) / 2 - newRow) * spacing;
+                const localY = (col - (maxCols - 1) / 2) * spacing;
+
+                const rotatedX = localX * cos - localY * sin;
+                const rotatedY = localX * sin + localY * cos;
+
+                soldier.formationX = unit.x + rotatedX;
+                soldier.formationY = unit.y + rotatedY;
+
+                // Mettre à jour le statut de bordure
+                soldier.isBorder = newRow === 0 || newRow === columnHeights[col] - 1 ||
+                                 col === 0 || col === maxCols - 1;
+
+                // Marquer pour repositionnement si pas en combat
+                if (soldier.state !== 'fighting' && soldier.state !== 'charging') {
+                    soldier.isRepositioning = true;
+                }
+            });
+        }
     }
 
     /**
@@ -739,13 +1211,19 @@ class SoldierManager {
      * Met à jour un soldat qui se déplace avec son unité
      */
     updateMovingSoldier(soldier, unit, deltaTime) {
-        // Les soldats disciplinés suivent leur formation
-        // Les soldats agressifs peuvent charger si assez proches
-        const combatStyle = this.getCombatStyle(unit);
+        // IMPORTANT: Les unités du joueur ne chargent PAS automatiquement
+        const playerFaction = this.battle.game?.playerFaction;
+        const isPlayerUnit = unit.faction === playerFaction;
 
-        if (combatStyle === 'aggressive' && unit.state === 'attacking' && unit.target) {
-            // Vérifier si un ennemi est à portée de charge
-            this.seekEnemyToCharge(soldier, unit);
+        if (!isPlayerUnit) {
+            // Les soldats disciplinés suivent leur formation
+            // Les soldats agressifs peuvent charger si assez proches
+            const combatStyle = this.getCombatStyle(unit);
+
+            if (combatStyle === 'aggressive' && unit.state === 'attacking' && unit.target) {
+                // Vérifier si un ennemi est à portée de charge
+                this.seekEnemyToCharge(soldier, unit);
+            }
         }
 
         // Suivre la formation
@@ -895,6 +1373,11 @@ class SoldierManager {
             soldier.isMoving = true;
         }
 
+        // IMPORTANT: Les unités du joueur ne cherchent PAS automatiquement à charger
+        const playerFaction = this.battle.game?.playerFaction;
+        const isPlayerUnit = unit.faction === playerFaction;
+        if (isPlayerUnit) return;
+
         // Si l'unité est en mode attaque et le soldat est de front, chercher un ennemi
         if (unit.state === 'attacking' && unit.target && soldier.row === 0) {
             const combatStyle = this.getCombatStyle(unit);
@@ -949,6 +1432,10 @@ class SoldierManager {
         }
 
         switch (soldier.state) {
+            case 'routing':
+                // Les soldats en fuite courent
+                soldier.animState = 'walk';
+                break;
             case 'fighting':
                 const isRanged = unit.type === 'ranged' || unit.type === 'skirmisher';
                 soldier.animState = isRanged ? 'ranged' : 'melee';
@@ -980,6 +1467,25 @@ class SoldierManager {
             soldier.isRepositioning = false;
             soldier.isMoving = false;
             return;
+        }
+
+        // IMPORTANT: Si le soldat est en combat, il ne suit PAS la formation
+        // Il doit d'abord finir son combat avant de rejoindre
+        if (soldier.combatTarget?.isAlive) {
+            // Marquer que le soldat doit rattraper la formation après le combat
+            soldier.needsToRejoinFormation = true;
+            return;
+        }
+
+        // Si le soldat vient de finir un combat et doit rattraper la formation
+        if (soldier.needsToRejoinFormation && dist > 50) {
+            // Vitesse de rattrapage rapide
+            soldier.isMoving = true;
+        }
+
+        // Une fois proche de la formation, retirer le marqueur
+        if (soldier.needsToRejoinFormation && dist < 30) {
+            soldier.needsToRejoinFormation = false;
         }
 
         // Mettre à jour la direction de marche
@@ -1143,28 +1649,43 @@ class SoldierManager {
     updateSoldierTargetPositions(unit, formationSystem) {
         if (!unit.soldiers) return;
 
-        const positions = formationSystem.calculateFormationPositions(
-            unit,
-            unit.x,
-            unit.y,
-            unit.facing || 0
-        );
+        const aliveSoldiers = unit.soldiers.filter(s => s.isAlive);
+        const config = formationSystem.getFormationConfig(unit);
+        const maxRows = config.rows;
+        const maxCols = config.columns;
+        const spacing = config.spacing;
+        const cos = Math.cos(unit.facing || 0);
+        const sin = Math.sin(unit.facing || 0);
 
-        // Réassigner les positions aux soldats vivants
-        let posIndex = 0;
-        for (const soldier of unit.soldiers) {
-            if (!soldier.isAlive) continue;
+        // IMPORTANT: Repositionner les soldats en conservant leur colonne
+        // Chaque colonne est traitée indépendamment pour un mouvement naturel
+        for (let col = 0; col < maxCols; col++) {
+            // Récupérer tous les soldats vivants de cette colonne, triés par row
+            const soldiersInColumn = aliveSoldiers
+                .filter(s => s.col === col)
+                .sort((a, b) => a.row - b.row);
 
-            if (posIndex < positions.length) {
-                const pos = positions[posIndex];
-                soldier.formationX = pos.x;
-                soldier.formationY = pos.y;
-                soldier.row = pos.row;
-                soldier.col = pos.col;
-                soldier.isBorder = pos.isBorder;
+            // Repositionner chaque soldat dans sa colonne
+            soldiersInColumn.forEach((soldier, index) => {
+                const newRow = index; // Row consécutif dans la colonne
+                soldier.row = newRow;
+
+                // Calculer la nouvelle position
+                const localX = ((maxRows - 1) / 2 - newRow) * spacing;
+                const localY = (col - (maxCols - 1) / 2) * spacing;
+
+                const rotatedX = localX * cos - localY * sin;
+                const rotatedY = localX * sin + localY * cos;
+
+                soldier.formationX = unit.x + rotatedX;
+                soldier.formationY = unit.y + rotatedY;
+
+                // Mettre à jour le statut de bordure
+                const totalRowsInColumn = soldiersInColumn.length;
+                soldier.isBorder = newRow === 0 || newRow === totalRowsInColumn - 1 ||
+                                 col === 0 || col === maxCols - 1;
                 soldier.isMoving = true;
-                posIndex++;
-            }
+            });
         }
     }
 

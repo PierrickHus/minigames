@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>O'Cha'To - Restaurant de Chats</title>
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+    <a href="../index.html" id="backButton">← Menu</a>
+
+    <!-- Menu Principal -->
+    <div id="mainMenu" class="screen active">
+        <div class="menu-content">
+            <h1>🐱 O'CHA'TO 🐱</h1>
+            <h2>Le Restaurant des Chats</h2>
+            <div class="menu-buttons">
+                <button data-action="newGame">Nouvelle Partie</button>
+                <button data-action="loadGame" id="loadBtn" disabled>Charger</button>
+                <button data-action="startTutorial">Tutoriel</button>
+                <button data-action="showGuide">Guide du Jeu</button>
+                <button data-action="showCredits">Crédits</button>
+                <button data-action="showSettings">Paramètres</button>
+            </div>
+        </div>
+        <div class="menu-footer">
+            <p>Cuisinez les meilleurs plats et servez vos clients félins !</p>
+        </div>
+    </div>
+
+    <!-- Sélection du personnage -->
+    <div id="characterSelect" class="screen">
+        <h1>Choisissez votre Chef Cuisinier</h1>
+        <div class="character-grid">
+            <div class="character-card" data-gender="male">
+                <div class="character-icon">🐱</div>
+                <div class="character-name">Chef Minou</div>
+                <div class="character-desc">Un chat agile et précis</div>
+            </div>
+            <div class="character-card" data-gender="female">
+                <div class="character-icon">🐱</div>
+                <div class="character-name">Cheffe Minette</div>
+                <div class="character-desc">Une chatte créative et rapide</div>
+            </div>
+        </div>
+        <button class="back-btn" data-action="showMenu">Retour</button>
+    </div>
+
+    <!-- Écran de Jeu Principal -->
+    <div id="gameScreen" class="screen">
+        <!-- Barre supérieure -->
+        <div id="topBar">
+            <div class="game-info">
+                <span id="livesDisplay" title="Vies restantes">❤️ 3</span>
+                <span id="clientsDisplay" title="Clients servis">👥 0/100</span>
+                <span id="scoreDisplay" title="Score">⭐ 0</span>
+            </div>
+            <div id="timerDisplay" class="timer">⏱️ --:--</div>
+            <div class="actions">
+                <button data-action="pauseGame">⏸️ Pause</button>
+                <button data-action="showMenu">Menu</button>
+            </div>
+        </div>
+
+        <!-- Zone de jeu Canvas -->
+        <div id="gameArea">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+
+        <!-- Panneau de commande actuelle -->
+        <div id="orderPanel" class="hidden">
+            <div class="order-header">
+                <h3>Commande en cours</h3>
+                <div id="orderTimer">⏱️ 0:00</div>
+            </div>
+            <div id="orderContent">
+                <div id="dishName"></div>
+                <div id="ingredientsList"></div>
+                <div id="stepsList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Écran Guide -->
+    <div id="guideScreen" class="screen">
+        <div class="guide-header">
+            <h1>Guide du Jeu</h1>
+            <button class="close-btn" data-action="closeGuide">✕</button>
+        </div>
+        <div class="guide-content">
+            <section class="guide-section">
+                <h2>🎯 Objectif</h2>
+                <p>Servez 100 clients sans perdre vos 3 vies pour gagner !</p>
+                <p>Vous perdez une vie chaque fois que vous échouez à préparer un plat dans les temps.</p>
+            </section>
+
+            <section class="guide-section">
+                <h2>🎮 Comment jouer</h2>
+                <ul>
+                    <li><strong>Clic gauche</strong> : Prendre un ingrédient ou interagir avec un ustensile</li>
+                    <li><strong>Préparez les plats</strong> : Suivez les recettes demandées par les clients</li>
+                    <li><strong>Gérez le temps</strong> : Chaque plat doit être prêt avant la fin du timer (2-8 min)</li>
+                </ul>
+            </section>
+
+            <section class="guide-section">
+                <h2>🍳 Ustensiles</h2>
+                <ul>
+                    <li>🔥 Four - Pour cuire les plats</li>
+                    <li>📡 Micro-ondes - Pour réchauffer rapidement</li>
+                    <li>🥄 Batteur - Pour mélanger les ingrédients</li>
+                    <li>🍳 Poêle - Pour faire sauter</li>
+                    <li>🍲 Casserole - Pour mijoter</li>
+                    <li>🔪 Couteau - Pour découper</li>
+                    <li>🍽️ Assiette - Pour servir</li>
+                </ul>
+            </section>
+
+            <section class="guide-section">
+                <h2>🥗 Ingrédients disponibles</h2>
+                <p>Salade, Champignon, Tomate, Pomme de terre, Curry, Piments, Sel, Poivre, Fond de tarte, Poivron, Œufs, Lait, Miel, Haricots verts, et bien plus...</p>
+            </section>
+
+            <section class="guide-section">
+                <h2>📈 Progression</h2>
+                <p>Les clients deviennent de plus en plus nombreux et demandent des plats de plus en plus complexes au fil du temps.</p>
+            </section>
+        </div>
+    </div>
+
+    <!-- Écran Crédits -->
+    <div id="creditsScreen" class="screen">
+        <div class="credits-content">
+            <h1>Crédits</h1>
+            <div class="credits-text">
+                <h2>🐱 O'Cha'To 🐱</h2>
+                <p class="credits-subtitle">Le Restaurant des Chats</p>
+
+                <div class="credits-section">
+                    <h3>Développement</h3>
+                    <p>Game Design & Programmation</p>
+                </div>
+
+                <div class="credits-section">
+                    <h3>Remerciements</h3>
+                    <p>Merci à tous les joueurs !</p>
+                </div>
+
+                <p class="credits-footer">© 2026 - O'Cha'To</p>
+            </div>
+            <button data-action="showMenu">Retour au Menu</button>
+        </div>
+    </div>
+
+    <!-- Écran Paramètres -->
+    <div id="settingsScreen" class="screen">
+        <div class="settings-content">
+            <h1>Paramètres</h1>
+            <div class="settings-options">
+                <div class="setting-item">
+                    <label for="volumeMusic">🎵 Musique</label>
+                    <input type="range" id="volumeMusic" min="0" max="100" value="50">
+                    <span id="volumeMusicValue">50%</span>
+                </div>
+                <div class="setting-item">
+                    <label for="volumeSfx">🔊 Effets sonores</label>
+                    <input type="range" id="volumeSfx" min="0" max="100" value="50">
+                    <span id="volumeSfxValue">50%</span>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="showTutorialHints" checked>
+                        Afficher les astuces
+                    </label>
+                </div>
+            </div>
+            <button data-action="showMenu">Retour au Menu</button>
+        </div>
+    </div>
+
+    <!-- Écran Game Over -->
+    <div id="gameOverScreen" class="screen">
+        <div class="gameover-content">
+            <h1>GAME OVER</h1>
+            <p id="gameOverMessage"></p>
+            <div id="gameOverStats">
+                <p>Clients servis: <span id="finalClientsServed">0</span>/100</p>
+                <p>Score final: <span id="finalScore">0</span></p>
+            </div>
+            <button data-action="showMenu">Retour au Menu</button>
+            <button data-action="newGame">Recommencer</button>
+        </div>
+    </div>
+
+    <!-- Écran Victoire -->
+    <div id="victoryScreen" class="screen">
+        <div class="victory-content">
+            <h1>🎉 VICTOIRE ! 🎉</h1>
+            <p>Félicitations ! Vous avez servi 100 clients avec succès !</p>
+            <p>Votre restaurant O'Cha'To est maintenant réputé dans tout le quartier !</p>
+            <div id="victoryStats">
+                <p>Score final: <span id="victoryScore">0</span></p>
+                <p>Vies restantes: <span id="victoryLives">0</span></p>
+            </div>
+            <button data-action="showMenu">Retour au Menu</button>
+            <button data-action="newGame">Rejouer</button>
+        </div>
+    </div>
+
+    <!-- Notifications -->
+    <div id="notifications"></div>
+
+    <!-- Modal de Pause -->
+    <div id="pauseModal" class="modal hidden">
+        <div class="modal-content">
+            <h2>⏸️ Pause</h2>
+            <div class="modal-buttons">
+                <button data-action="resumeGame">Reprendre</button>
+                <button data-action="showMenu">Menu Principal</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>

@@ -260,16 +260,19 @@ class FormationSystem {
 
     /**
      * Calcule les positions en grille (formations ordonnées)
+     * IMPORTANT: Les rangées (rows) sont orientées DANS LA DIRECTION du facing
+     * - facing = 0 (droite) => les rangées vont de gauche à droite
+     * - facing = π (gauche) => les rangées vont de droite à gauche
+     * - row 0 = premier rang (devant), dernière row = arrière
      */
     calculateGridPositions(unit, centerX, centerY, facing, config, maxSoldiers) {
         const positions = [];
         const { columns, rows, spacing, randomness } = config;
 
+        // Largeur = étendue latérale (perpendiculaire à facing)
+        // Profondeur = étendue frontale (dans la direction de facing)
         const formationWidth = (columns - 1) * spacing;
         const formationDepth = (rows - 1) * spacing;
-
-        const startX = -formationWidth / 2;
-        const startY = -formationDepth / 2;
 
         const cos = Math.cos(facing);
         const sin = Math.sin(facing);
@@ -281,9 +284,14 @@ class FormationSystem {
                 const randX = randomness > 0 ? (this.seededRandom(soldierIndex * 17 + 1) - 0.5) * randomness * 2 : 0;
                 const randY = randomness > 0 ? (this.seededRandom(soldierIndex * 31 + 2) - 0.5) * randomness * 2 : 0;
 
-                const localX = startX + col * spacing + randX;
-                const localY = startY + row * spacing + randY;
+                // CORRECTION: Inverser X et Y pour que les rangées soient perpendiculaires au facing
+                // - localX (horizontal dans le repère local) = profondeur (row)
+                // - localY (vertical dans le repère local) = largeur (col)
+                // IMPORTANT: Inverser le signe pour que row 0 soit DEVANT (positif) et dernière row soit DERRIÈRE (négatif)
+                const localX = ((rows - 1) / 2 - row) * spacing + randX;  // Profondeur: row 0 = devant (positif)
+                const localY = (col - (columns - 1) / 2) * spacing + randY; // Largeur: centré
 
+                // Rotation selon facing
                 const rotatedX = localX * cos - localY * sin;
                 const rotatedY = localX * sin + localY * cos;
 
@@ -362,41 +370,41 @@ class FormationSystem {
 
         // Recalculer la formation optimale
         const config = this.getFormationConfig(unit.type);
-        const aliveCount = aliveSoldiers.length;
+        const maxRows = config.rows;
+        const maxCols = config.columns;
+        const spacing = config.spacing;
+        const cos = Math.cos(unit.facing || 0);
+        const sin = Math.sin(unit.facing || 0);
 
-        // Ajuster le nombre de colonnes si nécessaire (formation plus compacte)
-        let newColumns = config.columns;
-        let newRows = Math.ceil(aliveCount / newColumns);
+        // IMPORTANT: Repositionner les soldats par colonne pour un mouvement fluide
+        // Chaque colonne est traitée indépendamment
+        for (let col = 0; col < maxCols; col++) {
+            // Récupérer tous les soldats vivants de cette colonne, triés par row
+            const soldiersInColumn = aliveSoldiers
+                .filter(s => s.col === col)
+                .sort((a, b) => a.row - b.row);
 
-        // S'assurer qu'on a assez de places
-        while (newColumns * newRows < aliveCount && newRows < config.rows) {
-            newRows++;
-        }
+            // Repositionner chaque soldat dans sa colonne
+            soldiersInColumn.forEach((soldier, index) => {
+                const newRow = index; // Row consécutif dans la colonne
+                soldier.row = newRow;
 
-        // Générer les nouvelles positions
-        const positions = this.calculateFormationPositions(
-            { ...unit, currentMen: aliveCount, type: unit.type },
-            unit.x,
-            unit.y,
-            unit.facing || 0
-        );
+                // Calculer la nouvelle position
+                const localX = ((maxRows - 1) / 2 - newRow) * spacing;
+                const localY = (col - (maxCols - 1) / 2) * spacing;
 
-        // Assigner les nouvelles positions aux soldats vivants
-        let posIndex = 0;
-        for (const soldier of aliveSoldiers) {
-            if (posIndex < positions.length) {
-                const newPos = positions[posIndex];
+                const rotatedX = localX * cos - localY * sin;
+                const rotatedY = localX * sin + localY * cos;
 
-                // Définir la nouvelle position cible
-                soldier.formationX = newPos.x;
-                soldier.formationY = newPos.y;
-                soldier.row = newPos.row;
-                soldier.col = newPos.col;
-                soldier.isBorder = newPos.isBorder;
+                soldier.formationX = unit.x + rotatedX;
+                soldier.formationY = unit.y + rotatedY;
+
+                // Mettre à jour le statut de bordure
+                const totalRowsInColumn = soldiersInColumn.length;
+                soldier.isBorder = newRow === 0 || newRow === totalRowsInColumn - 1 ||
+                                 col === 0 || col === maxCols - 1;
                 soldier.isRepositioning = true;
-
-                posIndex++;
-            }
+            });
         }
     }
 
@@ -570,45 +578,191 @@ class FormationSystem {
         const aliveCount = aliveSoldiers.length;
         if (aliveCount === 0) return;
 
-        // Réduire les colonnes si on a moins de soldats
-        let newColumns = Math.min(config.columns, aliveCount);
-        let newRows = Math.ceil(aliveCount / newColumns);
-
-        // Recalculer les positions avec la nouvelle disposition
-        const newSpacing = config.spacing;
-        const formationWidth = (newColumns - 1) * newSpacing;
-        const formationDepth = (newRows - 1) * newSpacing;
-
-        const startX = -formationWidth / 2;
-        const startY = -formationDepth / 2;
-
+        // Configuration de la formation
+        const maxRows = config.rows;
+        const maxCols = config.columns;
+        const spacing = config.spacing;
         const cos = Math.cos(unit.facing || 0);
         const sin = Math.sin(unit.facing || 0);
 
-        let soldierIndex = 0;
-        for (let row = 0; row < newRows && soldierIndex < aliveCount; row++) {
-            const colsInRow = Math.min(newColumns, aliveCount - row * newColumns);
-            const rowOffset = (newColumns - colsInRow) * newSpacing / 2; // Centrer les rangs incomplets
+        // IMPORTANT: Repositionner les soldats par colonne pour un mouvement fluide
+        // Chaque colonne est traitée indépendamment
+        for (let col = 0; col < maxCols; col++) {
+            // Récupérer tous les soldats vivants de cette colonne, triés par row
+            const soldiersInColumn = aliveSoldiers
+                .filter(s => s.col === col)
+                .sort((a, b) => a.row - b.row);
 
-            for (let col = 0; col < colsInRow && soldierIndex < aliveCount; col++) {
-                const soldier = aliveSoldiers[soldierIndex];
+            // Repositionner chaque soldat dans sa colonne
+            soldiersInColumn.forEach((soldier, index) => {
+                const newRow = index; // Row consécutif dans la colonne
+                soldier.row = newRow;
 
-                const localX = startX + col * newSpacing + rowOffset;
-                const localY = startY + row * newSpacing;
+                // Calculer la nouvelle position
+                const localX = ((maxRows - 1) / 2 - newRow) * spacing;
+                const localY = (col - (maxCols - 1) / 2) * spacing;
 
                 const rotatedX = localX * cos - localY * sin;
                 const rotatedY = localX * sin + localY * cos;
 
                 soldier.formationX = unit.x + rotatedX;
                 soldier.formationY = unit.y + rotatedY;
-                soldier.row = row;
-                soldier.col = col;
-                soldier.isBorder = row === 0 || row === newRows - 1 || col === 0 || col === colsInRow - 1;
-                soldier.isRepositioning = true;
 
-                soldierIndex++;
+                // Mettre à jour le statut de bordure
+                const totalRowsInColumn = soldiersInColumn.length;
+                soldier.isBorder = newRow === 0 || newRow === totalRowsInColumn - 1 ||
+                                 col === 0 || col === maxCols - 1;
+                soldier.isRepositioning = true;
+            });
+        }
+    }
+
+    /**
+     * Met à jour l'orientation d'une formation et recalcule les positions des soldats
+     * Utilisé quand une formation est interceptée et doit se réorienter
+     * @param {Object} unit - L'unité
+     * @param {number} newFacing - Nouvelle direction en radians
+     */
+    updateFormationFacing(unit, newFacing) {
+        if (!unit.soldiers) return;
+
+        // Mettre à jour l'orientation de l'unité
+        unit.facing = newFacing;
+
+        const config = this.getFormationConfig(unit);
+        const maxRows = config.rows;
+        const maxCols = config.columns;
+        const spacing = config.spacing;
+        const cos = Math.cos(newFacing);
+        const sin = Math.sin(newFacing);
+
+        // Recalculer les positions de formation pour tous les soldats vivants
+        const aliveSoldiers = unit.soldiers.filter(s => s.isAlive);
+
+        for (const soldier of aliveSoldiers) {
+            // Calculer la nouvelle position avec la nouvelle orientation
+            const localX = ((maxRows - 1) / 2 - soldier.row) * spacing;
+            const localY = (soldier.col - (maxCols - 1) / 2) * spacing;
+
+            const rotatedX = localX * cos - localY * sin;
+            const rotatedY = localX * sin + localY * cos;
+
+            soldier.formationX = unit.x + rotatedX;
+            soldier.formationY = unit.y + rotatedY;
+
+            // Les soldats qui ne sont pas en combat doivent se repositionner
+            if (soldier.state !== 'fighting' && soldier.state !== 'charging') {
+                soldier.isRepositioning = true;
             }
         }
+    }
+
+    /**
+     * Compacte complètement une formation après un combat
+     * Redistribue tous les soldats survivants en rectangle régulier
+     * @param {Object} unit - L'unité
+     */
+    compactFormationAfterCombat(unit) {
+        if (!unit.soldiers) return;
+
+        const aliveSoldiers = unit.soldiers.filter(s => s.isAlive);
+        if (aliveSoldiers.length === 0) return;
+
+        const config = this.getFormationConfig(unit);
+        const originalCols = config.columns;
+        const spacing = config.spacing;
+        const cos = Math.cos(unit.facing || 0);
+        const sin = Math.sin(unit.facing || 0);
+
+        // Calculer les nouvelles dimensions optimales
+        // Garder le même nombre de colonnes, ajuster les rangs
+        const newCols = originalCols;
+        const newRows = Math.ceil(aliveSoldiers.length / newCols);
+
+        // Redistribuer tous les soldats dans un rectangle compact
+        aliveSoldiers.forEach((soldier, index) => {
+            const newCol = index % newCols;
+            const newRow = Math.floor(index / newCols);
+
+            soldier.col = newCol;
+            soldier.row = newRow;
+
+            // Calculer la nouvelle position
+            const localX = ((newRows - 1) / 2 - newRow) * spacing;
+            const localY = (newCol - (newCols - 1) / 2) * spacing;
+
+            const rotatedX = localX * cos - localY * sin;
+            const rotatedY = localX * sin + localY * cos;
+
+            soldier.formationX = unit.x + rotatedX;
+            soldier.formationY = unit.y + rotatedY;
+
+            // Mettre à jour le statut de bordure
+            const isLastRow = newRow === newRows - 1;
+            const isFirstRow = newRow === 0;
+            const isFirstCol = newCol === 0;
+            const isLastCol = newCol === newCols - 1;
+
+            soldier.isBorder = isFirstRow || isLastRow || isFirstCol || isLastCol;
+
+            // Marquer pour repositionnement
+            soldier.isRepositioning = true;
+        });
+
+        console.log(`${unit.name}: Formation compactée - ${aliveSoldiers.length} soldats en ${newRows}x${newCols}`);
+    }
+
+    /**
+     * Reconfigure une formation avec de nouvelles dimensions (drag & drop)
+     * @param {Object} unit - L'unité
+     * @param {number} newRows - Nouveau nombre de rangs
+     * @param {number} newCols - Nouveau nombre de colonnes
+     * @param {Object} soldierManager - Le gestionnaire de soldats
+     */
+    reconfigureFormation(unit, newRows, newCols, soldierManager) {
+        if (!unit.soldiers) return;
+
+        const aliveSoldiers = unit.soldiers.filter(s => s.isAlive);
+        if (aliveSoldiers.length === 0) return;
+
+        const config = this.getFormationConfig(unit);
+        const spacing = config.spacing;
+        const cos = Math.cos(unit.facing || 0);
+        const sin = Math.sin(unit.facing || 0);
+
+        // Redistribuer tous les soldats vivants dans la nouvelle grille
+        aliveSoldiers.forEach((soldier, index) => {
+            const newCol = index % newCols;
+            const newRow = Math.floor(index / newCols);
+
+            soldier.col = newCol;
+            soldier.row = newRow;
+
+            // Calculer la nouvelle position
+            const localX = ((newRows - 1) / 2 - newRow) * spacing;
+            const localY = (newCol - (newCols - 1) / 2) * spacing;
+
+            const rotatedX = localX * cos - localY * sin;
+            const rotatedY = localX * sin + localY * cos;
+
+            soldier.formationX = unit.x + rotatedX;
+            soldier.formationY = unit.y + rotatedY;
+
+            // Mettre à jour le statut de bordure
+            const isLastRow = newRow === newRows - 1 || index >= aliveSoldiers.length - newCols;
+            const isFirstRow = newRow === 0;
+            const isFirstCol = newCol === 0;
+            const isLastCol = newCol === newCols - 1;
+
+            soldier.isBorder = isFirstRow || isLastRow || isFirstCol || isLastCol;
+
+            // Marquer pour repositionnement seulement si pas en combat
+            if (soldier.state !== 'fighting' && soldier.state !== 'charging') {
+                soldier.isRepositioning = true;
+            }
+        });
+
+        console.log(`${unit.name}: Formation reconfigurée - ${aliveSoldiers.length} soldats en ${newRows}x${newCols}`);
     }
 }
 

@@ -13,6 +13,7 @@ import CombatCalculator from './combat-calculator.js';
 import ProjectileSystem from './projectile-system.js';
 import CollisionSystem from './collision-system.js';
 import BattleDebugManager from './battle-debug.js';
+import BattleUIOverlay from './battle-ui-overlay.js';
 
 class BattleSystem {
     constructor(game) {
@@ -25,7 +26,10 @@ class BattleSystem {
         this.attackerUnits = [];
         this.defenderUnits = [];
 
-        this.selectedUnit = null;
+        this.selectedUnit = null; // Sélection simple (compatibilité)
+        this.selectedUnits = []; // Sélection multiple
+        this.isSelectionRectangle = false;
+        this.selectionStart = null;
         this.isPaused = false;
         this.speed = 1;
         this.isRunning = false;
@@ -34,12 +38,15 @@ class BattleSystem {
 
         // Caméra pour zoom et déplacement
         this.camera = { x: 0, y: 0, zoom: 1 };
-        this.isDragging = false;
+        this.isCameraDragging = false;
+        this.isUnitDragging = false;
         this.lastMousePos = { x: 0, y: 0 };
+        this.dragStartPos = { x: 0, y: 0 };
+        this.unitDragIndicator = null;
 
-        // Carte de bataille - grande carte pour les batailles épiques
-        this.mapWidth = 4000;
-        this.mapHeight = 2500;
+        // Carte de bataille - très grande carte pour les batailles épiques avec formations
+        this.mapWidth = 8000;  // x2 (4000 -> 8000)
+        this.mapHeight = 5000; // x2 (2500 -> 5000)
         this.obstacles = [];
         this.isSiege = false;
         this.siegeCity = null;
@@ -55,6 +62,7 @@ class BattleSystem {
         this.projectileSystem = null;
         this.collisionSystem = null;
         this.debugManager = null;
+        this.uiOverlay = null;
 
         // Flag pour activer/désactiver le nouveau système
         this.useNewSystem = true;
@@ -90,8 +98,12 @@ class BattleSystem {
         this.canvas.addEventListener('click', (e) => this.onClick(e));
         this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
         this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
-        this.canvas.addEventListener('mouseup', () => this.onMouseUp());
+        this.canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
         this.canvas.addEventListener('wheel', (e) => this.onWheel(e));
+        this.canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // Désactiver le menu contextuel
+
+        // Initialiser l'overlay UI
+        this.uiOverlay = new BattleUIOverlay(this);
 
         // Événement clavier pour le menu debug (F3)
         this.keyHandler = (e) => this.onKeyDown(e);
@@ -311,10 +323,16 @@ class BattleSystem {
 
     /**
      * Redimensionne le canvas
+     * @returns {void}
      */
     resize() {
         this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight - 120;
+        this.canvas.height = window.innerHeight - 60; // Seulement la barre du haut
+
+        // Mettre à jour les positions des éléments UI
+        if (this.uiOverlay) {
+            this.uiOverlay.updateButtonPositions();
+        }
     }
 
     /**
@@ -351,6 +369,174 @@ class BattleSystem {
         // Déterminer la faction selon le côté
         const faction = side === 'attacker' ? this.attacker.faction : this.defender.faction;
 
+        // Vérifier si la faction est romaine pour utiliser le déploiement tactique
+        const isRomanFaction = ['julii', 'brutii', 'scipii', 'senate'].includes(faction);
+
+        if (isRomanFaction) {
+            return this.positionUnitsRomanTactical(units, side, mirror, baseX, centerY, faction);
+        } else {
+            return this.positionUnitsStandard(units, side, mirror, baseX, centerY, faction);
+        }
+    }
+
+    /**
+     * Déploiement tactique romain
+     * - Tirailleurs (velites) devant
+     * - Infanterie en quinconce (hastati, principes, triarii)
+     * - Cavalerie sur les flancs
+     */
+    positionUnitsRomanTactical(units, side, mirror, baseX, centerY, faction) {
+        const positioned = [];
+        const dir = mirror ? 1 : -1;
+
+        // Séparer les unités par type
+        const infantry = units.filter(u => u.type === 'infantry');
+        const cavalry = units.filter(u => u.type === 'cavalry');
+        const ranged = units.filter(u => u.type === 'ranged' || u.type === 'skirmisher');
+        const elephants = units.filter(u => u.type === 'elephant');
+        const others = units.filter(u => !['infantry', 'cavalry', 'ranged', 'skirmisher', 'elephant'].includes(u.type));
+
+        // Espacements augmentés pour éviter les chevauchements
+        const verticalSpacing = 280;   // Espacement vertical entre lignes (140 -> 280)
+        const horizontalSpacing = 220; // Espacement horizontal entre unités (100 -> 220)
+        const quincunxOffset = 120;    // Décalage pour le quinconce (50 -> 120)
+        const flankDistance = 450;     // Distance des flancs par rapport au centre (250 -> 450)
+
+        // 1. TIRAILLEURS DEVANT (velites)
+        const rangedY = centerY - verticalSpacing * 1.5;
+        ranged.forEach((unit, i) => {
+            const numRanged = ranged.length;
+            const startX = baseX - dir * 300; // Plus en avant pour éviter le chevauchement
+            const spacing = horizontalSpacing;
+            const offsetY = (i - (numRanged - 1) / 2) * spacing;
+
+            positioned.push(this.createBattleUnit(unit,
+                startX,
+                rangedY + offsetY,
+                side,
+                faction
+            ));
+        });
+
+        // 2. INFANTERIE EN QUINCONCE
+        // Identifier les types d'infanterie romaine
+        const hastati = infantry.filter(u => u.id === 'hastati');
+        const principes = infantry.filter(u => u.id === 'principes');
+        const triarii = infantry.filter(u => u.id === 'triarii');
+        const otherInfantry = infantry.filter(u => !['hastati', 'principes', 'triarii'].includes(u.id));
+
+        // Ligne 1 : Hastati (infanterie légère) - devant
+        const hastatiY = centerY - verticalSpacing * 0.5;
+        hastati.forEach((unit, i) => {
+            const startX = baseX;
+            const offsetY = (i - (hastati.length - 1) / 2) * horizontalSpacing;
+
+            positioned.push(this.createBattleUnit(unit,
+                startX,
+                hastatiY + offsetY,
+                side,
+                faction
+            ));
+        });
+
+        // Ligne 2 : Principes (infanterie lourde) - milieu, en quinconce
+        const principesY = centerY + verticalSpacing * 0.5;
+        principes.forEach((unit, i) => {
+            const startX = baseX + dir * quincunxOffset; // Décalage pour quinconce
+            const offsetY = (i - (principes.length - 1) / 2) * horizontalSpacing + horizontalSpacing / 2; // Décalé de la moitié
+
+            positioned.push(this.createBattleUnit(unit,
+                startX,
+                principesY + offsetY,
+                side,
+                faction
+            ));
+        });
+
+        // Ligne 3 : Triarii (vétérans à la lance) - arrière
+        const triariiY = centerY + verticalSpacing * 1.5;
+        triarii.forEach((unit, i) => {
+            const startX = baseX + dir * quincunxOffset * 2; // Plus en arrière
+            const offsetY = (i - (triarii.length - 1) / 2) * horizontalSpacing;
+
+            positioned.push(this.createBattleUnit(unit,
+                startX,
+                triariiY + offsetY,
+                side,
+                faction
+            ));
+        });
+
+        // Autre infanterie (prétoriens, etc.) - derrière les triarii
+        const otherInfY = centerY + verticalSpacing * 2.5;
+        otherInfantry.forEach((unit, i) => {
+            const startX = baseX + dir * quincunxOffset * 3;
+            const offsetY = (i - (otherInfantry.length - 1) / 2) * horizontalSpacing;
+
+            positioned.push(this.createBattleUnit(unit,
+                startX,
+                otherInfY + offsetY,
+                side,
+                faction
+            ));
+        });
+
+        // 3. CAVALERIE SUR LES FLANCS
+        // Diviser la cavalerie en deux groupes (flanc gauche et flanc droit)
+        const halfCavalry = Math.ceil(cavalry.length / 2);
+        const leftCavalry = cavalry.slice(0, halfCavalry);
+        const rightCavalry = cavalry.slice(halfCavalry);
+
+        // Flanc gauche (bas de l'écran)
+        leftCavalry.forEach((unit, i) => {
+            const startX = baseX - dir * 100;
+            const offsetY = flankDistance + i * 250; // Plus espacé (120 -> 250)
+
+            positioned.push(this.createBattleUnit(unit,
+                startX,
+                centerY + offsetY,
+                side,
+                faction
+            ));
+        });
+
+        // Flanc droit (haut de l'écran)
+        rightCavalry.forEach((unit, i) => {
+            const startX = baseX - dir * 100;
+            const offsetY = -flankDistance - i * 250; // Plus espacé (120 -> 250)
+
+            positioned.push(this.createBattleUnit(unit,
+                startX,
+                centerY + offsetY,
+                side,
+                faction
+            ));
+        });
+
+        // 4. ÉLÉPHANTS ET AUTRES (derrière l'infanterie)
+        const specialY = centerY + verticalSpacing * 2;
+        [...elephants, ...others].forEach((unit, i) => {
+            const startX = baseX + dir * quincunxOffset * 2;
+            const offsetY = (i - (elephants.length + others.length - 1) / 2) * horizontalSpacing;
+
+            positioned.push(this.createBattleUnit(unit,
+                startX,
+                specialY + offsetY,
+                side,
+                faction
+            ));
+        });
+
+        return positioned;
+    }
+
+    /**
+     * Déploiement standard (pour les factions non-romaines)
+     */
+    positionUnitsStandard(units, side, mirror, baseX, centerY, faction) {
+        const positioned = [];
+        const dir = mirror ? 1 : -1;
+
         // Séparer par type
         const infantry = units.filter(u => u.type === 'infantry');
         const cavalry = units.filter(u => u.type === 'cavalry');
@@ -359,9 +545,8 @@ class BattleSystem {
         const others = units.filter(u => !['infantry', 'cavalry', 'ranged', 'skirmisher', 'elephant'].includes(u.type));
 
         const allUnits = [...ranged, ...infantry, ...elephants, ...cavalry, ...others];
-        const verticalSpacing = 120;
-        const horizontalSpacing = 80;
-        const dir = mirror ? 1 : -1;
+        const verticalSpacing = 250;   // Augmenté (120 -> 250)
+        const horizontalSpacing = 200; // Augmenté (80 -> 200)
 
         allUnits.forEach((unit, i) => {
             const col = Math.floor(i / 4);
@@ -477,44 +662,56 @@ class BattleSystem {
 
     /**
      * Gère le clic sur le canvas
+     * @param {MouseEvent} e - Événement de souris
+     * @returns {void}
      */
     onClick(e) {
-        if (this.isDragging) return;
+        // Ignorer si on était en train de glisser
+        if (this.isCameraDragging || this.isUnitDragging || this.isSelectionRectangle) return;
 
-        const worldPos = this.screenToWorld(e.clientX, e.clientY);
+        const rect = this.canvas.getBoundingClientRect();
+        const screenX = e.clientX - rect.left;
+        const screenY = e.clientY - rect.top;
 
-        // Vérifier si on clique sur une unité alliée pour la sélectionner (basé sur les soldats)
-        const playerUnits = this.attacker.faction === this.game.playerFaction ? this.attackerUnits : this.defenderUnits;
-        const clickedAlly = playerUnits.find(unit => {
-            return this.isPointInUnitFormation(unit, worldPos.x, worldPos.y) && unit.currentMen > 0;
-        });
-
-        if (clickedAlly) {
-            this.selectedUnit = clickedAlly;
+        // Vérifier d'abord si on clique sur l'UI overlay (coordonnées écran)
+        if (this.uiOverlay && this.uiOverlay.handleClick(screenX, screenY)) {
             return;
         }
 
-        if (!this.selectedUnit) return;
+        const worldPos = this.screenToWorld(e.clientX, e.clientY);
 
-        // Vérifier si on clique sur un ennemi (basé sur les soldats)
-        const enemyUnits = this.attacker.faction === this.game.playerFaction ? this.defenderUnits : this.attackerUnits;
-        const clickedEnemy = enemyUnits.find(unit => {
-            return this.isPointInUnitFormation(unit, worldPos.x, worldPos.y) && unit.currentMen > 0;
-        });
+        // CLIC GAUCHE : Sélection/Désélection d'unité
+        if (e.button === 0) {
+            const playerUnits = this.attacker.faction === this.game.playerFaction ? this.attackerUnits : this.defenderUnits;
+            const clickedAlly = playerUnits.find(unit => {
+                return this.isPointInUnitFormation(unit, worldPos.x, worldPos.y) && unit.currentMen > 0;
+            });
 
-        if (clickedEnemy) {
-            this.selectedUnit.target = clickedEnemy;
-            this.selectedUnit.state = 'attacking';
-        } else {
-            // Vérifier si la position est valide
-            if (this.collisionSystem && !this.collisionSystem.canMoveTo(this.selectedUnit, worldPos.x, worldPos.y)) {
-                this.game.notify('Position bloquée!', 'warning');
-                return;
+            if (clickedAlly) {
+                // CTRL+CLIC : Ajouter/Retirer de la sélection multiple
+                if (e.ctrlKey || e.metaKey) {
+                    const index = this.selectedUnits.indexOf(clickedAlly);
+                    if (index !== -1) {
+                        // Retirer de la sélection
+                        this.selectedUnits.splice(index, 1);
+                    } else {
+                        // Ajouter à la sélection
+                        this.selectedUnits.push(clickedAlly);
+                    }
+                    // Mettre à jour selectedUnit pour compatibilité
+                    this.selectedUnit = this.selectedUnits.length > 0 ? this.selectedUnits[0] : null;
+                } else {
+                    // CLIC SIMPLE : Sélectionner uniquement cette unité
+                    this.selectedUnits = [clickedAlly];
+                    this.selectedUnit = clickedAlly;
+                }
+            } else {
+                // Clic dans le vide : désélectionner (sauf si Ctrl pour sélection rectangle)
+                if (!e.ctrlKey && !e.metaKey) {
+                    this.selectedUnits = [];
+                    this.selectedUnit = null;
+                }
             }
-
-            this.selectedUnit.targetX = worldPos.x;
-            this.selectedUnit.targetY = worldPos.y;
-            this.selectedUnit.state = 'moving';
         }
     }
 
@@ -530,26 +727,275 @@ class BattleSystem {
 
     /**
      * Gestion des événements souris
+     * @param {MouseEvent} e - Événement de souris
+     * @returns {void}
      */
     onMouseDown(e) {
-        if (e.button === 2 || e.button === 1) {
-            this.isDragging = true;
+        const worldPos = this.screenToWorld(e.clientX, e.clientY);
+
+        // Clic gauche : démarrer sélection rectangle si dans le vide
+        if (e.button === 0) {
+            const playerUnits = this.attacker.faction === this.game.playerFaction ? this.attackerUnits : this.defenderUnits;
+            const clickedAlly = playerUnits.find(unit => {
+                return this.isPointInUnitFormation(unit, worldPos.x, worldPos.y) && unit.currentMen > 0;
+            });
+
+            // Si on ne clique pas sur une unité, préparer une sélection rectangle
+            if (!clickedAlly) {
+                this.selectionStart = { x: worldPos.x, y: worldPos.y };
+            }
+        }
+        // Clic droit
+        else if (e.button === 2) {
+            // Si une unité est sélectionnée, préparer le drag pour formation
+            if (this.selectedUnit) {
+                this.isUnitDragging = true;
+                this.dragStartPos = { x: worldPos.x, y: worldPos.y };
+                this.lastMousePos = { x: e.clientX, y: e.clientY };
+            }
+        }
+        // Clic molette pour déplacer la caméra
+        else if (e.button === 1) {
+            this.isCameraDragging = true;
             this.lastMousePos = { x: e.clientX, y: e.clientY };
         }
     }
 
+    /**
+     * Gestion du mouvement de la souris
+     * @param {MouseEvent} e - Événement de souris
+     * @returns {void}
+     */
     onMouseMove(e) {
-        if (this.isDragging) {
+        const rect = this.canvas.getBoundingClientRect();
+        const screenX = e.clientX - rect.left;
+        const screenY = e.clientY - rect.top;
+
+        // Mettre à jour le survol de l'UI overlay
+        const isOverUI = this.uiOverlay && this.uiOverlay.handleMouseMove(screenX, screenY);
+
+        // Changer le curseur
+        if (isOverUI) {
+            this.canvas.style.cursor = 'pointer';
+        } else if (this.isCameraDragging) {
+            this.canvas.style.cursor = 'grabbing';
+        } else if (this.isUnitDragging) {
+            this.canvas.style.cursor = 'move';
+        } else if (this.isSelectionRectangle) {
+            this.canvas.style.cursor = 'crosshair';
+        } else {
+            this.canvas.style.cursor = 'default';
+        }
+
+        // Drag de la caméra (molette)
+        if (this.isCameraDragging) {
             const dx = e.clientX - this.lastMousePos.x;
             const dy = e.clientY - this.lastMousePos.y;
             this.camera.x -= dx / this.camera.zoom;
             this.camera.y -= dy / this.camera.zoom;
             this.lastMousePos = { x: e.clientX, y: e.clientY };
         }
+
+        // Sélection rectangle (clic gauche maintenu)
+        if (this.selectionStart) {
+            const worldPos = this.screenToWorld(e.clientX, e.clientY);
+            const dragDistance = Math.hypot(
+                worldPos.x - this.selectionStart.x,
+                worldPos.y - this.selectionStart.y
+            );
+
+            // Si on a bougé de plus de 10 pixels, c'est une sélection rectangle
+            if (dragDistance > 10) {
+                this.isSelectionRectangle = true;
+                this.selectionEnd = { x: worldPos.x, y: worldPos.y };
+            }
+        }
+
+        // Drag d'unité (clic droit maintenu)
+        if (this.isUnitDragging && this.selectedUnit) {
+            const worldPos = this.screenToWorld(e.clientX, e.clientY);
+
+            // Calculer la distance de drag
+            const dragDistance = Math.hypot(
+                worldPos.x - this.dragStartPos.x,
+                worldPos.y - this.dragStartPos.y
+            );
+
+            // Si on a bougé de plus de 20 pixels, c'est un drag de formation
+            if (dragDistance > 20) {
+                // L'angle du drag définit l'ORIENTATION de la formation
+                const angle = Math.atan2(
+                    worldPos.y - this.dragStartPos.y,
+                    worldPos.x - this.dragStartPos.x
+                );
+
+                // La longueur du drag définit l'ÉTIREMENT de la formation
+                // Distance courte (< 150) = Formation étirée en largeur (plus de colonnes)
+                // Distance longue (>= 150) = Formation étirée en profondeur (plus de rangs)
+
+                const unit = this.selectedUnit;
+                const currentMen = unit.currentMen || unit.men;
+
+                // Calculer la nouvelle configuration selon la distance
+                let newRows, newCols;
+                if (dragDistance < 150) {
+                    // Formation large (shallow) - plus de colonnes
+                    newCols = Math.ceil(Math.sqrt(currentMen * 2));
+                    newRows = Math.ceil(currentMen / newCols);
+                } else {
+                    // Formation profonde (deep) - plus de rangs
+                    newRows = Math.ceil(Math.sqrt(currentMen * 2));
+                    newCols = Math.ceil(currentMen / newRows);
+                }
+
+                // Calculer les positions de prévisualisation avec la nouvelle orientation
+                const previewPositions = this.calculateFormationPreview(
+                    unit,
+                    this.dragStartPos.x,
+                    this.dragStartPos.y,
+                    newRows,
+                    newCols,
+                    angle  // Utiliser l'angle du drag comme orientation
+                );
+
+                // Dessiner un indicateur visuel (sera fait dans le render)
+                this.unitDragIndicator = {
+                    startX: this.dragStartPos.x,
+                    startY: this.dragStartPos.y,
+                    endX: worldPos.x,
+                    endY: worldPos.y,
+                    angle: angle,
+                    dragDistance: dragDistance,
+                    newRows: newRows,
+                    newCols: newCols,
+                    previewPositions: previewPositions
+                };
+            }
+
+            this.lastMousePos = { x: e.clientX, y: e.clientY };
+        }
     }
 
-    onMouseUp() {
-        this.isDragging = false;
+    /**
+     * Gestion du relâchement de la souris
+     * @param {MouseEvent} e - Événement de souris
+     * @returns {void}
+     */
+    onMouseUp(e) {
+        const worldPos = this.screenToWorld(e.clientX, e.clientY);
+
+        // Clic gauche relâché : finaliser sélection rectangle
+        if (e.button === 0 && this.isSelectionRectangle && this.selectionStart && this.selectionEnd) {
+            // Calculer les limites du rectangle
+            const minX = Math.min(this.selectionStart.x, this.selectionEnd.x);
+            const maxX = Math.max(this.selectionStart.x, this.selectionEnd.x);
+            const minY = Math.min(this.selectionStart.y, this.selectionEnd.y);
+            const maxY = Math.max(this.selectionStart.y, this.selectionEnd.y);
+
+            // Sélectionner toutes les unités dans le rectangle
+            const playerUnits = this.attacker.faction === this.game.playerFaction ? this.attackerUnits : this.defenderUnits;
+            const unitsInRect = playerUnits.filter(unit => {
+                if (unit.currentMen <= 0) return false;
+                // Vérifier si le centre de l'unité est dans le rectangle
+                return unit.x >= minX && unit.x <= maxX && unit.y >= minY && unit.y <= maxY;
+            });
+
+            if (unitsInRect.length > 0) {
+                this.selectedUnits = unitsInRect;
+                this.selectedUnit = this.selectedUnits[0];
+            }
+
+            // Nettoyer
+            this.isSelectionRectangle = false;
+            this.selectionStart = null;
+            this.selectionEnd = null;
+        } else if (e.button === 0) {
+            // Simple clic sans drag : nettoyer
+            this.selectionStart = null;
+            this.selectionEnd = null;
+        }
+
+        // Clic droit relâché
+        if (e.button === 2) {
+            if (this.isUnitDragging && this.selectedUnit) {
+                // Calculer la distance de drag
+                const dragDistance = Math.hypot(
+                    worldPos.x - this.dragStartPos.x,
+                    worldPos.y - this.dragStartPos.y
+                );
+
+                // Si drag minimal, c'est un simple clic droit
+                if (dragDistance <= 20) {
+                    // Vérifier si on clique sur un ennemi pour l'attaquer
+                    const enemyUnits = this.attacker.faction === this.game.playerFaction
+                        ? this.defenderUnits
+                        : this.attackerUnits;
+                    const clickedEnemy = enemyUnits.find(unit => {
+                        return this.isPointInUnitFormation(unit, worldPos.x, worldPos.y) && unit.currentMen > 0;
+                    });
+
+                    if (clickedEnemy) {
+                        // Attaquer l'ennemi avec toutes les unités sélectionnées
+                        for (const unit of this.selectedUnits) {
+                            unit.target = clickedEnemy;
+                            unit.state = 'attacking';
+                        }
+                        if (this.selectedUnits.length > 1) {
+                            this.game.notify(`${this.selectedUnits.length} unités attaquent ${clickedEnemy.name}`, 'info');
+                        } else {
+                            this.game.notify(`${this.selectedUnit.name} attaque ${clickedEnemy.name}`, 'info');
+                        }
+                    } else {
+                        // Déplacement groupé : calculer le centre de masse et déplacer relativement
+                        if (this.selectedUnits.length > 1) {
+                            this.moveUnitsGrouped(worldPos.x, worldPos.y);
+                        } else {
+                            // Déplacement simple d'une seule unité
+                            if (this.collisionSystem && !this.collisionSystem.canMoveTo(this.selectedUnit, worldPos.x, worldPos.y)) {
+                                this.game.notify('Position bloquée!', 'warning');
+                            } else {
+                                this.selectedUnit.targetX = worldPos.x;
+                                this.selectedUnit.targetY = worldPos.y;
+                                this.selectedUnit.state = 'moving';
+                                this.selectedUnit.target = null;
+                            }
+                        }
+                    }
+                } else {
+                    // C'était un drag : reconfigurer la formation selon la distance et l'angle
+                    if (this.unitDragIndicator && this.unitDragIndicator.newRows && this.unitDragIndicator.newCols) {
+                        const newRows = this.unitDragIndicator.newRows;
+                        const newCols = this.unitDragIndicator.newCols;
+                        const newOrientation = this.unitDragIndicator.angle;
+
+                        // Mettre à jour l'orientation de l'unité
+                        this.selectedUnit.facing = newOrientation;
+
+                        // Appliquer la nouvelle configuration de formation
+                        if (this.formationSystem && this.soldierManager) {
+                            this.formationSystem.reconfigureFormation(
+                                this.selectedUnit,
+                                newRows,
+                                newCols,
+                                this.soldierManager
+                            );
+                        }
+
+                        const formationType = dragDistance < 150 ? 'large' : 'profonde';
+                        this.game.notify(`${this.selectedUnit.name}: Formation ${formationType} (${newRows}x${newCols})`, 'success');
+                    }
+                }
+
+                // Nettoyer l'indicateur de drag
+                this.unitDragIndicator = null;
+            }
+
+            this.isUnitDragging = false;
+        }
+        // Molette relâchée
+        else if (e.button === 1) {
+            this.isCameraDragging = false;
+        }
     }
 
     onWheel(e) {
@@ -574,6 +1020,44 @@ class BattleSystem {
             e.preventDefault();
             this.debugManager?.toggleMenu();
         }
+    }
+
+    /**
+     * Déplace un groupe d'unités vers une destination en maintenant leurs positions relatives
+     * @param {number} targetX - Position X de destination (point cliqué)
+     * @param {number} targetY - Position Y de destination (point cliqué)
+     * @returns {void}
+     */
+    moveUnitsGrouped(targetX, targetY) {
+        if (this.selectedUnits.length === 0) return;
+
+        // Calculer le centre de masse des unités sélectionnées
+        let centerX = 0;
+        let centerY = 0;
+        for (const unit of this.selectedUnits) {
+            centerX += unit.x;
+            centerY += unit.y;
+        }
+        centerX /= this.selectedUnits.length;
+        centerY /= this.selectedUnits.length;
+
+        // Calculer le vecteur de déplacement
+        const dx = targetX - centerX;
+        const dy = targetY - centerY;
+
+        // Appliquer le vecteur à chaque unité
+        for (const unit of this.selectedUnits) {
+            const newX = unit.x + dx;
+            const newY = unit.y + dy;
+
+            // Définir la cible de mouvement
+            unit.targetX = newX;
+            unit.targetY = newY;
+            unit.state = 'moving';
+            unit.target = null;
+        }
+
+        this.game.notify(`${this.selectedUnits.length} unités se déplacent`, 'info');
     }
 
     /**
@@ -626,8 +1110,10 @@ class BattleSystem {
 
             unit.cooldown = Math.max(0, unit.cooldown - dt);
 
-            // IA automatique
-            if (unit.state === 'idle') {
+            // IA automatique - UNIQUEMENT pour les unités ennemies
+            // Les unités du joueur ne doivent PAS attaquer automatiquement
+            const isPlayerUnit = unit.faction === this.game.playerFaction;
+            if (!isPlayerUnit && unit.state === 'idle') {
                 const enemies = unit.side === 'attacker' ? this.defenderUnits : this.attackerUnits;
                 const aliveEnemies = enemies.filter(e => e.currentMen > 0);
 
@@ -861,10 +1347,29 @@ class BattleSystem {
         // Rendu debug (dans le système de coordonnées monde)
         this.debugManager?.render(ctx);
 
+        // Dessiner le rectangle de sélection (si actif)
+        if (this.isSelectionRectangle && this.selectionStart && this.selectionEnd) {
+            const minX = Math.min(this.selectionStart.x, this.selectionEnd.x);
+            const maxX = Math.max(this.selectionStart.x, this.selectionEnd.x);
+            const minY = Math.min(this.selectionStart.y, this.selectionEnd.y);
+            const maxY = Math.max(this.selectionStart.y, this.selectionEnd.y);
+
+            ctx.strokeStyle = '#00ff00';
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.1)';
+            ctx.lineWidth = 2;
+            ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
+            ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
+        }
+
         ctx.restore();
 
         // UI par-dessus (pas affectée par la caméra)
         this.renderUI(ctx, width, height);
+
+        // Rendre l'overlay UI (boutons et cartes d'unités)
+        if (this.uiOverlay) {
+            this.uiOverlay.render(ctx);
+        }
     }
 
     /**
@@ -946,6 +1451,11 @@ class BattleSystem {
 
         // Dessiner les overlays d'unités (sélection, barres de vie)
         this.renderUnitOverlays(ctx);
+
+        // Dessiner l'indicateur de drag de formation
+        if (this.unitDragIndicator) {
+            this.renderUnitDragIndicator(ctx);
+        }
     }
 
     /**
@@ -1083,7 +1593,120 @@ class BattleSystem {
     }
 
     /**
+     * Calcule les positions de prévisualisation pour une nouvelle formation
+     * @param {Object} unit - L'unité
+     * @param {number} centerX - Position X du centre
+     * @param {number} centerY - Position Y du centre
+     * @param {number} rows - Nombre de rangs
+     * @param {number} cols - Nombre de colonnes
+     * @param {number} facing - Orientation en radians
+     * @returns {Array} Positions {x, y} pour chaque soldat
+     */
+    calculateFormationPreview(unit, centerX, centerY, rows, cols, facing) {
+        const positions = [];
+        const spacing = 15; // Espacement entre soldats
+        const cos = Math.cos(facing);
+        const sin = Math.sin(facing);
+
+        const currentMen = unit.currentMen || unit.men;
+        let soldierCount = 0;
+
+        for (let row = 0; row < rows && soldierCount < currentMen; row++) {
+            for (let col = 0; col < cols && soldierCount < currentMen; col++) {
+                // Calculer la position locale (centrée)
+                const localX = ((rows - 1) / 2 - row) * spacing;
+                const localY = (col - (cols - 1) / 2) * spacing;
+
+                // Appliquer la rotation
+                const rotatedX = localX * cos - localY * sin;
+                const rotatedY = localX * sin + localY * cos;
+
+                positions.push({
+                    x: centerX + rotatedX,
+                    y: centerY + rotatedY
+                });
+
+                soldierCount++;
+            }
+        }
+
+        return positions;
+    }
+
+    /**
+     * Rend l'indicateur visuel de drag de formation
+     * @param {CanvasRenderingContext2D} ctx - Contexte du canvas
+     * @returns {void}
+     */
+    renderUnitDragIndicator(ctx) {
+        const indicator = this.unitDragIndicator;
+        if (!indicator) return;
+
+        // Dessiner les cercles de prévisualisation au sol
+        if (indicator.previewPositions) {
+            for (const pos of indicator.previewPositions) {
+                // Cercle de fond semi-transparent
+                ctx.fillStyle = 'rgba(255, 215, 0, 0.2)';
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Contour du cercle
+                ctx.strokeStyle = 'rgba(255, 215, 0, 0.8)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 6, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+
+        // Flèche de direction du drag
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.6)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([10, 5]);
+        ctx.beginPath();
+        ctx.moveTo(indicator.startX, indicator.startY);
+        ctx.lineTo(indicator.endX, indicator.endY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Pointe de la flèche
+        const arrowSize = 15;
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.8)';
+        ctx.beginPath();
+        ctx.moveTo(indicator.endX, indicator.endY);
+        ctx.lineTo(
+            indicator.endX - arrowSize * Math.cos(indicator.angle - Math.PI / 6),
+            indicator.endY - arrowSize * Math.sin(indicator.angle - Math.PI / 6)
+        );
+        ctx.lineTo(
+            indicator.endX - arrowSize * Math.cos(indicator.angle + Math.PI / 6),
+            indicator.endY - arrowSize * Math.sin(indicator.angle + Math.PI / 6)
+        );
+        ctx.closePath();
+        ctx.fill();
+
+        // Texte d'indication en haut
+        ctx.font = 'bold 16px Arial';
+        ctx.fillStyle = '#ffd700';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 4;
+
+        const formationType = indicator.dragDistance < 150 ? 'LARGE' : 'PROFONDE';
+        const text = `Formation ${formationType} (${indicator.newRows}x${indicator.newCols})`;
+        const textX = indicator.startX;
+        const textY = indicator.startX - 30;
+
+        ctx.strokeText(text, textX, textY);
+        ctx.fillText(text, textX, textY);
+    }
+
+    /**
      * Rend les overlays des unités (sélection, barres de vie)
+     * @param {CanvasRenderingContext2D} ctx - Contexte du canvas
+     * @returns {void}
      */
     renderUnitOverlays(ctx) {
         const allUnits = [...this.attackerUnits, ...this.defenderUnits];
@@ -1091,11 +1714,11 @@ class BattleSystem {
         for (const unit of allUnits) {
             if (unit.currentMen <= 0) continue;
 
-            const isSelected = this.selectedUnit === unit;
+            const isSelected = this.selectedUnits.includes(unit);
             const faction = FACTIONS[unit.side === 'attacker' ? this.attacker.faction : this.defender.faction];
             const bbox = this.getUnitBoundingBox(unit);
 
-            // Rectangle de sélection au lieu d'un cercle
+            // Rectangle de sélection au lieu d'un cercle (doré pour sélection multiple)
             if (isSelected) {
                 const padding = 8;
                 ctx.strokeStyle = '#ffd700';
@@ -1148,10 +1771,10 @@ class BattleSystem {
             if (unit.currentMen <= 0) return;
 
             const faction = FACTIONS[unit.side === 'attacker' ? this.attacker.faction : this.defender.faction];
-            const isSelected = this.selectedUnit === unit;
+            const isSelected = this.selectedUnits.includes(unit);
             const size = 50; // Taille de la zone de l'unité
 
-            // Rectangle de sélection
+            // Rectangle de sélection (doré pour sélection multiple)
             if (isSelected) {
                 ctx.strokeStyle = '#ffd700';
                 ctx.lineWidth = 3;
@@ -1351,10 +1974,13 @@ class BattleSystem {
             ctx.fillText(`⚔️ SIÈGE DE ${this.siegeCity.name.toUpperCase()} ⚔️`, width / 2, 25);
         }
 
-        ctx.font = '12px Arial';
+        // Instructions de contrôle
+        ctx.font = '11px Arial';
         ctx.fillStyle = '#aaa';
         ctx.textAlign = 'right';
-        ctx.fillText('Molette: Zoom | Clic droit: Déplacer', width - 10, 20);
+        ctx.fillText('Molette: Zoom | Clic molette: Caméra', width - 10, 20);
+        ctx.fillText('Clic gauche: Sélectionner | Clic droit: Déplacer/Attaquer', width - 10, 35);
+        ctx.fillText('Clic droit glissé: Changer formation', width - 10, 50);
     }
 
     /**
@@ -1395,6 +2021,9 @@ class BattleSystem {
         }
         if (this.debugManager) {
             this.debugManager.destroy();
+        }
+        if (this.uiOverlay) {
+            this.uiOverlay.destroy();
         }
         if (this.keyHandler) {
             window.removeEventListener('keydown', this.keyHandler);

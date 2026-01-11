@@ -533,12 +533,7 @@ body {
 }
 
 #battleControls {
-    background: rgba(0,0,0,0.9);
-    padding: 15px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-top: 3px solid #555;
+    display: none;
 }
 
 #unitCards {

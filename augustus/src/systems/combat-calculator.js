@@ -123,8 +123,13 @@ class CombatCalculator {
         // Appliquer le modificateur de direction
         const finalDamage = Math.floor(baseDamage * modifiers.damage);
 
-        // Dégâts au moral
-        const moraleDamage = Math.floor(finalDamage * 0.5 * modifiers.morale);
+        // Dégâts au moral avec résistance basée sur le moral de base de l'unité
+        // Les unités d'élite (moral élevé) résistent mieux aux pertes de moral
+        const baseMorale = defender.stats?.morale || 50;
+        const moraleResistance = this.getMoraleResistance(baseMorale);
+
+        let moraleDamage = finalDamage * 0.5 * modifiers.morale;
+        moraleDamage = Math.floor(moraleDamage * moraleResistance);
 
         // Calculer le nombre de pertes (environ 1 mort par 20 points de dégâts)
         const casualties = Math.floor(finalDamage / 20) + (Math.random() < (finalDamage % 20) / 20 ? 1 : 0);
@@ -136,6 +141,35 @@ class CombatCalculator {
             attackDirection: attackDirection,
             modifiers: modifiers
         };
+    }
+
+    /**
+     * Calcule la résistance au moral d'une unité selon son moral de base
+     * Les unités d'élite (moral élevé) perdent moins de moral
+     * @param {number} baseMorale - Moral de base de l'unité (40-95)
+     * @returns {number} Multiplicateur de perte de moral (0.3-1.5)
+     */
+    getMoraleResistance(baseMorale) {
+        // Unités élites (morale 80+): résistance x0.3-0.5 (perdent très peu de moral)
+        if (baseMorale >= 80) {
+            return 0.3 + (95 - baseMorale) * 0.02;
+        }
+        // Unités vétérans (morale 65-79): résistance x0.5-0.7
+        else if (baseMorale >= 65) {
+            return 0.5 + (80 - baseMorale) * 0.013;
+        }
+        // Unités régulières (morale 50-64): résistance x0.7-1.0
+        else if (baseMorale >= 50) {
+            return 0.7 + (65 - baseMorale) * 0.02;
+        }
+        // Unités médiocres (morale 40-49): résistance x1.0-1.3
+        else if (baseMorale >= 40) {
+            return 1.0 + (50 - baseMorale) * 0.03;
+        }
+        // Unités faibles (morale <40): résistance x1.3-1.5 (perdent beaucoup de moral)
+        else {
+            return 1.3 + (40 - baseMorale) * 0.02;
+        }
     }
 
     /**
