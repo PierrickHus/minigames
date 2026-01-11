@@ -7,97 +7,95 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Page de garde -->
-    <div id="menu-screen">
-        <div class="moon"></div>
-        <div class="stars-container" id="stars"></div>
-        <h1>👸 Le Baiser de la Reine 👸</h1>
-        <p class="subtitle">Une aventure au Moyen-Age</p>
-        <button class="menu-btn" id="new-game-btn">Nouvelle Partie</button>
-        <button class="menu-btn" id="load-btn">Charger Partie</button>
-        <button class="menu-btn" id="tutorial-btn">📖 Tutoriel</button>
-        <button class="menu-btn" id="guide-btn">Guide du Jeu</button>
-    </div>
+    <!-- Canvas principal -->
+    <canvas id="game-canvas"></canvas>
 
-    <!-- Tutoriel interactif -->
-    <div id="tutorial-screen">
-        <div class="tutorial-overlay"></div>
-        <div class="tutorial-box">
-            <h2 id="tutorial-title">Bienvenue, jeune Roi !</h2>
-            <p id="tutorial-text">Apprends à jouer en quelques étapes simples.</p>
-            <div id="tutorial-demo"></div>
-            <div class="tutorial-controls">
-                <button class="menu-btn tutorial-nav" id="tutorial-prev">⬅️ Précédent</button>
-                <span id="tutorial-step">1 / 5</span>
-                <button class="menu-btn tutorial-nav" id="tutorial-next">Suivant ➡️</button>
+    <!-- UI Overlay (DOM minimal pour l'interface) -->
+    <div id="ui-overlay">
+        <!-- Page de garde -->
+        <div id="menu-screen">
+            <div class="moon"></div>
+            <div class="stars-container" id="stars"></div>
+            <h1>👸 Le Baiser de la Reine 👸</h1>
+            <p class="subtitle">Une aventure au Moyen-Age</p>
+            <button class="menu-btn" id="new-game-btn">Nouvelle Partie</button>
+            <button class="menu-btn" id="load-btn">Charger Partie</button>
+            <button class="menu-btn" id="tutorial-btn">📖 Tutoriel</button>
+            <button class="menu-btn" id="guide-btn">Guide du Jeu</button>
+        </div>
+
+        <!-- Tutoriel interactif -->
+        <div id="tutorial-screen">
+            <div class="tutorial-overlay"></div>
+            <div class="tutorial-box">
+                <h2 id="tutorial-title">Bienvenue, jeune Roi !</h2>
+                <p id="tutorial-text">Apprends à jouer en quelques étapes simples.</p>
+                <div id="tutorial-demo"></div>
+                <div class="tutorial-controls">
+                    <button class="menu-btn tutorial-nav" id="tutorial-prev">⬅️ Précédent</button>
+                    <span id="tutorial-step">1 / 5</span>
+                    <button class="menu-btn tutorial-nav" id="tutorial-next">Suivant ➡️</button>
+                </div>
+                <button class="menu-btn" id="tutorial-close" style="margin-top: 20px;">Fermer le tutoriel</button>
             </div>
-            <button class="menu-btn" id="tutorial-close" style="margin-top: 20px;">Fermer le tutoriel</button>
         </div>
-    </div>
 
-    <!-- Guide du jeu -->
-    <div id="guide-screen">
-        <h2>Guide du Jeu</h2>
-        <div class="guide-content">
-            <p><span class="emoji">👑</span> Tu es le <strong>Roi</strong> ! Déplace-toi avec les flèches ou ZQSD.</p>
-            <p><span class="emoji">💎</span> Collecte les <strong>diamants</strong> pour augmenter ton score.</p>
-            <p><span class="emoji">👸</span> Attention à la <strong>Reine</strong> ! Si elle te touche, tu perds 3 diamants.</p>
-            <p><span class="emoji">🎵</span> Clique sur le bouton musique pour activer/couper le son.</p>
-            <p><span class="emoji">🏆</span> Objectif : Collecter <strong>400 diamants</strong> pour déclencher le DOOM !</p>
+        <!-- Guide du jeu -->
+        <div id="guide-screen">
+            <h2>Guide du Jeu</h2>
+            <div class="guide-content">
+                <p><span class="emoji">👑</span> Tu es le <strong>Roi</strong> ! Déplace-toi avec les flèches ou ZQSD.</p>
+                <p><span class="emoji">💎</span> Collecte les <strong>diamants</strong> pour augmenter ton score.</p>
+                <p><span class="emoji">👸</span> Attention à la <strong>Reine</strong> ! Si elle te touche, tu perds 3 diamants.</p>
+                <p><span class="emoji">🎵</span> Clique sur le bouton musique pour activer/couper le son.</p>
+                <p><span class="emoji">🏆</span> Objectif : Collecter <strong>400 diamants</strong> pour déclencher le DOOM !</p>
+            </div>
+            <button class="menu-btn" id="back-btn" style="margin-top: 30px;">Retour</button>
         </div>
-        <button class="menu-btn" id="back-btn" style="margin-top: 30px;">Retour</button>
-    </div>
 
-    <div id="game-container" style="display: none;">
-        <div id="score">💎 Diamants: <span id="score-value">0 / 500</span></div>
-        <div id="difficulty" class="diff-easy">Facile</div>
-
-        <!-- Elements DOOM MODE -->
-        <div id="doom-timer">⏱️ 5:00</div>
-        <div id="doom-lives">
-            <span class="life-heart">❤️</span>
-            <span class="life-heart">❤️</span>
-            <span class="life-heart">❤️</span>
+        <!-- HUD du jeu (affiché pendant le jeu) -->
+        <div id="game-hud">
+            <div id="score">💎 Diamants: <span id="score-value">0 / 500</span></div>
+            <div id="difficulty" class="diff-easy">Facile</div>
+            <div id="doom-timer">⏱️ 5:00</div>
+            <div id="doom-lives">
+                <span class="life-heart">❤️</span>
+                <span class="life-heart">❤️</span>
+                <span class="life-heart">❤️</span>
+            </div>
+            <div id="pattern-indicator"></div>
+            <button id="music-btn">🎵 Musique</button>
+            <button id="save-btn">💾 Sauvegarder</button>
         </div>
-        <div id="doom-warning"></div>
+
+        <!-- Ecran de victoire normal -->
+        <div id="victory-screen">
+            <h1>🏆 VICTOIRE ! 🏆</h1>
+            <p>Tu as collecté 400 diamants !</p>
+            <button class="menu-btn" id="replay-btn">Rejouer</button>
+        </div>
+
+        <!-- Ecran Game Over DOOM -->
+        <div id="doom-gameover">
+            <h1>💀 GAME OVER 💀</h1>
+            <p id="doom-gameover-text">Le démon vous a vaincu...</p>
+            <button class="menu-btn" id="doom-retry-btn">Réessayer</button>
+            <button class="menu-btn" id="doom-menu-btn">Menu Principal</button>
+        </div>
+
+        <!-- Ecran Victoire DOOM -->
+        <div id="doom-victory">
+            <h1>🏆 SURVIVANT ! 🏆</h1>
+            <p>Vous avez survécu 5 minutes face au démon !</p>
+            <p id="doom-victory-lives">Vies restantes : ❤️❤️❤️</p>
+            <button class="menu-btn" id="doom-victory-btn">Menu Principal</button>
+        </div>
+
+        <!-- Annonce DOOM -->
         <div id="doom-announcement">
             <h1>👿 DOOM OF HELL 👿</h1>
             <p>Survivez 5 minutes face au démon !</p>
         </div>
-        <div id="pattern-indicator"></div>
-
-        <div id="king">👑</div>
-        <div id="king-hitbox"></div>
-        <div id="king-bubble" class="speech-bubble"></div>
-        <div id="queen">👸</div>
-        <div id="queen-bubble" class="speech-bubble"></div>
-        <div id="house">🏰</div>
-        <div id="instructions">Utilise les flèches ou ZQSD pour déplacer le roi</div>
-        <button id="music-btn">🎵 Musique</button>
-        <button id="save-btn">💾 Sauvegarder</button>
-    </div>
-
-    <!-- Ecran de victoire normal -->
-    <div id="victory-screen">
-        <h1>🏆 VICTOIRE ! 🏆</h1>
-        <p>Tu as collecté 400 diamants !</p>
-        <button class="menu-btn" id="replay-btn">Rejouer</button>
-    </div>
-
-    <!-- Ecran Game Over DOOM -->
-    <div id="doom-gameover">
-        <h1>💀 GAME OVER 💀</h1>
-        <p id="doom-gameover-text">Le démon vous a vaincu...</p>
-        <button class="menu-btn" id="doom-retry-btn">Réessayer</button>
-        <button class="menu-btn" id="doom-menu-btn">Menu Principal</button>
-    </div>
-
-    <!-- Ecran Victoire DOOM -->
-    <div id="doom-victory">
-        <h1>🏆 SURVIVANT ! 🏆</h1>
-        <p>Vous avez survécu 5 minutes face au démon !</p>
-        <p id="doom-victory-lives">Vies restantes : ❤️❤️❤️</p>
-        <button class="menu-btn" id="doom-victory-btn">Menu Principal</button>
     </div>
 
     <audio id="medieval-music" loop>
@@ -109,6 +107,6 @@
         <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" type="audio/mpeg">
     </audio>
 
-    <script src="game.js"></script>
+    <script type="module" src="game.js"></script>
 </body>
 </html>

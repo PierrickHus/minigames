@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEBUG - Patterns DOOM</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: #0a0505;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+        }
+
+        /* Panel de controle - a gauche, hors du jeu */
+        #control-panel {
+            width: 280px;
+            min-width: 280px;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.95);
+            border-right: 2px solid #ff0000;
+            padding: 15px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            flex-shrink: 0;
+            z-index: 10000;
+        }
+
+        /* Scrollbar personnalisee */
+        #control-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #control-panel::-webkit-scrollbar-track {
+            background: #1a0505;
+            border-radius: 4px;
+        }
+
+        #control-panel::-webkit-scrollbar-thumb {
+            background: #ff3300;
+            border-radius: 4px;
+        }
+
+        #control-panel::-webkit-scrollbar-thumb:hover {
+            background: #ff6600;
+        }
+
+        #control-panel h2 {
+            color: #ff0000;
+            font-size: 18px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #ff0000;
+        }
+
+        .pattern-btn {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            margin: 5px 0;
+            font-size: 14px;
+            background: linear-gradient(180deg, #3a0a0a 0%, #1a0505 100%);
+            color: #ff6600;
+            border: 2px solid #ff3300;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .pattern-btn:hover {
+            background: linear-gradient(180deg, #5a1a1a 0%, #3a0a0a 100%);
+            box-shadow: 0 0 15px rgba(255, 51, 0, 0.5);
+            transform: scale(1.02);
+        }
+
+        .pattern-btn.active {
+            background: linear-gradient(180deg, #ff3300 0%, #aa1100 100%);
+            color: #fff;
+            box-shadow: 0 0 20px #ff3300;
+        }
+
+        /* Zone de jeu - prend le reste de l'espace */
+        #game-container {
+            flex: 1;
+            height: 100vh;
+            position: relative;
+            background: linear-gradient(to bottom, #1a0000 0%, #2d0a0a 30%, #3d1515 60%, #0a0505 100%);
+            overflow: hidden;
+            border: 3px solid #ff3300;
+            box-shadow: inset 0 0 50px rgba(255, 0, 0, 0.3);
+            display: block !important;
+        }
+
+        /* Stats - positionne dans le conteneur de jeu */
+        #stats {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            padding: 15px;
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        #stats h3 {
+            margin-bottom: 10px;
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        .stat-row {
+            margin: 5px 0;
+        }
+
+        .stat-value {
+            color: #ffff00;
+        }
+
+        /* Override pour le roi en mode debug */
+        #king {
+            border: 1px dashed rgba(255, 255, 0, 0.5) !important;
+        }
+
+        /* Hitbox du roi - zone de collision */
+        #king-hitbox {
+            position: absolute;
+            border: 3px solid #00ff00;
+            background: rgba(0, 255, 0, 0.2);
+            z-index: 11;
+            pointer-events: none;
+        }
+
+        /* Point central du roi pour debug */
+        #king-center {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #ff0000;
+            border-radius: 50%;
+            z-index: 12;
+            pointer-events: none;
+        }
+
+        /* Override pour la reine en mode debug DOOM */
+        #queen {
+            font-size: 70px !important;
+            animation: demonFloat 2s ease-in-out infinite, demonGlow 0.5s ease-in-out infinite !important;
+        }
+
+        @keyframes demonFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        @keyframes demonGlow {
+            0%, 100% { filter: drop-shadow(0 0 30px #ff0000) drop-shadow(0 0 60px #8b0000); }
+            50% { filter: drop-shadow(0 0 50px #ff4500) drop-shadow(0 0 100px #dc143c) brightness(1.3); }
+        }
+
+        /* Controles AI */
+        #ai-controls {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #ff3300;
+        }
+
+        #ai-controls label {
+            color: #ff9900;
+            font-size: 12px;
+        }
+
+        #ai-controls select, #ai-controls input {
+            width: 100%;
+            padding: 5px;
+            margin: 5px 0;
+            background: #1a0505;
+            color: #ff9900;
+            border: 1px solid #ff3300;
+            border-radius: 4px;
+        }
+
+        /* Indicateur pattern actif - positionne dans la zone de jeu */
+        #current-pattern {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+            color: #ff00ff;
+            text-shadow: 0 0 20px #ff00ff;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 30px;
+            border-radius: 10px;
+            border: 2px solid #ff00ff;
+            z-index: 100;
+        }
+
+        /* Mode pause */
+        .paused #king, .paused #queen, .paused .projectile {
+            animation-play-state: paused !important;
+        }
+
+        #pause-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 60px;
+            color: #ffff00;
+            text-shadow: 0 0 30px #ffff00;
+            z-index: 2000;
+            display: none;
+        }
+
+        .paused #pause-overlay {
+            display: block;
+        }
+
+        /* Cacher les elements du jeu normal */
+        #menu-screen, #guide-screen, #tutorial-screen, #victory-screen,
+        #doom-gameover, #doom-victory, #doom-announcement,
+        #score, #difficulty, #doom-timer, #doom-lives, #doom-warning,
+        #pattern-indicator, #instructions, #music-btn, #save-btn {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Panel de controle - a gauche -->
+    <div id="control-panel">
+        <h2>🔧 DEBUG PATTERNS</h2>
+        <div id="pattern-buttons"></div>
+
+        <div id="ai-controls">
+            <label>Mode Roi AI:</label>
+            <select id="ai-mode">
+                <option value="random">Aléatoire</option>
+                <option value="circle">Cercle</option>
+                <option value="dodge">Esquive</option>
+                <option value="static">Statique</option>
+                <option value="edges">Bords</option>
+            </select>
+
+            <label>Vitesse AI:</label>
+            <input type="range" id="ai-speed" min="1" max="10" value="5">
+
+            <label>Fire Rate (ms):</label>
+            <input type="number" id="fire-rate" value="180" min="50" max="2000" step="10">
+
+            <button class="pattern-btn" id="pause-btn">⏸️ Pause</button>
+            <button class="pattern-btn" id="clear-btn">🗑️ Clear Projectiles</button>
+        </div>
+    </div>
+
+    <!-- Zone de jeu - utilise le meme conteneur que le jeu principal -->
+    <div id="game-container">
+        <div id="house">🏰</div>
+        <div id="king">👑</div>
+        <div id="king-hitbox"></div>
+        <div id="king-center"></div>
+        <div id="queen">👿</div>
+        <div id="king-bubble" class="speech-bubble"></div>
+        <div id="queen-bubble" class="speech-bubble"></div>
+        <!-- Indicateur pattern -->
+        <div id="current-pattern">Sélectionnez un pattern</div>
+        <!-- Pause overlay -->
+        <div id="pause-overlay">⏸️ PAUSE</div>
+        <!-- Stats -->
+        <div id="stats">
+            <h3>📊 STATS</h3>
+            <div class="stat-row">Projectiles: <span class="stat-value" id="stat-projectiles">0</span></div>
+            <div class="stat-row">FPS: <span class="stat-value" id="stat-fps">60</span></div>
+            <div class="stat-row">Pattern: <span class="stat-value" id="stat-pattern">-</span></div>
+            <div class="stat-row">Roi X: <span class="stat-value" id="stat-king-x">0</span></div>
+            <div class="stat-row">Roi Y: <span class="stat-value" id="stat-king-y">0</span></div>
+        </div>
+
+        <!-- Elements caches mais necessaires pour game.js -->
+        <div id="score" style="display:none;">💎 Diamants: <span id="score-value">0 / 500</span></div>
+        <div id="difficulty" style="display:none;"></div>
+        <div id="doom-timer" style="display:none;"></div>
+        <div id="doom-lives" style="display:none;"></div>
+        <div id="doom-warning" style="display:none;"></div>
+        <div id="doom-announcement" style="display:none;"></div>
+        <div id="pattern-indicator" style="display:none;"></div>
+        <div id="instructions" style="display:none;"></div>
+        <button id="music-btn" style="display:none;"></button>
+        <button id="save-btn" style="display:none;"></button>
+    </div>
+
+    <!-- Ecrans caches mais necessaires pour game.js -->
+    <div id="menu-screen" style="display:none;"></div>
+    <div id="guide-screen" style="display:none;"><button id="back-btn"></button></div>
+    <div id="tutorial-screen" style="display:none;">
+        <div id="tutorial-demo"></div>
+        <button id="tutorial-prev"></button>
+        <button id="tutorial-next"></button>
+        <button id="tutorial-close"></button>
+        <span id="tutorial-step"></span>
+        <span id="tutorial-title"></span>
+        <span id="tutorial-text"></span>
+    </div>
+    <div id="victory-screen" style="display:none;"><button id="replay-btn"></button></div>
+    <div id="doom-gameover" style="display:none;">
+        <span id="doom-gameover-text"></span>
+        <button id="doom-retry-btn"></button>
+        <button id="doom-menu-btn"></button>
+    </div>
+    <div id="doom-victory" style="display:none;">
+        <span id="doom-victory-lives"></span>
+        <button id="doom-victory-btn"></button>
+    </div>
+    <button id="new-game-btn" style="display:none;"></button>
+    <button id="load-btn" style="display:none;"></button>
+    <button id="guide-btn" style="display:none;"></button>
+    <button id="tutorial-btn" style="display:none;"></button>
+
+    <!-- Audio elements -->
+    <audio id="medieval-music" loop>
+        <source src="https://upload.wikimedia.org/wikipedia/commons/a/a2/Bransle_simple.ogg" type="audio/ogg">
+    </audio>
+    <audio id="doom-music" loop>
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" type="audio/mpeg">
+    </audio>
+
+    <!-- Charger le moteur de jeu principal -->
+    <script src="game.js"></script>
+
+    <!-- Code specifique au debug -->
+    <script>
+        /**
+         * Page de debug pour tester les patterns DOOM
+         * Utilise game.js comme moteur et ajoute une couche de controle
+         */
+
+        // ============== ELEMENTS DEBUG ==============
+        const patternButtonsContainer = document.getElementById('pattern-buttons');
+        const currentPatternDisplay = document.getElementById('current-pattern');
+        const aiModeSelect = document.getElementById('ai-mode');
+        const aiSpeedInput = document.getElementById('ai-speed');
+        const fireRateInput = document.getElementById('fire-rate');
+        const pauseBtn = document.getElementById('pause-btn');
+        const clearBtn = document.getElementById('clear-btn');
+
+        // Stats
+        const statProjectiles = document.getElementById('stat-projectiles');
+        const statFps = document.getElementById('stat-fps');
+        const statPattern = document.getElementById('stat-pattern');
+        const statKingX = document.getElementById('stat-king-x');
+        const statKingY = document.getElementById('stat-king-y');
+
+        // Hitbox du roi (kingHitbox est deja declare dans game.js)
+        const kingCenterEl = document.getElementById('king-center');
+
+        // ============== ETAT DEBUG ==============
+        let debugPaused = false;
+        let aiAngle = 0;
+        let aiTargetX = kingX;
+        let aiTargetY = kingY;
+
+        // FPS counter
+        let frameCount = 0;
+        let lastFpsTime = Date.now();
+        let currentFps = 60;
+
+        // ============== PATTERNS ==============
+        const DEBUG_PATTERNS = [
+            { id: 'castle_siege', name: '🏰 Castle Siege', desc: 'Triple spirale + tir ciblé' },
+            { id: 'corners_dance', name: '📐 Corners Dance', desc: 'Burst radial massif' },
+            { id: 'stalker', name: '👁️ Stalker', desc: 'Mur de balles convergent' },
+            { id: 'cross_fire', name: '✝️ Cross Fire', desc: 'Croix tournante + laser' },
+            { id: 'orbit', name: '🌀 Orbit', desc: 'Double hélice spirale' },
+            { id: 'hell_rain', name: '🌧️ Hell Rain', desc: 'Pluie infernale massive' },
+            { id: 'diamond_hunt', name: '💎 Diamond Hunt', desc: 'Triple spirale + mur' },
+            { id: 'flower_bloom', name: '🌸 Flower Bloom', desc: 'Pétales en expansion' },
+            { id: 'laser_cage', name: '⚡ Laser Cage', desc: 'Cage de lasers' },
+            { id: 'chaos_spiral', name: '🌪️ Chaos Spiral', desc: 'Spirales imprévisibles' },
+            { id: 'wall_of_death', name: '🧱 Wall of Death', desc: 'Murs avec trous mouvants' },
+            { id: 'shotgun_burst', name: '💥 Shotgun Burst', desc: 'Rafales intenses' },
+            { id: 'galaxy_spin', name: '🌌 Galaxy Spin', desc: 'Galaxie multi-bras' }
+        ];
+
+        // Créer les boutons de pattern
+        DEBUG_PATTERNS.forEach(pattern => {
+            const btn = document.createElement('button');
+            btn.className = 'pattern-btn';
+            btn.innerHTML = `${pattern.name}<br><small style="color:#999">${pattern.desc}</small>`;
+            btn.dataset.pattern = pattern.id;
+            btn.addEventListener('click', () => selectDebugPattern(pattern.id));
+            patternButtonsContainer.appendChild(btn);
+        });
+
+        /**
+         * Sélectionne et active un pattern pour le debug
+         */
+        function selectDebugPattern(patternId) {
+            // Utiliser les variables de game.js
+            currentPattern = patternId;
+            doomMode = true;
+
+            // Mise à jour UI
+            document.querySelectorAll('#pattern-buttons .pattern-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.pattern === patternId);
+            });
+
+            const pattern = DEBUG_PATTERNS.find(p => p.id === patternId);
+            currentPatternDisplay.textContent = pattern ? pattern.name : patternId;
+            statPattern.textContent = patternId;
+
+            // Repositionner la reine au chateau
+            queenX = castleX - 35;
+            queenY = castleY - 35;
+        }
+
+        // ============== AI DU ROI ==============
+        function updateDebugKingAI() {
+            const mode = aiModeSelect.value;
+            const speed = parseInt(aiSpeedInput.value);
+            const margin = 80;
+            const gb = { width: container.offsetWidth, height: container.offsetHeight };
+
+            switch (mode) {
+                case 'random':
+                    if (Math.random() < 0.02) {
+                        aiTargetX = margin + Math.random() * (gb.width - margin * 2);
+                        aiTargetY = margin + Math.random() * (gb.height - margin * 2);
+                    }
+                    break;
+
+                case 'circle':
+                    aiAngle += 0.02 * speed;
+                    const radius = Math.min(gb.width, gb.height) * 0.35;
+                    aiTargetX = castleX + Math.cos(aiAngle) * radius;
+                    aiTargetY = castleY + Math.sin(aiAngle) * radius;
+                    break;
+
+                case 'dodge':
+                    let dodgeX = 0, dodgeY = 0;
+                    projectiles.forEach(p => {
+                        const dx = kingX - p.x;
+                        const dy = kingY - p.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                        if (dist < 150) {
+                            dodgeX += (dx / dist) * (150 - dist);
+                            dodgeY += (dy / dist) * (150 - dist);
+                        }
+                    });
+                    aiTargetX = kingX + dodgeX * 0.5;
+                    aiTargetY = kingY + dodgeY * 0.5;
+                    break;
+
+                case 'static':
+                    aiTargetX = kingX;
+                    aiTargetY = kingY;
+                    break;
+
+                case 'edges':
+                    aiAngle += 0.01 * speed;
+                    const phase = Math.floor(aiAngle / (Math.PI / 2)) % 4;
+                    switch (phase) {
+                        case 0: aiTargetX = gb.width - margin; aiTargetY = margin; break;
+                        case 1: aiTargetX = gb.width - margin; aiTargetY = gb.height - margin; break;
+                        case 2: aiTargetX = margin; aiTargetY = gb.height - margin; break;
+                        case 3: aiTargetX = margin; aiTargetY = margin; break;
+                    }
+                    break;
+            }
+
+            // Mouvement vers la cible
+            const dx = aiTargetX - kingX;
+            const dy = aiTargetY - kingY;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+            if (dist > 5) {
+                kingX += (dx / dist) * speed;
+                kingY += (dy / dist) * speed;
+            }
+
+            // Limites strictes du conteneur
+            const minX = 10;
+            const maxX = gb.width - 60;
+            const minY = 10;
+            const maxY = gb.height - 60;
+
+            kingX = Math.max(minX, Math.min(maxX, kingX));
+            kingY = Math.max(minY, Math.min(maxY, kingY));
+
+            king.style.left = kingX + 'px';
+            king.style.top = kingY + 'px';
+        }
+
+        /**
+         * Met a jour la position de la hitbox du roi pour le debug visuel
+         */
+        function updateDebugKingHitbox() {
+            const kingWidth = king.offsetWidth || 50;
+            const kingHeight = king.offsetHeight || 50;
+            const centerX = kingWidth / 2;
+            const centerY = kingHeight / 2 + HITBOX_VERTICAL_OFFSET;
+            const offsetX = centerX - HITBOX_SIZE / 2;
+            const offsetY = centerY - HITBOX_SIZE / 2;
+
+            kingHitbox.style.left = (kingX + offsetX) + 'px';
+            kingHitbox.style.top = (kingY + offsetY) + 'px';
+            kingHitbox.style.width = HITBOX_SIZE + 'px';
+            kingHitbox.style.height = HITBOX_SIZE + 'px';
+
+            // Point central rouge pour debug
+            kingCenterEl.style.left = (kingX + centerX - 3) + 'px';
+            kingCenterEl.style.top = (kingY + centerY - 3) + 'px';
+        }
+
+        // ============== BOUCLE DEBUG ==============
+        let lastDebugProjectileTime = 0;
+
+        function debugGameLoop() {
+            if (!debugPaused) {
+                // FPS
+                frameCount++;
+                const now = Date.now();
+                if (now - lastFpsTime >= 1000) {
+                    currentFps = frameCount;
+                    frameCount = 0;
+                    lastFpsTime = now;
+                }
+
+                // Tir - utilise fireDoomProjectiles de game.js
+                const fireRate = parseInt(fireRateInput.value);
+                if (currentPattern && now - lastDebugProjectileTime > fireRate) {
+                    fireDoomProjectiles();
+                    lastDebugProjectileTime = now;
+                }
+
+                // Mise à jour projectiles avec collision hitbox
+                const kingWidth = king.offsetWidth || 50;
+                const kingHeight = king.offsetHeight || 50;
+                const hitboxCenterX = kingX + kingWidth / 2;
+                const hitboxCenterY = kingY + kingHeight / 2 + HITBOX_VERTICAL_OFFSET;
+                const hitboxHalf = HITBOX_SIZE / 2;
+
+                for (let i = projectiles.length - 1; i >= 0; i--) {
+                    const p = projectiles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.element.style.left = p.x + 'px';
+                    p.element.style.top = p.y + 'px';
+
+                    // Collision avec la hitbox du roi
+                    if (p.x > hitboxCenterX - hitboxHalf && p.x < hitboxCenterX + hitboxHalf &&
+                        p.y > hitboxCenterY - hitboxHalf && p.y < hitboxCenterY + hitboxHalf) {
+                        p.element.remove();
+                        projectiles.splice(i, 1);
+                        continue;
+                    }
+
+                    // Hors ecran
+                    if (p.x < -50 || p.x > container.offsetWidth + 50 ||
+                        p.y < -50 || p.y > container.offsetHeight + 50) {
+                        p.element.remove();
+                        projectiles.splice(i, 1);
+                    }
+                }
+
+                // AI du roi
+                updateDebugKingAI();
+                updateDebugKingHitbox();
+
+                // Reine - s'assurer qu'elle reste dans les limites
+                const gb = { width: container.offsetWidth, height: container.offsetHeight };
+                queenX = Math.max(10, Math.min(gb.width - 80, queenX));
+                queenY = Math.max(10, Math.min(gb.height - 80, queenY));
+                queen.style.left = queenX + 'px';
+                queen.style.top = queenY + 'px';
+
+                // Stats
+                statProjectiles.textContent = projectiles.length;
+                statFps.textContent = currentFps;
+                statKingX.textContent = Math.round(kingX);
+                statKingY.textContent = Math.round(kingY);
+            }
+
+            requestAnimationFrame(debugGameLoop);
+        }
+
+        // ============== CONTROLES ==============
+        pauseBtn.addEventListener('click', () => {
+            debugPaused = !debugPaused;
+            pauseBtn.textContent = debugPaused ? '▶️ Play' : '⏸️ Pause';
+            document.body.classList.toggle('paused', debugPaused);
+        });
+
+        clearBtn.addEventListener('click', () => {
+            clearProjectiles();
+        });
+
+        // Touche Espace pour pause
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                pauseBtn.click();
+            }
+        });
+
+        // ============== INIT ==============
+        function initDebug() {
+            const gb = { width: container.offsetWidth, height: container.offsetHeight };
+
+            // Initialiser les positions
+            kingX = gb.width / 2 - 25;
+            kingY = gb.height - 150;
+            queenX = castleX - 35;
+            queenY = castleY - 35;
+            aiTargetX = kingX;
+            aiTargetY = kingY;
+
+            king.style.left = kingX + 'px';
+            king.style.top = kingY + 'px';
+            queen.style.left = queenX + 'px';
+            queen.style.top = queenY + 'px';
+            queen.textContent = '👿';
+
+            // Initialiser la hitbox
+            updateDebugKingHitbox();
+
+            // Activer le mode DOOM pour que fireDoomProjectiles fonctionne
+            doomMode = true;
+
+            console.log('🔧 Debug patterns prêt - Sélectionnez un pattern pour commencer');
+        }
+
+        // Attendre que le layout soit calculé
+        setTimeout(initDebug, 100);
+
+        // Lancer la boucle debug
+        debugGameLoop();
+    </script>
+</body>
+</html>

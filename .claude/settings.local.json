@@ -3,7 +3,8 @@
     "allow": [
       "Bash(dir:*)",
       "Bash(node --check:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(ls:*)"
     ]
   }
 }

@@ -1,3 +1,8 @@
+/**
+ * CSS optimisé pour la version Canvas
+ * Moins d'éléments DOM = meilleures performances
+ */
+
 * {
     margin: 0;
     padding: 0;
@@ -6,17 +11,52 @@
 
 body {
     overflow: hidden;
-    background: linear-gradient(to bottom, #150830 0%, #220e45 30%, #2d1560 60%, #0a1025 100%);
+    background: #0a0a2e;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-#game-container {
+/* ============== CANVAS ============== */
+
+#game-canvas {
     position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: linear-gradient(to bottom, #150830 0%, #220e45 30%, #2d1560 60%, #0a1025 100%);
+    display: none;
+    cursor: default;
+}
+
+/* ============== UI OVERLAY ============== */
+
+#ui-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+#ui-overlay > * {
+    pointer-events: auto;
+}
+
+/* ============== HUD DU JEU ============== */
+
+#game-hud {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+}
+
+#game-hud > * {
+    pointer-events: auto;
 }
 
 #score {
@@ -26,83 +66,67 @@ body {
     transform: translateX(-50%);
     font-size: 32px;
     color: #ffd700;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-    z-index: 100;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
     background: rgba(0,0,0,0.3);
     padding: 10px 30px;
     border-radius: 20px;
 }
 
-#king {
-    position: absolute;
-    font-size: 50px;
-    user-select: none;
-    transition: transform 0.1s;
-    filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));
-    z-index: 10;
-}
-
-#king-hitbox {
-    position: absolute;
-    border: 2px solid #00ff00;
-    background: rgba(0, 255, 0, 0.2);
-    z-index: 11;
-    pointer-events: none;
-    border-radius: 2px;
-    box-shadow: 0 0 8px rgba(0, 255, 0, 0.5);
-}
-
-#queen {
-    position: absolute;
-    font-size: 50px;
-    user-select: none;
-    filter: drop-shadow(0 0 15px #ff69b4);
-    z-index: 9;
-    transition: all 0.3s ease;
-}
-
-#house {
-    position: absolute;
-    font-size: 120px;
-    user-select: none;
-    filter: drop-shadow(3px 3px 6px rgba(0,0,0,0.7));
-    z-index: 5;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-}
-
-.diamond {
-    position: absolute;
-    font-size: 35px;
-    animation: sparkle 1s ease-in-out infinite;
-    filter: drop-shadow(0 0 10px #00bfff);
-    user-select: none;
-}
-
-@keyframes sparkle {
-    0%, 100% { transform: scale(1) rotate(0deg); }
-    50% { transform: scale(1.2) rotate(10deg); }
-}
-
-.collected {
-    animation: collect 0.3s ease-out forwards;
-}
-
-@keyframes collect {
-    0% { transform: scale(1); opacity: 1; }
-    100% { transform: scale(2); opacity: 0; }
-}
-
-#instructions {
+#difficulty {
     position: fixed;
-    bottom: 20px;
+    top: 70px;
     left: 50%;
     transform: translateX(-50%);
-    color: #aaa;
-    font-size: 16px;
-    text-align: center;
-    z-index: 100;
+    font-size: 18px;
+    padding: 5px 20px;
+    border-radius: 15px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    transition: all 0.5s ease;
+}
+
+.diff-easy {
+    background: rgba(0, 255, 0, 0.3);
+    color: #00ff00;
+    border: 2px solid #00ff00;
+}
+
+.diff-medium {
+    background: rgba(255, 255, 0, 0.3);
+    color: #ffff00;
+    border: 2px solid #ffff00;
+}
+
+.diff-hard {
+    background: rgba(255, 165, 0, 0.3);
+    color: #ffa500;
+    border: 2px solid #ffa500;
+}
+
+.diff-extreme {
+    background: rgba(255, 0, 0, 0.3);
+    color: #ff0000;
+    border: 2px solid #ff0000;
+    animation: extremePulse 0.5s ease-in-out infinite;
+}
+
+.diff-doom {
+    background: rgba(128, 0, 128, 0.5);
+    color: #ff00ff;
+    border: 2px solid #ff00ff;
+    animation: doomPulse 0.3s ease-in-out infinite;
+    text-shadow: 0 0 10px #ff00ff, 0 0 20px #ff0000;
+}
+
+@keyframes extremePulse {
+    0%, 100% { transform: translateX(-50%) scale(1); }
+    50% { transform: translateX(-50%) scale(1.1); }
+}
+
+@keyframes doomPulse {
+    0%, 100% { transform: translateX(-50%) scale(1); box-shadow: 0 0 20px #ff00ff; }
+    50% { transform: translateX(-50%) scale(1.15); box-shadow: 0 0 40px #ff0000; }
 }
 
 #music-btn, #save-btn {
@@ -115,7 +139,6 @@ body {
     border: 2px solid #ffd700;
     border-radius: 10px;
     cursor: pointer;
-    z-index: 100;
 }
 
 #music-btn {
@@ -130,7 +153,123 @@ body {
     background: rgba(139, 69, 19, 1);
 }
 
-/* Page de garde */
+/* ============== MODE DOOM UI ============== */
+
+#doom-timer {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 48px;
+    color: #ff0000;
+    text-shadow: 0 0 20px #ff0000, 0 0 40px #8b0000;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px 40px;
+    border-radius: 20px;
+    border: 3px solid #ff0000;
+    animation: timerPulse 1s ease-in-out infinite;
+    display: none;
+}
+
+#doom-timer.active {
+    display: block;
+}
+
+@keyframes timerPulse {
+    0%, 100% { box-shadow: 0 0 20px #ff0000; }
+    50% { box-shadow: 0 0 40px #ff4500, 0 0 60px #ff0000; }
+}
+
+#doom-lives {
+    position: fixed;
+    top: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 36px;
+    display: none;
+}
+
+#doom-lives.active {
+    display: flex;
+    gap: 10px;
+}
+
+.life-heart {
+    animation: heartBeat 1s ease-in-out infinite;
+    filter: drop-shadow(0 0 10px #ff0000);
+}
+
+.life-heart.lost {
+    filter: grayscale(1) opacity(0.3);
+    animation: none;
+}
+
+@keyframes heartBeat {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+}
+
+#doom-announcement {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 500;
+    text-align: center;
+    display: none;
+    pointer-events: none;
+}
+
+#doom-announcement.active {
+    display: block;
+    animation: announceIn 0.5s ease-out;
+}
+
+@keyframes announceIn {
+    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+    50% { transform: translate(-50%, -50%) scale(1.2); }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+#doom-announcement h1 {
+    font-size: 80px;
+    color: #ff0000;
+    text-shadow: 0 0 30px #ff0000, 0 0 60px #8b0000, 0 0 90px #ff4500;
+    animation: doomTitle 0.3s ease-in-out infinite;
+}
+
+@keyframes doomTitle {
+    0%, 100% { transform: scale(1) rotate(-1deg); }
+    50% { transform: scale(1.05) rotate(1deg); }
+}
+
+#doom-announcement p {
+    font-size: 32px;
+    color: #ff6600;
+    text-shadow: 0 0 20px #ff6600;
+    margin-top: 20px;
+}
+
+#pattern-indicator {
+    position: fixed;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 20px;
+    color: #ff00ff;
+    text-shadow: 0 0 10px #ff00ff;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 5px 20px;
+    border-radius: 10px;
+    display: none;
+}
+
+#pattern-indicator.active {
+    display: block;
+}
+
+/* ============== MENU PRINCIPAL ============== */
+
 #menu-screen {
     position: fixed;
     top: 0;
@@ -156,14 +295,6 @@ body {
 @keyframes twinkle {
     0%, 100% { opacity: 0.3; transform: scale(1); }
     50% { opacity: 1; transform: scale(1.3); }
-}
-
-.star:nth-child(odd) {
-    animation-delay: 0.5s;
-}
-
-.star:nth-child(3n) {
-    animation-delay: 1s;
 }
 
 .moon {
@@ -209,7 +340,8 @@ body {
     box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
 }
 
-/* Guide du jeu */
+/* ============== GUIDE ============== */
+
 #guide-screen {
     position: fixed;
     top: 0;
@@ -252,53 +384,8 @@ body {
     margin-right: 10px;
 }
 
-/* Ecran de victoire */
-#victory-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: linear-gradient(to bottom, #1a0a2e 0%, #3a1a5e 50%, #5a2a8e 100%);
-    display: none;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    z-index: 2000;
-}
+/* ============== TUTORIEL ============== */
 
-#victory-screen h1 {
-    font-size: 80px;
-    color: #ffd700;
-    text-shadow: 0 0 30px #ffd700, 0 0 60px #ff6600;
-    margin-bottom: 20px;
-    animation: victoryPulse 1s ease-in-out infinite;
-}
-
-@keyframes victoryPulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.1); }
-}
-
-#victory-screen p {
-    font-size: 32px;
-    color: #fff;
-    margin-bottom: 40px;
-}
-
-.confetti {
-    position: absolute;
-    width: 10px;
-    height: 10px;
-    animation: fall 3s linear infinite;
-}
-
-@keyframes fall {
-    0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
-    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
-}
-
-/* Tutoriel interactif */
 #tutorial-screen {
     position: fixed;
     top: 0;
@@ -353,7 +440,7 @@ body {
     margin-bottom: 30px;
 }
 
-#tutorial-demo .demo-emoji {
+.demo-emoji {
     font-size: 60px;
     margin: 0 20px;
     animation: bounce 1s ease-in-out infinite;
@@ -364,14 +451,14 @@ body {
     50% { transform: translateY(-15px); }
 }
 
-#tutorial-demo .keys {
+.keys {
     display: flex;
     gap: 5px;
     flex-direction: column;
     align-items: center;
 }
 
-#tutorial-demo .key {
+.key {
     background: linear-gradient(180deg, #555 0%, #333 100%);
     border: 2px solid #888;
     border-radius: 8px;
@@ -382,7 +469,7 @@ body {
     box-shadow: 0 4px 0 #222;
 }
 
-#tutorial-demo .keys-row {
+.keys-row {
     display: flex;
     gap: 5px;
 }
@@ -423,350 +510,44 @@ body {
     50% { opacity: 0.6; transform: scale(1.2); }
 }
 
-/* Bulles de BD */
-.speech-bubble {
-    position: absolute;
-    background: white;
-    border-radius: 15px;
-    padding: 10px 15px;
-    font-size: 14px;
-    font-weight: bold;
-    max-width: 150px;
-    text-align: center;
-    z-index: 100;
-    opacity: 0;
-    transform: scale(0);
-    transition: all 0.3s ease;
-    box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
-}
+/* ============== ÉCRANS DE FIN ============== */
 
-.speech-bubble.show {
-    opacity: 1;
-    transform: scale(1);
-}
-
-.speech-bubble::after {
-    content: '';
-    position: absolute;
-    bottom: -10px;
-    left: 20px;
-    border-width: 10px 10px 0;
-    border-style: solid;
-    border-color: white transparent transparent transparent;
-}
-
-#king-bubble {
-    color: #8b4513;
-}
-
-#queen-bubble {
-    color: #ff1493;
-}
-
-#queen-bubble::after {
-    left: auto;
-    right: 20px;
-}
-
-@keyframes bubblePop {
-    0% { transform: scale(0); opacity: 0; }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(1); opacity: 1; }
-}
-
-.speech-bubble.pop {
-    animation: bubblePop 0.4s ease forwards;
-}
-
-/* Projectiles de la reine */
-.projectile {
-    position: absolute;
-    font-size: 20px;
-    z-index: 8;
-    pointer-events: none;
-    filter: drop-shadow(0 0 8px #ff1493);
-}
-
-/* Indicateur de difficulte */
-#difficulty {
-    position: fixed;
-    top: 70px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 18px;
-    padding: 5px 20px;
-    border-radius: 15px;
-    z-index: 100;
-    font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    transition: all 0.5s ease;
-}
-
-.diff-easy {
-    background: rgba(0, 255, 0, 0.3);
-    color: #00ff00;
-    border: 2px solid #00ff00;
-}
-
-.diff-medium {
-    background: rgba(255, 255, 0, 0.3);
-    color: #ffff00;
-    border: 2px solid #ffff00;
-}
-
-.diff-hard {
-    background: rgba(255, 165, 0, 0.3);
-    color: #ffa500;
-    border: 2px solid #ffa500;
-}
-
-.diff-extreme {
-    background: rgba(255, 0, 0, 0.3);
-    color: #ff0000;
-    border: 2px solid #ff0000;
-    animation: extremePulse 0.5s ease-in-out infinite;
-}
-
-.diff-doom {
-    background: rgba(128, 0, 128, 0.5);
-    color: #ff00ff;
-    border: 2px solid #ff00ff;
-    animation: doomPulse 0.3s ease-in-out infinite;
-    text-shadow: 0 0 10px #ff00ff, 0 0 20px #ff0000;
-}
-
-@keyframes extremePulse {
-    0%, 100% { transform: translateX(-50%) scale(1); }
-    50% { transform: translateX(-50%) scale(1.1); }
-}
-
-@keyframes doomPulse {
-    0%, 100% { transform: translateX(-50%) scale(1); box-shadow: 0 0 20px #ff00ff; }
-    50% { transform: translateX(-50%) scale(1.15); box-shadow: 0 0 40px #ff0000; }
-}
-
-.queen-rage {
-    animation: queenRage 0.2s ease-in-out infinite;
-}
-
-@keyframes queenRage {
-    0%, 100% { filter: drop-shadow(0 0 15px #ff69b4); }
-    50% { filter: drop-shadow(0 0 30px #ff0000) brightness(1.5); }
-}
-
-.queen-doom {
-    animation: queenDoom 0.1s ease-in-out infinite;
-}
-
-@keyframes queenDoom {
-    0%, 100% { filter: drop-shadow(0 0 20px #ff00ff) brightness(1.2); transform: scale(1); }
-    25% { filter: drop-shadow(0 0 40px #ff0000) brightness(2); transform: scale(1.1); }
-    50% { filter: drop-shadow(0 0 30px #00ffff) brightness(1.5); transform: scale(1.05); }
-    75% { filter: drop-shadow(0 0 35px #ffff00) brightness(1.8); transform: scale(1.08); }
-}
-
-/* ============== MODE DOOM OF HELL ============== */
-
-/* Animation de transformation de la reine en demon */
-.queen-transforming {
-    animation: queenTransform 0.5s ease-in-out forwards;
-}
-
-@keyframes queenTransform {
-    0% {
-        transform: scale(1) rotate(0deg);
-        filter: drop-shadow(0 0 15px #ff69b4);
-    }
-    50% {
-        transform: scale(1.5) rotate(180deg);
-        filter: drop-shadow(0 0 40px #ff0000) brightness(2);
-    }
-    100% {
-        transform: scale(1.2) rotate(360deg);
-        filter: drop-shadow(0 0 30px #ff0000);
-    }
-}
-
-/* Transformation demon de la reine */
-.queen-demon {
-    font-size: 70px !important;
-    animation: demonFloat 2s ease-in-out infinite, demonGlow 0.5s ease-in-out infinite;
-}
-
-@keyframes demonFloat {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-20px); }
-}
-
-@keyframes demonGlow {
-    0%, 100% { filter: drop-shadow(0 0 30px #ff0000) drop-shadow(0 0 60px #8b0000); }
-    50% { filter: drop-shadow(0 0 50px #ff4500) drop-shadow(0 0 100px #dc143c) brightness(1.3); }
-}
-
-/* Container mode DOOM */
-#game-container.doom-mode {
-    background: linear-gradient(to bottom, #1a0000 0%, #2d0a0a 30%, #3d1515 60%, #0a0505 100%);
-    animation: doomBackground 3s ease-in-out infinite;
-}
-
-@keyframes doomBackground {
-    0%, 100% { filter: brightness(1); }
-    50% { filter: brightness(0.8) sepia(0.2); }
-}
-
-/* Timer de survie */
-#doom-timer {
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 48px;
-    color: #ff0000;
-    text-shadow: 0 0 20px #ff0000, 0 0 40px #8b0000;
-    z-index: 100;
-    background: rgba(0, 0, 0, 0.7);
-    padding: 10px 40px;
-    border-radius: 20px;
-    border: 3px solid #ff0000;
-    animation: timerPulse 1s ease-in-out infinite;
-    display: none;
-}
-
-#doom-timer.active {
-    display: block;
-}
-
-@keyframes timerPulse {
-    0%, 100% { box-shadow: 0 0 20px #ff0000; }
-    50% { box-shadow: 0 0 40px #ff4500, 0 0 60px #ff0000; }
-}
-
-/* Indicateur de vies */
-#doom-lives {
-    position: fixed;
-    top: 90px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 36px;
-    z-index: 100;
-    display: none;
-}
-
-#doom-lives.active {
-    display: flex;
-    gap: 10px;
-}
-
-.life-heart {
-    animation: heartBeat 1s ease-in-out infinite;
-    filter: drop-shadow(0 0 10px #ff0000);
-}
-
-.life-heart.lost {
-    filter: grayscale(1) opacity(0.3);
-    animation: none;
-}
-
-@keyframes heartBeat {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.2); }
-}
-
-/* Annonce de phase DOOM */
-#doom-announcement {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 500;
-    text-align: center;
-    display: none;
-    pointer-events: none;
-}
-
-#doom-announcement.active {
-    display: block;
-    animation: announceIn 0.5s ease-out;
-}
-
-@keyframes announceIn {
-    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-    50% { transform: translate(-50%, -50%) scale(1.2); }
-    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-}
-
-#doom-announcement h1 {
-    font-size: 80px;
-    color: #ff0000;
-    text-shadow: 0 0 30px #ff0000, 0 0 60px #8b0000, 0 0 90px #ff4500;
-    animation: doomTitle 0.3s ease-in-out infinite;
-}
-
-@keyframes doomTitle {
-    0%, 100% { transform: scale(1) rotate(-1deg); }
-    50% { transform: scale(1.05) rotate(1deg); }
-}
-
-#doom-announcement p {
-    font-size: 32px;
-    color: #ff6600;
-    text-shadow: 0 0 20px #ff6600;
-    margin-top: 20px;
-}
-
-/* Indicateur de pattern */
-#pattern-indicator {
-    position: fixed;
-    bottom: 60px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 20px;
-    color: #ff00ff;
-    text-shadow: 0 0 10px #ff00ff;
-    z-index: 100;
-    background: rgba(0, 0, 0, 0.5);
-    padding: 5px 20px;
-    border-radius: 10px;
-    display: none;
-}
-
-#pattern-indicator.active {
-    display: block;
-}
-
-/* Effet de dash de la reine */
-.queen-dashing {
-    transition: none !important;
-}
-
-.queen-dashing::after {
-    content: '';
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, #ff0000, transparent);
-    animation: dashTrail 0.2s ease-out;
-}
-
-@keyframes dashTrail {
-    0% { opacity: 1; transform: scaleX(3); }
-    100% { opacity: 0; transform: scaleX(1); }
-}
-
-/* Ecran Game Over DOOM */
-#doom-gameover {
+#victory-screen, #doom-gameover, #doom-victory {
     position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: linear-gradient(to bottom, #0a0000 0%, #1a0505 50%, #0a0000 100%);
     display: none;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     z-index: 2000;
+}
+
+#victory-screen {
+    background: linear-gradient(to bottom, #1a0a2e 0%, #3a1a5e 50%, #5a2a8e 100%);
+}
+
+#doom-gameover {
+    background: linear-gradient(to bottom, #0a0000 0%, #1a0505 50%, #0a0000 100%);
+}
+
+#doom-victory {
+    background: linear-gradient(to bottom, #0a1a0a 0%, #1a3a1a 50%, #0a2a0a 100%);
+}
+
+#victory-screen h1 {
+    font-size: 80px;
+    color: #ffd700;
+    text-shadow: 0 0 30px #ffd700, 0 0 60px #ff6600;
+    margin-bottom: 20px;
+    animation: victoryPulse 1s ease-in-out infinite;
+}
+
+@keyframes victoryPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
 }
 
 #doom-gameover h1 {
@@ -782,27 +563,6 @@ body {
     75% { transform: translateX(5px); }
 }
 
-#doom-gameover p {
-    font-size: 36px;
-    color: #ff6600;
-    margin: 20px 0 40px;
-}
-
-/* Ecran Victoire DOOM */
-#doom-victory {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: linear-gradient(to bottom, #0a1a0a 0%, #1a3a1a 50%, #0a2a0a 100%);
-    display: none;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    z-index: 2000;
-}
-
 #doom-victory h1 {
     font-size: 80px;
     color: #00ff00;
@@ -815,76 +575,16 @@ body {
     50% { text-shadow: 0 0 50px #00ff00, 0 0 100px #00ff00, 0 0 150px #ffd700; }
 }
 
-#doom-victory p {
-    font-size: 36px;
-    color: #ffd700;
+#victory-screen p, #doom-gameover p, #doom-victory p {
+    font-size: 32px;
+    color: #fff;
     margin: 20px 0 40px;
 }
 
-/* Warning avant DOOM */
-#doom-warning {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(255, 0, 0, 0.3);
-    z-index: 400;
-    display: none;
-    pointer-events: none;
-    animation: warningFlash 0.5s ease-in-out infinite;
+#doom-gameover p {
+    color: #ff6600;
 }
 
-#doom-warning.active {
-    display: block;
-}
-
-@keyframes warningFlash {
-    0%, 100% { opacity: 0; }
-    50% { opacity: 1; }
-}
-
-/* Projectiles DOOM speciaux - Style Touhou */
-.projectile-doom {
-    font-size: 18px !important;
-    filter: drop-shadow(0 0 8px #ff0000) drop-shadow(0 0 15px #ff4500) !important;
-    animation: projectilePulse 0.15s ease-in-out infinite;
-}
-
-.projectile-skull {
-    font-size: 20px !important;
-    animation: skullSpin 0.3s linear infinite;
-    filter: drop-shadow(0 0 12px #8b0000) drop-shadow(0 0 25px #ff0000) !important;
-}
-
-@keyframes skullSpin {
-    0% { transform: rotate(0deg) scale(1); }
-    50% { transform: rotate(180deg) scale(1.1); }
-    100% { transform: rotate(360deg) scale(1); }
-}
-
-@keyframes projectilePulse {
-    0%, 100% { opacity: 0.9; }
-    50% { opacity: 1; filter: drop-shadow(0 0 12px #ff0000) drop-shadow(0 0 20px #ffff00) brightness(1.3) !important; }
-}
-
-/* Effet de trainee pour projectiles rapides */
-.projectile-doom::before {
-    content: '';
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    opacity: 0.4;
-    transform: translateX(-10px);
-}
-
-/* Chateau en mode DOOM */
-#house.doom-castle {
-    filter: drop-shadow(0 0 30px #ff0000) drop-shadow(0 0 60px #8b0000);
-    animation: castlePulse 2s ease-in-out infinite;
-}
-
-@keyframes castlePulse {
-    0%, 100% { filter: drop-shadow(0 0 30px #ff0000) drop-shadow(0 0 60px #8b0000); }
-    50% { filter: drop-shadow(0 0 50px #ff4500) drop-shadow(0 0 100px #dc143c); }
+#doom-victory p {
+    color: #ffd700;
 }
