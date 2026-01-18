@@ -4,7 +4,8 @@
       "Bash(dir:*)",
       "Bash(node --check:*)",
       "Bash(find:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(tree:*)"
     ]
   }
 }
