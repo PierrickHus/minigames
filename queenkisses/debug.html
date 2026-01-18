@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEBUG - Patterns DOOM</title>
+    <link rel="stylesheet" href="css/debug-styles.css">
+</head>
+<body>
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Panneau de contrôles -->
+    <div id="controls" class="debug-panel">
+        <h2>🎮 Contrôles</h2>
+
+        <div class="control-group">
+            <label for="pattern-select">Pattern actif:</label>
+            <select id="pattern-select"></select>
+        </div>
+
+        <div class="control-group">
+            <label for="king-ai">AI du Roi:</label>
+            <select id="king-ai">
+                <option value="random">Aléatoire</option>
+                <option value="circle">Cercle</option>
+                <option value="dodge">Esquive</option>
+                <option value="static">Statique</option>
+                <option value="edges">Coins</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label for="fire-rate">
+                Cadence de tir:
+                <span class="value-display" id="fire-rate-value">350ms</span>
+            </label>
+            <input type="range" id="fire-rate" min="100" max="1000" value="350" step="50">
+        </div>
+
+        <button id="clear-btn">🗑️ Effacer Projectiles</button>
+        <button id="reset-btn">🔄 Réinitialiser Positions</button>
+    </div>
+
+    <!-- Panneau de statistiques -->
+    <div id="stats" class="debug-panel">
+        <h2>📊 Statistiques</h2>
+
+        <div class="stat-row">
+            <span class="stat-label">Projectiles:</span>
+            <span class="stat-value" id="stat-projectiles">0</span>
+        </div>
+
+        <div class="stat-row">
+            <span class="stat-label">FPS:</span>
+            <span class="stat-value" id="stat-fps">60</span>
+        </div>
+
+        <div class="stat-row">
+            <span class="stat-label">King X:</span>
+            <span class="stat-value" id="stat-king-x">0</span>
+        </div>
+
+        <div class="stat-row">
+            <span class="stat-label">King Y:</span>
+            <span class="stat-value" id="stat-king-y">0</span>
+        </div>
+    </div>
+
+    <script type="module" src="src/debug/debug-game.js"></script>
+</body>
+</html>

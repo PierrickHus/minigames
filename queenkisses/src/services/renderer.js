@@ -1,7 +1,10 @@
 /**
  * Système de rendu Canvas optimisé pour le jeu
  * Gère tous les aspects visuels via Canvas 2D
+ * Utilise l'accélération matérielle et optimisations de performance
  */
+
+import { RENDERER_CONFIG } from '../data/config.js';
 
 export class Renderer {
     /**
@@ -10,7 +13,14 @@ export class Renderer {
      */
     constructor(canvas) {
         this.canvas = canvas;
-        this.ctx = canvas.getContext('2d', { alpha: false });
+
+        // Optimisations pour accélération matérielle
+        this.ctx = canvas.getContext('2d', {
+            alpha: RENDERER_CONFIG.ALPHA,
+            desynchronized: true, // Permet le rendu asynchrone (meilleures performances)
+            willReadFrequently: false // On ne lit pas les pixels souvent
+        });
+
         this.width = 0;
         this.height = 0;
 
@@ -20,6 +30,11 @@ export class Renderer {
         // Effets visuels
         this.particles = [];
         this.screenShake = { x: 0, y: 0, intensity: 0 };
+
+        // Optimisation CSS pour accélération matérielle
+        if (RENDERER_CONFIG.WILL_CHANGE) {
+            this.canvas.style.willChange = 'transform';
+        }
 
         this.resize();
         window.addEventListener('resize', () => this.resize());
