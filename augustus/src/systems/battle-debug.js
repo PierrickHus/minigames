@@ -7,6 +7,48 @@
 const STORAGE_KEY = 'augustus_battle_debug';
 
 /**
+ * Configuration des seuils de fatigue pour l'affichage visuel
+ * Les couleurs changent selon le niveau de fatigue du soldat
+ */
+const FATIGUE_THRESHOLDS = {
+    low: 30,       // Vert (0-30%)
+    medium: 60,    // Jaune (30-60%)
+    high: 80       // Orange (60-80%), Rouge (80-100%)
+};
+
+/**
+ * Couleurs associees aux niveaux de fatigue
+ */
+const FATIGUE_COLORS = {
+    low: '#00ff00',      // Vert
+    medium: '#ffff00',   // Jaune
+    high: '#ff8800',     // Orange
+    critical: '#ff0000'  // Rouge
+};
+
+/**
+ * Configuration des couleurs d'encerclement selon le nombre d'attaquants
+ */
+const ENCIRCLEMENT_COLORS = {
+    2: 'rgba(255, 255, 0, 0.3)',   // Jaune
+    3: 'rgba(255, 165, 0, 0.4)',   // Orange
+    4: 'rgba(255, 0, 0, 0.5)'      // Rouge (4+)
+};
+
+/**
+ * Dimensions pour les indicateurs visuels de debug
+ */
+const DEBUG_VISUAL_CONFIG = {
+    fatigueBarWidth: 10,
+    fatigueBarHeight: 2,
+    fatigueBarOffsetY: 12,
+    encirclementRadius: 12,
+    chargeLineColor: '#ff8800',
+    abilityIconOffsetX: 10,
+    abilityIconOffsetY: -5
+};
+
+/**
  * Options de debug par défaut
  */
 const DEFAULT_DEBUG_OPTIONS = {
@@ -19,7 +61,11 @@ const DEFAULT_DEBUG_OPTIONS = {
     showFormationState: false,
     showDamageNumbers: false,
     showCollisionRadius: false,
-    showFormationGrid: false
+    showFormationGrid: false,
+    showFatigue: false,
+    showAbilities: false,
+    showEncirclement: false,
+    showCharge: false
 };
 
 /**
@@ -134,7 +180,11 @@ class BattleDebugManager {
             { key: 'showFormationGrid', label: '📐 Grille formations', section: 'formations' },
             { key: 'showFallbackMode', label: '⭕ Mode fallback (ronds)', section: 'rendering' },
             { key: 'showDamageNumbers', label: '💥 Nombres de dégâts', section: 'combat' },
-            { key: 'showCollisionRadius', label: '🔵 Rayon collision', section: 'combat' }
+            { key: 'showCollisionRadius', label: '🔵 Rayon collision', section: 'combat' },
+            { key: 'showFatigue', label: '😰 Fatigue soldats', section: 'combat' },
+            { key: 'showAbilities', label: '✨ Abilities actives', section: 'combat' },
+            { key: 'showEncirclement', label: '🔄 Encerclement', section: 'combat' },
+            { key: 'showCharge', label: '🐴 Trajectoire charge', section: 'combat' }
         ];
 
         let currentSection = '';
@@ -339,6 +389,26 @@ class BattleDebugManager {
                 // Rayon de collision
                 if (this.options.showCollisionRadius) {
                     this.renderCollisionRadius(ctx, soldier);
+                }
+
+                // Fatigue
+                if (this.options.showFatigue) {
+                    this.renderSoldierFatigue(ctx, soldier);
+                }
+
+                // Abilities actives
+                if (this.options.showAbilities) {
+                    this.renderSoldierAbilities(ctx, soldier);
+                }
+
+                // Encerclement
+                if (this.options.showEncirclement) {
+                    this.renderEncirclement(ctx, soldier);
+                }
+
+                // Trajectoire de charge
+                if (this.options.showCharge) {
+                    this.renderChargeTrajectory(ctx, soldier);
                 }
             }
 
@@ -649,6 +719,10 @@ class BattleDebugManager {
                     color = '#aaa';
                     text = 'Miss';
                     break;
+                case 'charge':
+                    color = '#f80';
+                    text = `⚔${dn.damage}`;
+                    break;
                 default:
                     color = '#f00';
                     text = `-${dn.damage}`;
@@ -661,6 +735,182 @@ class BattleDebugManager {
 
             ctx.globalAlpha = 1;
         }
+    }
+
+    /**
+     * Affiche la barre de fatigue d'un soldat
+     * La couleur varie selon le niveau: vert (0-30), jaune (30-60), orange (60-80), rouge (80-100)
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu canvas
+     * @param {Object} soldier - Le soldat dont on affiche la fatigue
+     */
+    renderSoldierFatigue(ctx, soldier) {
+        const fatigue = soldier.fatigue || 0;
+        const fatiguePercent = fatigue / 100;
+
+        const barWidth = DEBUG_VISUAL_CONFIG.fatigueBarWidth;
+        const barHeight = DEBUG_VISUAL_CONFIG.fatigueBarHeight;
+        const x = soldier.x - barWidth / 2;
+        const y = soldier.y + DEBUG_VISUAL_CONFIG.fatigueBarOffsetY;
+
+        // Fond de la barre
+        ctx.fillStyle = '#333';
+        ctx.fillRect(x, y, barWidth, barHeight);
+
+        // Couleur selon le niveau de fatigue
+        let color;
+        if (fatigue < FATIGUE_THRESHOLDS.low) {
+            color = FATIGUE_COLORS.low;
+        } else if (fatigue < FATIGUE_THRESHOLDS.medium) {
+            color = FATIGUE_COLORS.medium;
+        } else if (fatigue < FATIGUE_THRESHOLDS.high) {
+            color = FATIGUE_COLORS.high;
+        } else {
+            color = FATIGUE_COLORS.critical;
+        }
+
+        // Barre de fatigue
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, barWidth * fatiguePercent, barHeight);
+    }
+
+    /**
+     * Affiche les icones des abilities actives pour un soldat
+     * Chaque ability active est representee par une petite icone a cote du soldat
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu canvas
+     * @param {Object} soldier - Le soldat dont on affiche les abilities
+     */
+    renderSoldierAbilities(ctx, soldier) {
+        const abilities = soldier.abilities;
+        if (!abilities) return;
+
+        const unit = soldier.unit;
+        const baseX = soldier.x + DEBUG_VISUAL_CONFIG.abilityIconOffsetX;
+        const baseY = soldier.y + DEBUG_VISUAL_CONFIG.abilityIconOffsetY;
+        let iconIndex = 0;
+
+        ctx.font = '8px Arial';
+        ctx.textAlign = 'left';
+
+        // Pilum lance (epuise)
+        if (abilities.pilumThrown) {
+            ctx.fillStyle = '#888888';
+            ctx.fillText('🗡', baseX + (iconIndex * 10), baseY);
+            iconIndex++;
+        }
+
+        // Warcry actif (pulse anime)
+        if (abilities.warcryActive) {
+            const pulse = 0.7 + Math.sin(performance.now() / 200) * 0.3;
+            ctx.globalAlpha = pulse;
+            ctx.fillStyle = '#ffff00';
+            ctx.fillText('📢', baseX + (iconIndex * 10), baseY);
+            ctx.globalAlpha = 1;
+            iconIndex++;
+        }
+
+        // Berserk actif
+        if (abilities.berserkActive) {
+            ctx.fillStyle = '#ff0000';
+            ctx.fillText('😤', baseX + (iconIndex * 10), baseY);
+            iconIndex++;
+        }
+
+        // Testudo actif (niveau unite)
+        if (unit?.activeAbilities?.testudo) {
+            ctx.fillStyle = '#0088ff';
+            ctx.fillText('🐢', baseX + (iconIndex * 10), baseY);
+            iconIndex++;
+        }
+
+        // Phalanx actif (niveau unite)
+        if (unit?.activeAbilities?.phalanx) {
+            ctx.fillStyle = '#8800ff';
+            ctx.fillText('🔱', baseX + (iconIndex * 10), baseY);
+            iconIndex++;
+        }
+    }
+
+    /**
+     * Affiche un cercle d'encerclement autour d'un soldat attaque par plusieurs ennemis
+     * La couleur et l'opacite varient selon le nombre d'attaquants
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu canvas
+     * @param {Object} soldier - Le soldat potentiellement encercle
+     */
+    renderEncirclement(ctx, soldier) {
+        const engagedCount = soldier.engagedWith?.length || 0;
+
+        if (engagedCount < 2) return;
+
+        // Selectionner la couleur selon le nombre d'attaquants
+        let color;
+        if (engagedCount === 2) {
+            color = ENCIRCLEMENT_COLORS[2];
+        } else if (engagedCount === 3) {
+            color = ENCIRCLEMENT_COLORS[3];
+        } else {
+            color = ENCIRCLEMENT_COLORS[4];
+        }
+
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = 2;
+
+        ctx.beginPath();
+        ctx.arc(soldier.x, soldier.y, DEBUG_VISUAL_CONFIG.encirclementRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    /**
+     * Affiche la trajectoire de charge d'un soldat en train de charger
+     * Dessine une ligne pointillee de la position de depart a la position actuelle
+     * avec une fleche indiquant la direction
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu canvas
+     * @param {Object} soldier - Le soldat en charge
+     */
+    renderChargeTrajectory(ctx, soldier) {
+        if (!soldier.isCharging || !soldier.chargeStartPos) return;
+
+        const startX = soldier.chargeStartPos.x;
+        const startY = soldier.chargeStartPos.y;
+        const endX = soldier.x;
+        const endY = soldier.y;
+
+        // Ligne pointillee de la position de depart a la position actuelle
+        ctx.strokeStyle = DEBUG_VISUAL_CONFIG.chargeLineColor;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 3]);
+
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+
+        ctx.setLineDash([]);
+
+        // Fleche au bout indiquant la direction
+        const angle = Math.atan2(endY - startY, endX - startX);
+        const arrowSize = 6;
+
+        ctx.fillStyle = DEBUG_VISUAL_CONFIG.chargeLineColor;
+        ctx.beginPath();
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(
+            endX - Math.cos(angle - 0.4) * arrowSize,
+            endY - Math.sin(angle - 0.4) * arrowSize
+        );
+        ctx.lineTo(
+            endX - Math.cos(angle + 0.4) * arrowSize,
+            endY - Math.sin(angle + 0.4) * arrowSize
+        );
+        ctx.closePath();
+        ctx.fill();
+
+        // Point de depart (cercle)
+        ctx.fillStyle = '#ffaa00';
+        ctx.beginPath();
+        ctx.arc(startX, startY, 3, 0, Math.PI * 2);
+        ctx.fill();
     }
 
     /**

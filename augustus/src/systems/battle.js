@@ -347,10 +347,12 @@ class BattleSystem {
             for (const unit of this.attackerUnits) {
                 unit.facing = 0; // Face à droite
                 this.soldierManager.createSoldiersForUnit(unit, this.formationSystem);
+                this.soldierManager.initializeAbilitiesForUnit(unit);
             }
             for (const unit of this.defenderUnits) {
                 unit.facing = Math.PI; // Face à gauche
                 this.soldierManager.createSoldiersForUnit(unit, this.formationSystem);
+                this.soldierManager.initializeAbilitiesForUnit(unit);
             }
         }
     }
@@ -1108,8 +1110,6 @@ class BattleSystem {
         allUnits.forEach(unit => {
             if (unit.currentMen <= 0) return;
 
-            unit.cooldown = Math.max(0, unit.cooldown - dt);
-
             // IA automatique - UNIQUEMENT pour les unités ennemies
             // Les unités du joueur ne doivent PAS attaquer automatiquement
             const isPlayerUnit = unit.faction === this.game.playerFaction;
@@ -1212,12 +1212,6 @@ class BattleSystem {
                     if (this.useNewSystem && this.soldierManager) {
                         this.soldierManager.updateSoldierTargetPositions(unit, this.formationSystem);
                     }
-
-                    // Peut quand même tirer en reculant
-                    if (unit.cooldown <= 0) {
-                        this.attack(unit, unit.target);
-                        unit.cooldown = 60;
-                    }
                 } else {
                     // À bonne portée pour le combat
                     // Pour le corps à corps, continuer à avancer légèrement pour maintenir la pression
@@ -1230,66 +1224,9 @@ class BattleSystem {
                             this.soldierManager.updateSoldierTargetPositions(unit, this.formationSystem);
                         }
                     }
-
-                    if (unit.cooldown <= 0) {
-                        this.attack(unit, unit.target);
-                        unit.cooldown = 60;
-                    }
                 }
             }
         });
-    }
-
-    /**
-     * Effectue une attaque
-     */
-    attack(attacker, defender) {
-        if (this.useNewSystem && this.combatCalculator) {
-            // Nouveau système de combat
-            const result = this.combatCalculator.calculateDamage(attacker, defender);
-
-            // Gérer les réactions des soldats de bordure
-            this.combatCalculator.handleBorderSoldierReaction(defender, attacker, result.attackDirection);
-
-            // Appliquer les pertes
-            const killedIndices = this.combatCalculator.distributeCasualties(defender, result.casualties);
-
-            // Réorganiser la formation
-            if (killedIndices.length > 0 && this.formationSystem) {
-                this.formationSystem.repositionAfterCasualties(defender, killedIndices);
-            }
-
-            // Dégâts au moral
-            defender.morale -= result.moraleDamage;
-
-            // Déclencher animation d'attaque sur les soldats de front
-            if (this.soldierManager) {
-                this.soldierManager.triggerAttackAnimation(attacker, defender, 1);
-            }
-
-            // Tir à distance: créer des projectiles
-            const isRanged = attacker.type === 'ranged' || attacker.type === 'skirmisher';
-            if (isRanged && this.projectileSystem) {
-                this.projectileSystem.createVolley(attacker, defender);
-            }
-
-            // Vérifier routing
-            if (this.combatCalculator.shouldRout(defender)) {
-                defender.state = 'routing';
-            }
-        } else {
-            // Ancien système (fallback)
-            const attackPower = attacker.stats.attack * (attacker.currentMen / attacker.men);
-            const defensePower = defender.stats.defense + defender.stats.armor;
-            const damage = Math.max(1, Math.floor((attackPower - defensePower * 0.5) * (0.8 + Math.random() * 0.4)));
-
-            defender.currentMen = Math.max(0, defender.currentMen - damage);
-
-            defender.morale -= damage * 0.5;
-            if (defender.morale < 20 && Math.random() < 0.3) {
-                defender.state = 'routing';
-            }
-        }
     }
 
     /**
@@ -1760,6 +1697,49 @@ class BattleSystem {
                 ctx.font = '16px Arial';
                 ctx.fillText('💨', bbox.maxX + 5, bbox.minY);
             }
+
+            // Indicateurs d'abilities d'unite actives (hors-debug)
+            this.renderUnitAbilityIndicators(ctx, unit, bbox);
+        }
+    }
+
+    /**
+     * Affiche les indicateurs visuels des abilities d'unite actives
+     * Ces indicateurs sont visibles en permanence, pas seulement en mode debug
+     * @param {CanvasRenderingContext2D} ctx - Contexte de rendu canvas
+     * @param {Object} unit - L'unite dont on affiche les abilities
+     * @param {Object} bbox - Bounding box de l'unite {minX, minY, maxX, maxY, centerX, centerY}
+     */
+    renderUnitAbilityIndicators(ctx, unit, bbox) {
+        if (!unit.activeAbilities) return;
+
+        const indicators = [];
+
+        if (unit.activeAbilities.testudo) {
+            indicators.push({ icon: '🐢', color: '#0088ff' });
+        }
+
+        if (unit.activeAbilities.phalanx) {
+            indicators.push({ icon: '🔱', color: '#8800ff' });
+        }
+
+        if (indicators.length === 0) return;
+
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+
+        const indicatorSpacing = 18;
+        const startX = bbox.centerX - ((indicators.length - 1) * indicatorSpacing / 2);
+        const indicatorY = bbox.minY - 8;
+
+        for (let i = 0; i < indicators.length; i++) {
+            const indicator = indicators[i];
+            const x = startX + (i * indicatorSpacing);
+
+            ctx.fillStyle = '#000';
+            ctx.fillText(indicator.icon, x + 1, indicatorY + 1);
+            ctx.fillStyle = indicator.color;
+            ctx.fillText(indicator.icon, x, indicatorY);
         }
     }
 
@@ -2007,6 +1987,47 @@ class BattleSystem {
         } else {
             this.endBattle('attacker');
         }
+    }
+
+    /**
+     * Active ou desactive une ability pour une unite
+     * Gere les abilities activables comme testudo et phalanx
+     * @param {Object} unit - L'unite concernee
+     * @param {string} abilityName - Nom de l'ability (testudo, phalanx)
+     * @returns {boolean} True si l'ability a ete togglee avec succes
+     */
+    toggleUnitAbility(unit, abilityName) {
+        if (!unit || !this.soldierManager) return false;
+
+        // Verifier que l'unite a ete initialisee
+        if (!unit.abilitiesInitialized) {
+            this.soldierManager.initializeAbilitiesForUnit(unit);
+        }
+
+        // Recuperer l'etat actuel de l'ability
+        const currentState = unit.activeAbilities?.[abilityName] || false;
+
+        // Toggler selon le type d'ability
+        let success = false;
+        switch (abilityName) {
+            case 'testudo':
+                success = this.soldierManager.toggleTestudo(unit, !currentState);
+                break;
+            case 'phalanx':
+                success = this.soldierManager.togglePhalanx(unit, !currentState);
+                break;
+            default:
+                return false;
+        }
+
+        // Notifier le joueur si succes
+        if (success) {
+            const newState = unit.activeAbilities[abilityName];
+            const stateText = newState ? 'activee' : 'desactivee';
+            this.game.notify(`${unit.name}: ${abilityName} ${stateText}`, 'info');
+        }
+
+        return success;
     }
 
     /**
