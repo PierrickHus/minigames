@@ -1,0 +1,36 @@
+# infantry_eastern_idle_S
+# Unit: infantry | Faction: eastern | Animation: idle | Direction: S
+# Dimensions: 384x64 (6 frames of 64x64)
+# Output: infantry/eastern/idle_S.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+6 frames showing idle breathing animation loop,
+eastern infantry soldier,
+colorful scale lamellar armor with bright orange and gold robes,
+wicker and leather crescent shield,
+curved shamshir scimitar sword held at side,
+pointed bronze helmet with aventail mail curtain,
+baggy colorful silk trousers, pointed leather boots,
+standing at attention pose, slight chest breathing movement,
+facing forward toward viewer, front view,
+64x64 pixels per frame, 384x64 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 16 color palette, transparent background,
+inspired by final fantasy tactics and fire emblem GBA,
+top-down RPG perspective, 3/4 view slightly from above
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 384x64

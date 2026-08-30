@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZombieDead - Survivez aux morts</title>
+    <link rel="stylesheet" href="css/hud.css">
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <!-- Canvas 3D -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD Overlay -->
+    <div id="hud">
+        <div id="crosshair">
+            <div class="crosshair-line crosshair-top"></div>
+            <div class="crosshair-line crosshair-bottom"></div>
+            <div class="crosshair-line crosshair-left"></div>
+            <div class="crosshair-line crosshair-right"></div>
+            <div class="crosshair-dot"></div>
+        </div>
+
+        <div id="healthBar">
+            <div id="healthBarFill"></div>
+            <span id="healthText">100</span>
+        </div>
+
+        <div id="ammoDisplay">
+            <span id="ammoCurrentMag">12</span>
+            <span class="ammo-separator">/</span>
+            <span id="ammoReserve">60</span>
+        </div>
+
+        <div id="weaponName">Pistolet</div>
+
+        <div id="waveInfo">
+            <span id="waveNumber">Vague 1</span>
+            <span id="zombiesRemaining">0 restants</span>
+        </div>
+
+        <div id="scoreDisplay">
+            <span id="scoreValue">0</span>
+        </div>
+
+        <div id="waveBanner" class="hidden">
+            <span id="waveBannerText">Vague 1</span>
+        </div>
+
+        <div id="killFeed"></div>
+
+        <div id="minimapContainer">
+            <canvas id="minimapCanvas"></canvas>
+        </div>
+    </div>
+
+    <!-- Damage overlay -->
+    <div id="damageOverlay"></div>
+
+    <!-- Menu screens -->
+    <div id="menuScreen">
+        <div class="menu-content">
+            <h1 class="menu-title">ZOMBIE<span class="title-accent">DEAD</span></h1>
+            <p class="menu-subtitle">Les morts marchent. Combien de temps tiendrez-vous ?</p>
+            <div class="menu-controls">
+                <p><strong>ZQSD</strong> - Se déplacer</p>
+                <p><strong>Souris</strong> - Viser</p>
+                <p><strong>Clic gauche</strong> - Tirer</p>
+                <p><strong>R</strong> - Recharger</p>
+                <p><strong>1/2/3</strong> - Changer d'arme</p>
+                <p><strong>Shift</strong> - Sprinter</p>
+                <p><strong>Espace</strong> - Esquiver</p>
+            </div>
+            <button id="startButton">CLIQUEZ POUR JOUER</button>
+        </div>
+    </div>
+
+    <div id="pauseScreen" class="hidden">
+        <div class="menu-content">
+            <h2>PAUSE</h2>
+            <button id="resumeButton">REPRENDRE</button>
+        </div>
+    </div>
+
+    <div id="gameOverScreen" class="hidden">
+        <div class="menu-content">
+            <h2>GAME OVER</h2>
+            <p id="finalScore">Score: 0</p>
+            <p id="finalWave">Vague atteinte: 1</p>
+            <button id="restartButton">RECOMMENCER</button>
+        </div>
+    </div>
+
+    <!-- Back link -->
+    <a href="../index.html" id="backLink">&larr; Retour</a>
+    <a href="debug.html" target="_blank" id="debugLink">DEBUG (F3)</a>
+    <a href="debug-characters.html" target="_blank" id="charDebugLink">CHARACTERS</a>
+
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+# ranged_gaul_death
+# Unit: ranged | Faction: gaul | Animation: death | Direction: N/A
+# Dimensions: 256x64 (4 frames of 64x64)
+# Output: ranged/gaul/death.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+4 frames showing death fall animation,
+gallic archer,
+light leather armor, blue and earth tones tunic,
+bow falling, quiver spilling arrows,
+death sequence: hit reaction, staggering, falling, dead on ground,
+64x64 pixels per frame, 256x64 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 16 color palette, transparent background
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 256x64

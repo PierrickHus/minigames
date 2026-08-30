@@ -1,0 +1,31 @@
+# cavalry_carthage_death
+# Unit: cavalry | Faction: carthage | Animation: death | Direction: N/A
+# Dimensions: 320x80 (4 frames of 80x80)
+# Output: cavalry/carthage/death.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+4 frames showing cavalry death animation,
+carthaginian cavalry soldier falling from brown horse,
+rider in bronze scale armor over purple tunic with white linen, purple and white cloak,
+horse rearing and falling, rider thrown off,
+death sequence: horse hit, horse falling, rider thrown, both down,
+dramatic cavalry death scene,
+80x80 pixels per frame, 320x80 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 20 color palette, transparent background
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 320x80

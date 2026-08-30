@@ -1,0 +1,37 @@
+# infantry_carthage_attack_E
+# Unit: infantry | Faction: carthage | Animation: attack | Direction: E
+# Dimensions: 384x64 (6 frames of 64x64)
+# Output: infantry/carthage/attack_E.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+6 frames showing sword attack animation,
+carthaginian infantry soldier,
+bronze scale armor over purple tunic with white linen,
+round aspis shield with crescent moon emblem raised defensively,
+curved falcata sword attacking forward,
+conical bronze helmet with cheek guards,
+leather sandals with leg wraps, african features,
+attack sequence: ready stance, wind up, thrust forward,
+full extension, retract, return to ready,
+sword thrust attack motion, shield covering body,
+facing right, side profile view, looking east,
+64x64 pixels per frame, 384x64 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 16 color palette, transparent background,
+dynamic action pose, combat animation
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 384x64

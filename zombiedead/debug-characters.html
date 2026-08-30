@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZombieDead - Character Viewer</title>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+    }
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a1a;
+            color: #ccc;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 3D Viewport */
+        #viewport {
+            flex: 1;
+            position: relative;
+        }
+        #viewportCanvas { display: block; width: 100%; height: 100%; }
+        #viewportInfo {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: #666;
+            font-size: 11px;
+        }
+
+        /* Side panel */
+        #panel {
+            width: 340px;
+            display: flex;
+            flex-direction: column;
+            background: #1e1e1e;
+            border-left: 1px solid #333;
+            overflow-y: auto;
+        }
+        .section {
+            padding: 10px 12px;
+            border-bottom: 1px solid #333;
+        }
+        .section h3 {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        /* Character list */
+        .char-item {
+            padding: 8px 10px;
+            margin-bottom: 3px;
+            background: #252525;
+            border-radius: 3px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            display: flex;
+            justify-content: space-between;
+        }
+        .char-item:hover { background: #2a2a2a; }
+        .char-item.selected { border-left-color: #ffff00; background: #2a2a1a; }
+        .char-name { font-weight: bold; }
+        .char-name.walker { color: #CC4444; }
+        .char-name.runner { color: #CCAA22; }
+        .char-name.fatty { color: #AA44AA; }
+        .char-name.abomination { color: #FF2222; }
+        .char-stats { color: #666; font-size: 11px; }
+
+        /* Layers */
+        .layer-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            cursor: pointer;
+        }
+        .layer-toggle input { accent-color: #8B0000; cursor: pointer; }
+        .layer-toggle label { cursor: pointer; user-select: none; }
+        .layer-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+
+        /* Skeleton tree */
+        #skeletonTree {
+            font-size: 11px;
+            line-height: 1.8;
+        }
+        .bone-entry {
+            padding-left: 12px;
+            border-left: 1px solid #333;
+            margin-left: 4px;
+        }
+        .bone-name {
+            color: #aaa;
+            cursor: pointer;
+        }
+        .bone-name:hover { color: #ffff00; }
+        .bone-name.highlighted { color: #ffff00; font-weight: bold; }
+        .bone-pivot { color: #44aa44; font-size: 10px; }
+        .bone-mesh { color: #888; font-size: 10px; }
+        .bone-pos { color: #555; font-size: 10px; }
+
+        /* Stats */
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+            border-bottom: 1px solid #2a2a2a;
+        }
+        .stat-label { color: #777; }
+        .stat-value { color: #ddd; }
+
+        /* Pose buttons */
+        .pose-btn {
+            padding: 5px 10px;
+            margin: 2px;
+            background: #333;
+            border: 1px solid #444;
+            color: #ccc;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: inherit;
+            border-radius: 3px;
+        }
+        .pose-btn:hover { background: #444; }
+        .pose-btn.active { background: #553322; border-color: #8B0000; }
+        .pose-btn.severed { background: #4a2222; border-color: #882222; color: #cc8888; text-decoration: line-through; }
+    </style>
+</head>
+<body>
+    <div id="viewport">
+        <canvas id="viewportCanvas"></canvas>
+        <div id="viewportInfo">Clic gauche: rotation | Molette: zoom | Clic droit: pan</div>
+    </div>
+    <div id="panel">
+        <div class="section">
+            <h3>Personnages</h3>
+            <div id="charList"></div>
+        </div>
+        <div class="section">
+            <h3>Couches anatomiques</h3>
+            <div id="layerToggles"></div>
+        </div>
+        <div class="section">
+            <h3>Animations</h3>
+            <div id="animButtons"></div>
+            <div id="animControls" style="margin-top:8px; display:none;">
+                <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                    <button class="pose-btn" id="btnPlayPause">⏸ Pause</button>
+                    <button class="pose-btn" id="btnRestart">⏮ Début</button>
+                    <span id="animTimeDisplay" style="color:#888; font-size:11px;">0.00s</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <span style="color:#666; font-size:11px;">Vitesse:</span>
+                    <input type="range" id="animSpeedSlider" min="0.1" max="3" step="0.1" value="1" style="flex:1; accent-color:#8B0000;">
+                    <span id="animSpeedDisplay" style="color:#888; font-size:11px;">x1.0</span>
+                </div>
+            </div>
+        </div>
+        <div class="section">
+            <h3>Membres (cliquer pour arracher)</h3>
+            <div id="limbButtons"></div>
+            <button class="pose-btn" id="btnResetLimbs" style="margin-top:6px;">Restaurer tous les membres</button>
+        </div>
+        <div class="section">
+            <h3>Statistiques</h3>
+            <div id="charStats"></div>
+        </div>
+        <div class="section">
+            <h3>Squelette / Hiérarchie</h3>
+            <div id="skeletonTree"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { ZombieFactory } from './src/enemies/ZombieFactory.js';
+        import {
+            PIVOT_NAMES, getPivots, resetPivots,
+            animWalk, animLimp, animCrawl, animAttack, animBite,
+            animDeath, animPushed, animIdle, animHeadlook, animRun
+        } from './src/enemies/ZombieAnimations.js';
+
+        // ========== SETUP 3D ==========
+        const canvas = document.getElementById('viewportCanvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x222222);
+
+        const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 50);
+        camera.position.set(2, 1.5, 2);
+
+        const controls = new OrbitControls(camera, canvas);
+        controls.target.set(0, 0.8, 0);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.1;
+        controls.update();
+
+        // Éclairage
+        scene.add(new THREE.AmbientLight(0x888888, 0.8));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(3, 5, 3);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+        const fillLight = new THREE.DirectionalLight(0x4466aa, 0.4);
+        fillLight.position.set(-2, 3, -2);
+        scene.add(fillLight);
+
+        // Sol grille
+        const gridHelper = new THREE.GridHelper(4, 20, 0x444444, 0x333333);
+        scene.add(gridHelper);
+
+        // Axes
+        const axesHelper = new THREE.AxesHelper(0.5);
+        axesHelper.position.set(-1.5, 0, -1.5);
+        scene.add(axesHelper);
+
+        function resize() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            renderer.setSize(rect.width, rect.height);
+            camera.aspect = rect.width / rect.height;
+            camera.updateProjectionMatrix();
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // ========== STATE ==========
+        let currentModel = null;
+        let currentType = 'walker';
+        let currentAnim = 'tpose';
+        let highlightedBone = null;
+        let pivotHelpers = [];
+        let boneHelpers = [];
+
+        // Animation state
+        let animTime = 0;
+        let animPlaying = false;
+        let animSpeed = 1;
+        let lastFrameTimestamp = 0;
+
+        /** Membres détachés dans le viewer debug */
+        const severedLimbs = new Set();
+
+        /**
+         * Prépare le modèle avant chaque animation :
+         * reset des pivots, application de l'état des membres, restauration de l'opacité
+         */
+        function prepareModel(model) {
+            model.position.y = 0;
+            model.position.z = 0;
+            model.rotation.x = 0;
+            model.rotation.z = 0;
+            resetPivots(getPivots(model));
+            model.traverse(c => {
+                if (c.isMesh && c.material && c.material.opacity < 1) {
+                    c.material.opacity = 1;
+                    c.material.transparent = false;
+                }
+            });
+            applyLimbState();
+        }
+
+        /** Applique les transformations du corps retournées par une animation */
+        function applyResult(model, result) {
+            if (!result) return;
+            if (result.bodyRotX !== undefined) model.rotation.x = result.bodyRotX;
+            if (result.bodyRotZ !== undefined) model.rotation.z = result.bodyRotZ;
+            if (result.bodyY !== undefined) model.position.y = result.bodyY;
+            if (result.bodyZ !== undefined) model.position.z = result.bodyZ;
+        }
+
+        /** Construit l'objet limbs simulé à partir de severedLimbs pour les fonctions d'animation */
+        function buildLimbsState() {
+            const limbs = {};
+            for (const name of PIVOT_NAMES) {
+                limbs[name] = { attached: !severedLimbs.has(name) };
+            }
+            return limbs;
+        }
+
+        /**
+         * Définition des animations — chaque apply() délègue à ZombieAnimations
+         */
+        const animations = {
+            tpose: {
+                label: 'Pose T', duration: 0, loop: false,
+                apply(model) {
+                    prepareModel(model);
+                    const pv = getPivots(model);
+                    if (pv.leftArm) pv.leftArm.rotation.z = -Math.PI / 2;
+                    if (pv.rightArm) pv.rightArm.rotation.z = Math.PI / 2;
+                }
+            },
+            idle: {
+                label: 'Idle (repos)', duration: 3, loop: true,
+                apply(model, t) {
+                    prepareModel(model);
+                    const pv = getPivots(model);
+                    const limbs = buildLimbsState();
+                    const legs = legCount();
+                    if (legs === 0) { model.rotation.x = Math.PI / 2; model.position.y = 0.15; }
+                    else if (legs === 1) { model.rotation.z = (hasLimb('leftLeg') ? -1 : 1) * 0.15; model.position.y = -0.2; }
+                    animIdle(pv, limbs, t);
+                }
+            },
+            shamble: {
+                label: 'Marche', duration: 2, loop: true,
+                apply(model, t) {
+                    prepareModel(model);
+                    const pv = getPivots(model);
+                    const limbs = buildLimbsState();
+                    const legs = legCount();
+                    if (legs === 0) { applyResult(model, animCrawl(pv, limbs, t)); return; }
+                    if (legs === 1) { applyResult(model, animLimp(pv, limbs, t, !hasLimb('leftLeg'))); return; }
+                    applyResult(model, animWalk(pv, limbs, t));
+                }
+            },
+            run: {
+                label: 'Course', duration: 1, loop: true,
+                apply(model, t) {
+                    prepareModel(model);
+                    const pv = getPivots(model);
+                    const limbs = buildLimbsState();
+                    if (legCount() < 2) { animations.shamble.apply(model, t); return; }
+                    applyResult(model, animRun(pv, limbs, t));
+                }
+            },
+            attack: {
+                label: 'Attaque', duration: 0.7, loop: true,
+                apply(model, t) {
+                    prepareModel(model);
+                    const pv = getPivots(model);
+                    const limbs = buildLimbsState();
+                    if (armCount() === 0) { applyResult(model, animBite(pv, t * 1000)); return; }
+                    applyResult(model, animAttack(pv, limbs, t * 1000));
+                }
+            },
+            death: {
+                label: 'Mort', duration: 2, loop: false,
+                apply(model, t) {
+                    prepareModel(model);
+                    const pv = getPivots(model);
+                    const limbs = buildLimbsState();
+                    const progress = Math.min(t / 2, 1);
+                    applyResult(model, animDeath(pv, limbs, progress));
+                    model.traverse(c => { if (c.isMesh && c.material) { c.material.transparent = true; c.material.opacity = 1 - progress * 0.8; } });
+                }
+            },
+            pushed: {
+                label: 'Bousculé', duration: 0.8, loop: false,
+                apply(model, t) {
+                    prepareModel(model);
+                    const pv = getPivots(model);
+                    const limbs = buildLimbsState();
+                    applyResult(model, animPushed(pv, limbs, t));
+                }
+            },
+            headlook: {
+                label: 'Regard autour', duration: 4, loop: true,
+                apply(model, t) {
+                    prepareModel(model);
+                    const pv = getPivots(model);
+                    const limbs = buildLimbsState();
+                    animHeadlook(pv, limbs, t);
+                }
+            },
+            crawl: {
+                label: 'Ramper', duration: 2, loop: true,
+                apply(model, t) {
+                    prepareModel(model);
+                    const pv = getPivots(model);
+                    const limbs = buildLimbsState();
+                    applyResult(model, animCrawl(pv, limbs, t));
+                }
+            },
+            limp: {
+                label: 'Boiter (1 jambe)', duration: 2, loop: true,
+                apply(model, t) {
+                    prepareModel(model);
+                    const pv = getPivots(model);
+                    const limbs = buildLimbsState();
+                    applyResult(model, animLimp(pv, limbs, t, !hasLimb('leftLeg')));
+                }
+            },
+            bite: {
+                label: 'Morsure (sans bras)', duration: 0.7, loop: true,
+                apply(model, t) {
+                    prepareModel(model);
+                    const pv = getPivots(model);
+                    applyResult(model, animBite(pv, t * 1000));
+                }
+            }
+        };
+
+        /** Couches anatomiques avec couleurs et visibilité */
+        const layers = {
+            skeleton:    { label: 'Squelette (os)',       color: '#eeeeaa', visible: false, wireColor: 0xeeeeaa },
+            joints:      { label: 'Articulations',        color: '#44cc44', visible: true,  wireColor: 0x44cc44 },
+            muscles:     { label: 'Muscles',              color: '#cc4444', visible: false, wireColor: 0xcc4444 },
+            organs:      { label: 'Organes',              color: '#cc44cc', visible: false, wireColor: 0xcc44cc },
+            skin:        { label: 'Peau (mesh)',          color: '#aa9977', visible: true,  wireColor: 0xaa9977 },
+            wireframe:   { label: 'Wireframe',            color: '#4488cc', visible: false, wireColor: 0x4488cc },
+            boundingBox: { label: 'Bounding box',         color: '#ffff00', visible: false, wireColor: 0xffff00 },
+            pivotAxes:   { label: 'Axes de pivot',        color: '#ff8800', visible: true,  wireColor: 0xff8800 }
+        };
+
+        // ========== UI ==========
+        function buildCharList() {
+            const types = ZombieFactory.getTypes();
+            const configs = ZombieFactory.getConfigs();
+            const list = document.getElementById('charList');
+            list.innerHTML = '';
+
+            for (const type of types) {
+                const cfg = configs[type];
+                const item = document.createElement('div');
+                item.className = `char-item${type === currentType ? ' selected' : ''}`;
+                item.innerHTML = `<span class="char-name ${type}">${type.toUpperCase()}</span>
+                    <span class="char-stats">HP:${cfg.health} SPD:${cfg.speed} DMG:${cfg.damage}</span>`;
+                item.onclick = () => selectCharacter(type);
+                list.appendChild(item);
+            }
+        }
+
+        function buildLayerToggles() {
+            const container = document.getElementById('layerToggles');
+            container.innerHTML = '';
+
+            for (const [key, layer] of Object.entries(layers)) {
+                const div = document.createElement('div');
+                div.className = 'layer-toggle';
+                div.innerHTML = `<input type="checkbox" id="layer_${key}" ${layer.visible ? 'checked' : ''}>
+                    <div class="layer-color" style="background:${layer.color}"></div>
+                    <label for="layer_${key}">${layer.label}</label>`;
+                div.querySelector('input').addEventListener('change', (e) => {
+                    layer.visible = e.target.checked;
+                    updateLayerVisibility();
+                });
+                container.appendChild(div);
+            }
+        }
+
+        function buildAnimButtons() {
+            const container = document.getElementById('animButtons');
+            container.innerHTML = '';
+
+            for (const [key, anim] of Object.entries(animations)) {
+                const btn = document.createElement('button');
+                btn.className = `pose-btn${key === currentAnim ? ' active' : ''}`;
+                btn.textContent = anim.label;
+                btn.onclick = () => selectAnimation(key);
+                container.appendChild(btn);
+            }
+        }
+
+        // ========== MEMBRES ==========
+        const LIMB_LABELS = {
+            neck: 'Tête', leftArm: 'Bras gauche', rightArm: 'Bras droit',
+            leftLeg: 'Jambe gauche', rightLeg: 'Jambe droite'
+        };
+
+        function buildLimbButtons() {
+            const container = document.getElementById('limbButtons');
+            container.innerHTML = '';
+            for (const [name, label] of Object.entries(LIMB_LABELS)) {
+                const btn = document.createElement('button');
+                const isSevered = severedLimbs.has(name);
+                btn.className = `pose-btn${isSevered ? ' severed' : ''}`;
+                btn.textContent = isSevered ? `${label} (arraché)` : label;
+                btn.onclick = () => toggleLimb(name);
+                container.appendChild(btn);
+            }
+        }
+
+        function toggleLimb(name) {
+            if (severedLimbs.has(name)) {
+                severedLimbs.delete(name);
+            } else {
+                severedLimbs.add(name);
+            }
+            applyLimbState();
+            buildLimbButtons();
+        }
+
+        function resetAllLimbs() {
+            severedLimbs.clear();
+            applyLimbState();
+            buildLimbButtons();
+        }
+
+        /** Cache/montre les pivots selon l'état des membres */
+        function applyLimbState() {
+            if (!currentModel) return;
+            for (const name of Object.keys(LIMB_LABELS)) {
+                const pivot = currentModel.getObjectByName(name);
+                if (pivot) {
+                    pivot.visible = !severedLimbs.has(name);
+                }
+            }
+        }
+
+        document.getElementById('btnResetLimbs').addEventListener('click', resetAllLimbs);
+
+        /** Helpers pour les animations : vérifie si un membre est encore là */
+        function hasLimb(name) { return !severedLimbs.has(name); }
+        function legCount() { return (hasLimb('leftLeg') ? 1 : 0) + (hasLimb('rightLeg') ? 1 : 0); }
+        function armCount() { return (hasLimb('leftArm') ? 1 : 0) + (hasLimb('rightArm') ? 1 : 0); }
+
+        function selectAnimation(key) {
+            currentAnim = key;
+            animTime = 0;
+            animPlaying = animations[key].duration > 0;
+            buildAnimButtons();
+            updateAnimControls();
+
+            // Appliquer l'état initial de l'anim
+            if (currentModel) {
+                animations[key].apply(currentModel, 0);
+            }
+        }
+
+        function updateAnimControls() {
+            const controlsEl = document.getElementById('animControls');
+            const anim = animations[currentAnim];
+            controlsEl.style.display = anim.duration > 0 ? 'block' : 'none';
+            document.getElementById('btnPlayPause').textContent = animPlaying ? '⏸ Pause' : '▶ Play';
+        }
+
+        // Contrôles d'animation
+        document.getElementById('btnPlayPause').addEventListener('click', () => {
+            animPlaying = !animPlaying;
+            updateAnimControls();
+        });
+
+        document.getElementById('btnRestart').addEventListener('click', () => {
+            animTime = 0;
+            animPlaying = true;
+            updateAnimControls();
+        });
+
+        document.getElementById('animSpeedSlider').addEventListener('input', (e) => {
+            animSpeed = Number.parseFloat(e.target.value);
+            document.getElementById('animSpeedDisplay').textContent = `x${animSpeed.toFixed(1)}`;
+        });
+
+        function updateStats() {
+            const configs = ZombieFactory.getConfigs();
+            const cfg = configs[currentType];
+            if (!cfg) return;
+
+            document.getElementById('charStats').innerHTML = `
+                <div class="stat-row"><span class="stat-label">Santé</span><span class="stat-value">${cfg.health}</span></div>
+                <div class="stat-row"><span class="stat-label">Vitesse</span><span class="stat-value">${cfg.speed}</span></div>
+                <div class="stat-row"><span class="stat-label">Dégâts</span><span class="stat-value">${cfg.damage}</span></div>
+                <div class="stat-row"><span class="stat-label">Score</span><span class="stat-value">${cfg.scoreValue}</span></div>
+                <div class="stat-row"><span class="stat-label">Masse</span><span class="stat-value">${cfg.mass}</span></div>
+                <div class="stat-row"><span class="stat-label">Rayon collision</span><span class="stat-value">${cfg.collisionRadius}</span></div>
+                <div class="stat-row"><span class="stat-label">Échelle</span><span class="stat-value">${cfg.scale}</span></div>
+                <div class="stat-row"><span class="stat-label">Meshes</span><span class="stat-value">${countMeshes()}</span></div>
+                <div class="stat-row"><span class="stat-label">Pivots</span><span class="stat-value">${countPivots()}</span></div>
+                <div class="stat-row"><span class="stat-label">Triangles</span><span class="stat-value">${countTriangles()}</span></div>
+            `;
+        }
+
+        function countMeshes() {
+            if (!currentModel) return 0;
+            let count = 0;
+            currentModel.traverse(c => { if (c.isMesh) count++; });
+            return count;
+        }
+
+        function countPivots() {
+            if (!currentModel) return 0;
+            let count = 0;
+            currentModel.traverse(c => { if (c.isGroup && c !== currentModel) count++; });
+            return count;
+        }
+
+        function countTriangles() {
+            if (!currentModel) return 0;
+            let count = 0;
+            currentModel.traverse(c => {
+                if (c.isMesh && c.geometry) {
+                    const idx = c.geometry.index;
+                    count += idx ? idx.count / 3 : c.geometry.attributes.position.count / 3;
+                }
+            });
+            return Math.floor(count);
+        }
+
+        function buildSkeletonTree() {
+            const container = document.getElementById('skeletonTree');
+            if (!currentModel) { container.innerHTML = ''; return; }
+            container.innerHTML = buildNodeHTML(currentModel, 0);
+        }
+
+        function buildNodeHTML(node, depth) {
+            const isGroup = node.isGroup;
+            const isMesh = node.isMesh;
+            let icon = '⬜';
+            if (isGroup) icon = '📂';
+            else if (isMesh) icon = '🔷';
+            const name = node.name || `(${node.type})`;
+            const pos = `(${node.position.x.toFixed(2)}, ${node.position.y.toFixed(2)}, ${node.position.z.toFixed(2)})`;
+            const rot = node.rotation.x !== 0 || node.rotation.y !== 0 || node.rotation.z !== 0
+                ? ` rot:(${(node.rotation.x * 180 / Math.PI).toFixed(0)}°, ${(node.rotation.y * 180 / Math.PI).toFixed(0)}°, ${(node.rotation.z * 180 / Math.PI).toFixed(0)}°)`
+                : '';
+
+            const highlighted = highlightedBone === node.name ? ' highlighted' : '';
+            let html = `<div class="bone-name${highlighted}" onclick="window.highlightBone('${node.name}')">${icon} ${name}</div>`;
+            html += `<span class="bone-pos">${pos}${rot}</span>`;
+
+            if (isGroup && node !== currentModel) {
+                html += ` <span class="bone-pivot">[PIVOT]</span>`;
+            }
+
+            let childrenHTML = '';
+            for (const child of node.children) {
+                childrenHTML += `<div class="bone-entry">${buildNodeHTML(child, depth + 1)}</div>`;
+            }
+
+            return html + childrenHTML;
+        }
+
+        window.highlightBone = function(name) {
+            highlightedBone = highlightedBone === name ? null : name;
+            buildSkeletonTree();
+            updateHelpers();
+        };
+
+        // ========== MODEL LOADING ==========
+        function selectCharacter(type) {
+            currentType = type;
+            loadModel(type);
+            buildCharList();
+            updateStats();
+        }
+
+        function loadModel(type) {
+            if (currentModel) {
+                scene.remove(currentModel);
+                currentModel.traverse(c => {
+                    if (c.isMesh) { c.geometry.dispose(); c.material.dispose(); }
+                });
+            }
+            clearHelpers();
+
+            currentModel = ZombieFactory.buildDebugMesh(type);
+            scene.add(currentModel);
+
+            // Appliquer la pose initiale de l'animation courante
+            animTime = 0;
+            const anim = animations[currentAnim];
+            animPlaying = anim.duration > 0;
+            anim.apply(currentModel, 0);
+
+            applyLimbState();
+            updateLayerVisibility();
+            updateHelpers();
+            buildSkeletonTree();
+            updateStats();
+            updateAnimControls();
+        }
+
+        // ========== LAYER HELPERS ==========
+        function clearHelpers() {
+            for (const h of pivotHelpers) scene.remove(h);
+            for (const h of boneHelpers) scene.remove(h);
+            pivotHelpers = [];
+            boneHelpers = [];
+        }
+
+        function updateHelpers() {
+            clearHelpers();
+            if (!currentModel) return;
+
+            currentModel.traverse((node) => {
+                // Axes de pivot sur les Group (articulations)
+                if (layers.pivotAxes.visible && node.isGroup && node !== currentModel && node.name) {
+                    const axes = new THREE.AxesHelper(0.15);
+                    node.add(axes);
+                    pivotHelpers.push(axes);
+                }
+
+                // Sphères vertes aux articulations
+                if (layers.joints.visible && node.isGroup && node !== currentModel && node.name) {
+                    const sphere = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.03, 8, 6),
+                        new THREE.MeshBasicMaterial({ color: layers.joints.wireColor })
+                    );
+                    node.add(sphere);
+                    pivotHelpers.push(sphere);
+                }
+
+                // Bounding box
+                if (layers.boundingBox.visible && node.isMesh) {
+                    const box = new THREE.BoxHelper(node, layers.boundingBox.wireColor);
+                    scene.add(box);
+                    boneHelpers.push(box);
+                }
+            });
+
+            // Squelette (lignes entre pivots)
+            if (layers.skeleton.visible) {
+                buildSkeletonLines(currentModel);
+            }
+
+            // Muscles (wireframe rouge semi-transparent sur les meshes)
+            if (layers.muscles.visible) {
+                buildMuscleOverlay(currentModel);
+            }
+
+            // Organes (sphères internes simulées)
+            if (layers.organs.visible) {
+                buildOrganOverlay(currentModel);
+            }
+
+            // Highlight du bone sélectionné
+            if (highlightedBone) {
+                const node = currentModel.getObjectByName(highlightedBone);
+                if (node) {
+                    const highlight = new THREE.AxesHelper(0.3);
+                    node.add(highlight);
+                    pivotHelpers.push(highlight);
+
+                    if (node.isMesh) {
+                        const box = new THREE.BoxHelper(node, 0xffff00);
+                        scene.add(box);
+                        boneHelpers.push(box);
+                    }
+                }
+            }
+        }
+
+        function buildSkeletonLines(model) {
+            const worldPos = new THREE.Vector3();
+
+            model.traverse((node) => {
+                if (!node.isGroup || node === model) return;
+
+                node.getWorldPosition(worldPos);
+                const parentPos = new THREE.Vector3();
+                if (node.parent) node.parent.getWorldPosition(parentPos);
+
+                const points = [parentPos.clone(), worldPos.clone()];
+                const geo = new THREE.BufferGeometry().setFromPoints(points);
+                const line = new THREE.Line(geo, new THREE.LineBasicMaterial({
+                    color: layers.skeleton.wireColor, linewidth: 2
+                }));
+                scene.add(line);
+                boneHelpers.push(line);
+            });
+        }
+
+        function buildMuscleOverlay(model) {
+            model.traverse((node) => {
+                if (!node.isMesh || !node.geometry) return;
+                const wireGeo = node.geometry.clone();
+                const wireMat = new THREE.MeshBasicMaterial({
+                    color: layers.muscles.wireColor,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.3
+                });
+                const wire = new THREE.Mesh(wireGeo, wireMat);
+                wire.position.copy(node.position);
+                wire.rotation.copy(node.rotation);
+                wire.scale.copy(node.scale).multiplyScalar(0.95);
+                if (node.parent) {
+                    node.parent.add(wire);
+                    pivotHelpers.push(wire);
+                }
+            });
+        }
+
+        function buildOrganOverlay(model) {
+            // Organes simulés : sphères à des positions anatomiques clés
+            const organPositions = [
+                { name: 'coeur', y: 1.05, x: 0.05, z: 0, r: 0.06, color: 0xcc2222 },
+                { name: 'poumon_g', y: 1.05, x: -0.1, z: 0, r: 0.08, color: 0xcc8888 },
+                { name: 'poumon_d', y: 1.05, x: 0.12, z: 0, r: 0.08, color: 0xcc8888 },
+                { name: 'estomac', y: 0.85, x: 0, z: -0.03, r: 0.07, color: 0xaaaa44 },
+                { name: 'cerveau', y: 1.5, x: 0, z: 0, r: 0.08, color: 0xccaacc },
+            ];
+
+            for (const organ of organPositions) {
+                const mesh = new THREE.Mesh(
+                    new THREE.SphereGeometry(organ.r, 8, 6),
+                    new THREE.MeshBasicMaterial({
+                        color: organ.color, transparent: true, opacity: 0.5
+                    })
+                );
+                mesh.position.set(organ.x, organ.y, organ.z);
+                model.add(mesh);
+                pivotHelpers.push(mesh);
+            }
+        }
+
+        function updateLayerVisibility() {
+            if (!currentModel) return;
+
+            // Skin visibility
+            currentModel.traverse((node) => {
+                if (node.isMesh && node.material && !node.name.startsWith('mutation')) {
+                    node.visible = layers.skin.visible;
+                }
+            });
+
+            // Wireframe overlay
+            if (layers.wireframe.visible) {
+                currentModel.traverse((node) => {
+                    if (node.isMesh && node.material) {
+                        node.material.wireframe = true;
+                    }
+                });
+            } else {
+                currentModel.traverse((node) => {
+                    if (node.isMesh && node.material) {
+                        node.material.wireframe = false;
+                    }
+                });
+            }
+
+            updateHelpers();
+        }
+
+        // ========== ANIMATION LOOP ==========
+        function animate(timestamp) {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            // Delta time
+            const dt = lastFrameTimestamp ? (timestamp - lastFrameTimestamp) / 1000 : 0;
+            lastFrameTimestamp = timestamp;
+
+            // Mise à jour de l'animation courante
+            if (currentModel && animPlaying) {
+                const anim = animations[currentAnim];
+                animTime += dt * animSpeed;
+
+                if (anim.loop) {
+                    animTime = animTime % anim.duration;
+                } else if (animTime >= anim.duration) {
+                    animTime = anim.duration;
+                    animPlaying = false;
+                    updateAnimControls();
+                }
+
+                anim.apply(currentModel, animTime);
+
+                // Affichage du temps
+                document.getElementById('animTimeDisplay').textContent =
+                    `${animTime.toFixed(2)}s / ${anim.duration.toFixed(1)}s`;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // ========== INIT ==========
+        buildCharList();
+        buildLayerToggles();
+        buildAnimButtons();
+        buildLimbButtons();
+        loadModel('walker');
+        animate(0);
+    </script>
+</body>
+</html>

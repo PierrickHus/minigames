@@ -1,0 +1,36 @@
+# cavalry_carthage_walk_SE
+# Unit: cavalry | Faction: carthage | Animation: walk | Direction: SE
+# Dimensions: 480x80 (6 frames of 80x80)
+# Output: cavalry/carthage/walk_SE.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+6 frames showing horse trot cycle animation,
+carthaginian cavalry soldier mounted on brown horse,
+rider wearing bronze scale armor over purple tunic with white linen,
+purple and white military cloak flowing behind,
+oval cavalry shield, long spatha cavalry sword at side,
+conical bronze helmet with cheek guards,
+horse with purple and white saddle cloth,
+horse trotting animation, legs moving in trot gait,
+rider bobbing with horse movement, cloak billowing,
+facing southeast diagonal, 3/4 front-right view,
+80x80 pixels per frame, 480x80 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 20 color palette, transparent background,
+seamless trot loop animation
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 480x80

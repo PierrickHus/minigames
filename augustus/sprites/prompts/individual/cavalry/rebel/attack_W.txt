@@ -1,0 +1,36 @@
+# cavalry_rebel_attack_W
+# Unit: cavalry | Faction: rebel | Animation: attack | Direction: W
+# Dimensions: 480x80 (6 frames of 80x80)
+# Output: cavalry/rebel/attack_W.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+6 frames showing cavalry charge attack animation,
+rebel cavalry soldier mounted on galloping horse,
+rider wearing mismatched worn leather armor, ragged brown tunic,
+brown and grey cloak flying dramatically,
+oval cavalry shield raised, long sword raised high then slashing down,
+no helmet or simple leather cap, dirty unkempt hair,
+horse charging forward,
+horse gallop animation, dramatic charge attack,
+sword swing from high to low, rider leaning into attack,
+facing left, side profile view, looking west,
+80x80 pixels per frame, 480x80 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 20 color palette, transparent background,
+dynamic cavalry combat animation
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 480x80

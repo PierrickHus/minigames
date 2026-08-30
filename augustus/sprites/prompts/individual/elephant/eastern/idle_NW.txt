@@ -1,0 +1,36 @@
+# elephant_eastern_idle_NW
+# Unit: elephant | Faction: eastern | Animation: idle | Direction: NW
+# Dimensions: 576x96 (6 frames of 96x96)
+# Output: elephant/eastern/idle_NW.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+6 frames showing idle animation loop,
+carthaginian war elephant, large african elephant,
+wooden tower howdah on back with orange and gold decorations,
+2 small archer soldiers visible in tower,
+mahout rider on elephant neck with hook,
+elephant wearing bronze head armor plate,
+decorated tusks with metal tips, orange and gold fabric draping on sides,
+elephant standing with subtle swaying movement,
+ears flapping slightly, trunk moving,
+facing away northwest diagonal, 3/4 back-left view,
+96x96 pixels per frame, 576x96 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 24 color palette, transparent background,
+massive war beast, ancient military
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 576x96

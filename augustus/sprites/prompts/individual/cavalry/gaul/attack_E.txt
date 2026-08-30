@@ -1,0 +1,36 @@
+# cavalry_gaul_attack_E
+# Unit: cavalry | Faction: gaul | Animation: attack | Direction: E
+# Dimensions: 480x80 (6 frames of 80x80)
+# Output: cavalry/gaul/attack_E.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+6 frames showing cavalry charge attack animation,
+gallic cavalry soldier mounted on galloping horse,
+rider wearing bare muscular chest with blue woad war paint swirling tribal patterns,
+blue and earth tones cloak flying dramatically,
+oval cavalry shield raised, long sword raised high then slashing down,
+no helmet, long wild blonde hair and large mustache,
+horse charging forward,
+horse gallop animation, dramatic charge attack,
+sword swing from high to low, rider leaning into attack,
+facing right, side profile view, looking east,
+80x80 pixels per frame, 480x80 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 20 color palette, transparent background,
+dynamic cavalry combat animation
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 480x80

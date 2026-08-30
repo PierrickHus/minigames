@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZombieDead - Debug Panel</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #1a1a1a;
+            color: #ccc;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Panneau gauche : carte 2D */
+        #mapPanel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #333;
+        }
+
+        #mapHeader {
+            padding: 8px 12px;
+            background: #222;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #mapHeader h2 {
+            font-size: 14px;
+            color: #8B0000;
+            letter-spacing: 1px;
+        }
+
+        #connectionStatus {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        #connectionStatus.connected { background: #2a4a2a; color: #4a4; }
+        #connectionStatus.disconnected { background: #4a2a2a; color: #a44; }
+
+        #mapCanvas {
+            flex: 1;
+            display: block;
+            cursor: crosshair;
+        }
+
+        /* Panneau droit : contrôles + infos */
+        #sidePanel {
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            background: #1e1e1e;
+            overflow-y: auto;
+        }
+
+        .panel-section {
+            padding: 10px 12px;
+            border-bottom: 1px solid #333;
+        }
+
+        .panel-section h3 {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        /* Checkboxes de debug */
+        .debug-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            cursor: pointer;
+        }
+
+        .debug-option input[type="checkbox"] {
+            accent-color: #8B0000;
+            cursor: pointer;
+        }
+
+        .debug-option label {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        /* Game state */
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .stat-label { color: #888; }
+        .stat-value { color: #ddd; font-weight: bold; }
+        .stat-value.health-good { color: #4a4; }
+        .stat-value.health-mid { color: #aa4; }
+        .stat-value.health-low { color: #a44; }
+
+        /* Entity list */
+        #entityList {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .entity-item {
+            padding: 5px 8px;
+            margin-bottom: 2px;
+            background: #252525;
+            border-radius: 3px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 3px solid transparent;
+        }
+
+        .entity-item:hover { background: #2a2a2a; }
+        .entity-item.selected { border-left-color: #ffff00; background: #2a2a1a; }
+        .entity-item.player-entity { border-left-color: #44CC44; }
+        .entity-item .entity-type { font-weight: bold; }
+        .entity-item .entity-type.walker { color: #CC4444; }
+        .entity-item .entity-type.runner { color: #CCAA22; }
+        .entity-item .entity-type.fatty { color: #AA44AA; }
+        .entity-item .entity-type.abomination { color: #FF2222; }
+        .entity-item .entity-type.player { color: #44CC44; }
+        .entity-item .entity-state { color: #888; font-size: 11px; }
+
+        /* Selected entity detail */
+        #entityDetail {
+            background: #222;
+            border-radius: 4px;
+            padding: 8px;
+            min-height: 60px;
+        }
+
+        #entityDetail .detail-title {
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            color: #ffff00;
+        }
+
+        #entityDetail .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+            font-size: 12px;
+        }
+
+        #entityDetail .detail-label { color: #777; }
+        #entityDetail .detail-value { color: #bbb; }
+
+        /* Legend */
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+            font-size: 11px;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Carte 2D -->
+    <div id="mapPanel">
+        <div id="mapHeader">
+            <h2>ZOMBIEDEAD DEBUG</h2>
+            <span id="connectionStatus" class="disconnected">DISCONNECTED</span>
+            <span id="fpsCounter">-- FPS</span>
+        </div>
+        <canvas id="mapCanvas"></canvas>
+    </div>
+
+    <!-- Panneau latéral -->
+    <div id="sidePanel">
+        <!-- Options de debug -->
+        <div class="panel-section">
+            <h3>Affichage</h3>
+            <div class="debug-option">
+                <input type="checkbox" id="showNavmesh" checked>
+                <label for="showNavmesh">NavMesh (grille)</label>
+            </div>
+            <div class="debug-option">
+                <input type="checkbox" id="showPaths" checked>
+                <label for="showPaths">Pathfinding (chemins)</label>
+            </div>
+            <div class="debug-option">
+                <input type="checkbox" id="showColliders" checked>
+                <label for="showColliders">Colliders (obstacles)</label>
+            </div>
+            <div class="debug-option">
+                <input type="checkbox" id="showFov" checked>
+                <label for="showFov">Cône de vision joueur</label>
+            </div>
+            <div class="debug-option">
+                <input type="checkbox" id="showEntityRadius">
+                <label for="showEntityRadius">Rayon de collision</label>
+            </div>
+            <div class="debug-option">
+                <input type="checkbox" id="showGrid">
+                <label for="showGrid">Grille de cellules</label>
+            </div>
+        </div>
+
+        <!-- État du jeu -->
+        <div class="panel-section">
+            <h3>État du jeu</h3>
+            <div class="stat-row">
+                <span class="stat-label">Vague</span>
+                <span class="stat-value" id="statWave">--</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Zombies restants</span>
+                <span class="stat-value" id="statRemaining">--</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Zombies actifs</span>
+                <span class="stat-value" id="statActive">--</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Joueur HP</span>
+                <span class="stat-value" id="statPlayerHP">--</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Score</span>
+                <span class="stat-value" id="statScore">--</span>
+            </div>
+        </div>
+
+        <!-- Légende -->
+        <div class="panel-section">
+            <h3>Légende</h3>
+            <div class="legend-item"><div class="legend-dot" style="background:#44CC44"></div>Joueur</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#CC4444"></div>Walker</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#CCAA22"></div>Runner</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#AA44AA"></div>Fatty</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#FF2222"></div>Abomination</div>
+            <div class="legend-item"><div class="legend-dot" style="background:rgba(255,0,0,0.3)"></div>Cellule bloquée</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ffff00"></div>Chemin pathfinding</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ff8800"></div>Waypoint courant</div>
+        </div>
+
+        <!-- Liste des entités -->
+        <div class="panel-section">
+            <h3>Entités</h3>
+            <div id="entityList"></div>
+        </div>
+
+        <!-- Détail de l'entité sélectionnée -->
+        <div class="panel-section">
+            <h3>Entité sélectionnée</h3>
+            <div id="entityDetail">
+                <span style="color:#555">Cliquez sur une entité dans la liste ou sur la carte</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Page de debug 2D pour ZombieDead
+         * Communique avec le jeu via BroadcastChannel
+         */
+
+        const channel = new BroadcastChannel('zombiedead-debug');
+        const canvas = document.getElementById('mapCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // État
+        let snapshot = null;
+        let selectedEntityIndex = -1; // -1 = joueur, 0+ = index zombie
+        let selectedIsPlayer = false;
+        let lastFrameTime = performance.now();
+        let frameCount = 0;
+
+        // Options d'affichage
+        const options = {
+            showNavmesh: true,
+            showPaths: true,
+            showColliders: true,
+            showFov: true,
+            showEntityRadius: false,
+            showGrid: false
+        };
+
+        // Bind checkboxes
+        for (const key of Object.keys(options)) {
+            const el = document.getElementById(key);
+            if (el) {
+                el.checked = options[key];
+                el.addEventListener('change', () => { options[key] = el.checked; });
+            }
+        }
+
+        // Connexion avec retry automatique
+        let connected = false;
+        const statusEl = document.getElementById('connectionStatus');
+
+        function tryConnect() {
+            channel.postMessage({ type: 'debug-connect' });
+        }
+
+        // Retry toutes les secondes tant que non connecté
+        const connectInterval = setInterval(() => {
+            if (!connected) {
+                statusEl.className = 'disconnected';
+                statusEl.textContent = 'EN ATTENTE DU JEU...';
+                tryConnect();
+            }
+        }, 1000);
+        tryConnect();
+
+        window.addEventListener('beforeunload', () => {
+            clearInterval(connectInterval);
+            channel.postMessage({ type: 'debug-disconnect' });
+        });
+
+        // Réception des messages
+        channel.onmessage = (e) => {
+            const msg = e.data;
+
+            if (msg.type === 'game-reload') {
+                window.location.reload();
+                return;
+            }
+
+            if (msg.type === 'debug-ack') {
+                connected = true;
+                statusEl.className = 'connected';
+                statusEl.textContent = 'CONNECTED';
+            }
+
+            if (msg.type === 'snapshot') {
+                if (!connected) {
+                    connected = true;
+                    statusEl.className = 'connected';
+                    statusEl.textContent = 'CONNECTED';
+                }
+                snapshot = msg.data;
+                updateStats();
+                updateEntityList();
+                render();
+                countFps();
+            }
+        };
+
+        // Resize canvas
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height - document.getElementById('mapHeader').offsetHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // FPS counter
+        function countFps() {
+            frameCount++;
+            const now = performance.now();
+            if (now - lastFrameTime >= 1000) {
+                document.getElementById('fpsCounter').textContent = `${frameCount} FPS`;
+                frameCount = 0;
+                lastFrameTime = now;
+            }
+        }
+
+        // Conversion monde -> canvas
+        function worldToCanvas(worldX, worldZ) {
+            if (!snapshot) return { x: 0, y: 0 };
+            const gridW = snapshot.navGrid.width;
+            const gridH = snapshot.navGrid.height;
+            const cellSize = snapshot.navGrid.cellSize;
+            const worldSize = gridW * cellSize;
+            const halfWorld = worldSize / 2;
+
+            const padding = 20;
+            const mapSize = Math.min(canvas.width, canvas.height) - padding * 2;
+            const scale = mapSize / worldSize;
+            const offsetX = (canvas.width - mapSize) / 2;
+            const offsetY = (canvas.height - mapSize) / 2;
+
+            return {
+                x: offsetX + (worldX + halfWorld) * scale,
+                y: offsetY + (worldZ + halfWorld) * scale,
+                scale
+            };
+        }
+
+        // Clic sur la carte pour sélectionner une entité
+        canvas.addEventListener('click', (e) => {
+            if (!snapshot) return;
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            // Vérifier le joueur
+            const pp = worldToCanvas(snapshot.player.x, snapshot.player.z);
+            if (Math.hypot(mx - pp.x, my - pp.y) < 10) {
+                selectedIsPlayer = true;
+                selectedEntityIndex = -1;
+                updateEntityList();
+                updateEntityDetail();
+                return;
+            }
+
+            // Vérifier les zombies
+            for (let i = 0; i < snapshot.zombies.length; i++) {
+                const z = snapshot.zombies[i];
+                const zp = worldToCanvas(z.x, z.z);
+                if (Math.hypot(mx - zp.x, my - zp.y) < 10) {
+                    selectedIsPlayer = false;
+                    selectedEntityIndex = i;
+                    updateEntityList();
+                    updateEntityDetail();
+                    return;
+                }
+            }
+
+            // Clic dans le vide = désélection
+            selectedIsPlayer = false;
+            selectedEntityIndex = -1;
+            updateEntityList();
+            updateEntityDetail();
+        });
+
+        // Stats du jeu
+        function updateStats() {
+            if (!snapshot) return;
+            document.getElementById('statWave').textContent = snapshot.wave.current;
+            document.getElementById('statRemaining').textContent = snapshot.wave.remaining;
+            document.getElementById('statActive').textContent = snapshot.zombies.filter(z => z.isAlive).length;
+
+            const hpEl = document.getElementById('statPlayerHP');
+            hpEl.textContent = `${Math.ceil(snapshot.player.health)} / ${snapshot.player.maxHealth}`;
+            const ratio = snapshot.player.health / snapshot.player.maxHealth;
+            hpEl.className = 'stat-value ' + (ratio > 0.6 ? 'health-good' : ratio > 0.3 ? 'health-mid' : 'health-low');
+
+            document.getElementById('statScore').textContent = snapshot.player.score;
+        }
+
+        // Liste des entités
+        function updateEntityList() {
+            if (!snapshot) return;
+            const list = document.getElementById('entityList');
+            let html = '';
+
+            // Joueur
+            const playerSel = selectedIsPlayer ? ' selected' : '';
+            html += `<div class="entity-item player-entity${playerSel}" onclick="selectEntity(-1, true)">
+                <span class="entity-type player">Joueur</span>
+                <span class="entity-state">${snapshot.player.isAlive ? 'ALIVE' : 'DEAD'}</span>
+            </div>`;
+
+            // Zombies
+            for (let i = 0; i < snapshot.zombies.length; i++) {
+                const z = snapshot.zombies[i];
+                if (!z.isAlive) continue;
+                const sel = (!selectedIsPlayer && selectedEntityIndex === i) ? ' selected' : '';
+                const mode = z.pathData && z.pathData.useDirectMode ? 'DIRECT' : 'PATH';
+                html += `<div class="entity-item${sel}" onclick="selectEntity(${i}, false)">
+                    <span class="entity-type ${z.type}">${z.type}</span>
+                    <span class="entity-state">${z.state} | ${mode}</span>
+                </div>`;
+            }
+
+            list.innerHTML = html;
+        }
+
+        window.selectEntity = function(index, isPlayer) {
+            selectedEntityIndex = index;
+            selectedIsPlayer = isPlayer;
+            updateEntityList();
+            updateEntityDetail();
+        };
+
+        // Détail de l'entité sélectionnée
+        function updateEntityDetail() {
+            const detail = document.getElementById('entityDetail');
+            if (!snapshot) return;
+
+            if (selectedIsPlayer) {
+                const p = snapshot.player;
+                detail.innerHTML = `
+                    <div class="detail-title" style="color:#44CC44">Joueur</div>
+                    <div class="detail-row"><span class="detail-label">Position</span><span class="detail-value">(${p.x.toFixed(1)}, ${p.z.toFixed(1)})</span></div>
+                    <div class="detail-row"><span class="detail-label">Santé</span><span class="detail-value">${Math.ceil(p.health)} / ${p.maxHealth}</span></div>
+                    <div class="detail-row"><span class="detail-label">Score</span><span class="detail-value">${p.score}</span></div>
+                    <div class="detail-row"><span class="detail-label">Rotation Y</span><span class="detail-value">${(p.rotationY * 180 / Math.PI).toFixed(1)}°</span></div>
+                    <div class="detail-row"><span class="detail-label">État</span><span class="detail-value">${p.isAlive ? 'Vivant' : 'Mort'}</span></div>
+                `;
+                return;
+            }
+
+            if (selectedEntityIndex >= 0 && selectedEntityIndex < snapshot.zombies.length) {
+                const z = snapshot.zombies[selectedEntityIndex];
+                const pd = z.pathData;
+                let pathInfo = 'Aucun';
+                if (pd) {
+                    if (pd.useDirectMode) {
+                        pathInfo = 'Mode direct (ligne de vue)';
+                    } else if (pd.waypointCount > 0) {
+                        pathInfo = `${pd.waypointIndex + 1} / ${pd.waypointCount} waypoints`;
+                    }
+                }
+
+                const typeColors = { walker: '#CC4444', runner: '#CCAA22', fatty: '#AA44AA', abomination: '#FF2222' };
+                detail.innerHTML = `
+                    <div class="detail-title" style="color:${typeColors[z.type] || '#ccc'}">${z.type.toUpperCase()}</div>
+                    <div class="detail-row"><span class="detail-label">Position</span><span class="detail-value">(${z.x.toFixed(1)}, ${z.z.toFixed(1)})</span></div>
+                    <div class="detail-row"><span class="detail-label">Santé</span><span class="detail-value">${Math.ceil(z.health)} / ${z.maxHealth}</span></div>
+                    <div class="detail-row"><span class="detail-label">Vitesse</span><span class="detail-value">${z.speed}</span></div>
+                    <div class="detail-row"><span class="detail-label">Dégâts</span><span class="detail-value">${z.damage}</span></div>
+                    <div class="detail-row"><span class="detail-label">Points</span><span class="detail-value">${z.scoreValue}</span></div>
+                    <div class="detail-row"><span class="detail-label">État</span><span class="detail-value">${z.state}</span></div>
+                    <div class="detail-row"><span class="detail-label">Pathfinding</span><span class="detail-value">${pathInfo}</span></div>
+                    ${pd ? `<div class="detail-row"><span class="detail-label">Recalc timer</span><span class="detail-value">${pd.recalcTimer.toFixed(2)}s</span></div>` : ''}
+                `;
+                return;
+            }
+
+            detail.innerHTML = '<span style="color:#555">Cliquez sur une entité dans la liste ou sur la carte</span>';
+        }
+
+        // ========== RENDU 2D ==========
+
+        function render() {
+            if (!snapshot) return;
+
+            const gridW = snapshot.navGrid.width;
+            const gridH = snapshot.navGrid.height;
+            const cellSize = snapshot.navGrid.cellSize;
+            const worldSize = gridW * cellSize;
+            const halfWorld = worldSize / 2;
+
+            const padding = 20;
+            const mapSize = Math.min(canvas.width, canvas.height) - padding * 2;
+            const scale = mapSize / worldSize;
+            const offsetX = (canvas.width - mapSize) / 2;
+            const offsetY = (canvas.height - mapSize) / 2;
+
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Fond de la carte
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(offsetX, offsetY, mapSize, mapSize);
+
+            // Grille de cellules
+            if (options.showGrid) {
+                ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+                ctx.lineWidth = 0.5;
+                for (let i = 0; i <= gridW; i++) {
+                    const x = offsetX + i * cellSize * scale;
+                    ctx.beginPath();
+                    ctx.moveTo(x, offsetY);
+                    ctx.lineTo(x, offsetY + mapSize);
+                    ctx.stroke();
+                }
+                for (let j = 0; j <= gridH; j++) {
+                    const y = offsetY + j * cellSize * scale;
+                    ctx.beginPath();
+                    ctx.moveTo(offsetX, y);
+                    ctx.lineTo(offsetX + mapSize, y);
+                    ctx.stroke();
+                }
+            }
+
+            // NavMesh (cellules bloquées)
+            if (options.showNavmesh) {
+                const cells = snapshot.navGrid.cells;
+                for (let row = 0; row < gridH; row++) {
+                    for (let col = 0; col < gridW; col++) {
+                        if (cells[row * gridW + col] === 1) {
+                            ctx.fillStyle = 'rgba(255, 50, 50, 0.3)';
+                            ctx.fillRect(
+                                offsetX + col * cellSize * scale,
+                                offsetY + row * cellSize * scale,
+                                cellSize * scale,
+                                cellSize * scale
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Chemins de pathfinding
+            if (options.showPaths) {
+                for (let i = 0; i < snapshot.zombies.length; i++) {
+                    const z = snapshot.zombies[i];
+                    if (!z.isAlive || !z.pathData || !z.pathData.waypoints || z.pathData.waypoints.length === 0) continue;
+
+                    const isSelected = !selectedIsPlayer && selectedEntityIndex === i;
+                    const pd = z.pathData;
+
+                    ctx.strokeStyle = isSelected ? '#ffff00' : 'rgba(255, 255, 0, 0.3)';
+                    ctx.lineWidth = isSelected ? 2 : 1;
+                    ctx.beginPath();
+
+                    const start = toCanvas(z.x, z.z);
+                    ctx.moveTo(start.x, start.y);
+
+                    for (let wi = pd.waypointIndex; wi < pd.waypoints.length; wi++) {
+                        const wp = pd.waypoints[wi];
+                        const p = toCanvas(wp.x, wp.z);
+                        ctx.lineTo(p.x, p.y);
+                    }
+                    ctx.stroke();
+
+                    // Waypoint courant
+                    if (pd.waypointIndex < pd.waypoints.length) {
+                        const wp = pd.waypoints[pd.waypointIndex];
+                        const p = toCanvas(wp.x, wp.z);
+                        ctx.fillStyle = '#ff8800';
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, isSelected ? 4 : 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+
+            // Zombies
+            const typeColors = { walker: '#CC4444', runner: '#CCAA22', fatty: '#AA44AA', abomination: '#FF2222' };
+            const typeSizes = { walker: 3, runner: 3, fatty: 5, abomination: 7 };
+
+            for (let i = 0; i < snapshot.zombies.length; i++) {
+                const z = snapshot.zombies[i];
+                if (!z.isAlive) continue;
+                const p = toCanvas(z.x, z.z);
+                const isSelected = !selectedIsPlayer && selectedEntityIndex === i;
+                const size = typeSizes[z.type] || 3;
+
+                // Rayon de collision
+                if (options.showEntityRadius) {
+                    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                    ctx.lineWidth = 1;
+                    const radiusMap = { walker: 0.4, runner: 0.4, fatty: 0.7, abomination: 0.9 };
+                    const r = (radiusMap[z.type] || 0.4) * scale;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                // Point zombie
+                ctx.fillStyle = typeColors[z.type] || '#CC4444';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Halo de sélection
+                if (isSelected) {
+                    ctx.strokeStyle = '#ffff00';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, size + 5, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+
+            // Joueur
+            const pp = toCanvas(snapshot.player.x, snapshot.player.z);
+
+            // Cône de vision
+            if (options.showFov) {
+                const fovAngle = Math.PI / 4;
+                const fovLen = 15 * scale;
+                ctx.fillStyle = 'rgba(68, 204, 68, 0.08)';
+                ctx.beginPath();
+                ctx.moveTo(pp.x, pp.y);
+                ctx.arc(pp.x, pp.y, fovLen, -snapshot.player.rotationY - fovAngle / 2 - Math.PI / 2, -snapshot.player.rotationY + fovAngle / 2 - Math.PI / 2);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // Rayon de collision joueur
+            if (options.showEntityRadius) {
+                ctx.strokeStyle = 'rgba(68, 204, 68, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(pp.x, pp.y, 0.4 * scale, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Triangle joueur
+            ctx.save();
+            ctx.translate(pp.x, pp.y);
+            ctx.rotate(-snapshot.player.rotationY);
+            ctx.fillStyle = selectedIsPlayer ? '#88ff88' : '#44CC44';
+            ctx.beginPath();
+            ctx.moveTo(0, -7);
+            ctx.lineTo(-5, 5);
+            ctx.lineTo(5, 5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+
+            if (selectedIsPlayer) {
+                ctx.strokeStyle = '#ffff00';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(pp.x, pp.y, 12, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Bordure de la carte
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(offsetX, offsetY, mapSize, mapSize);
+
+            // Helper local
+            function toCanvas(wx, wz) {
+                return {
+                    x: offsetX + (wx + halfWorld) * scale,
+                    y: offsetY + (wz + halfWorld) * scale
+                };
+            }
+        }
+
+        // Update detail panel en continu
+        setInterval(() => {
+            if (snapshot) updateEntityDetail();
+        }, 200);
+    </script>
+</body>
+</html>

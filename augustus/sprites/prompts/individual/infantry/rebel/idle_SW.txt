@@ -1,0 +1,36 @@
+# infantry_rebel_idle_SW
+# Unit: infantry | Faction: rebel | Animation: idle | Direction: SW
+# Dimensions: 384x64 (6 frames of 64x64)
+# Output: infantry/rebel/idle_SW.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+6 frames showing idle breathing animation loop,
+rebel infantry soldier,
+mismatched worn leather armor, ragged brown tunic,
+battered wooden round shield, no emblem,
+rusty sword or farming tool weapon held at side,
+no helmet or simple leather cap, dirty unkempt hair,
+torn dirty clothes, bare feet or worn sandals,
+standing at attention pose, slight chest breathing movement,
+facing southwest diagonal, 3/4 front-left view,
+64x64 pixels per frame, 384x64 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 16 color palette, transparent background,
+inspired by final fantasy tactics and fire emblem GBA,
+top-down RPG perspective, 3/4 view slightly from above
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 384x64

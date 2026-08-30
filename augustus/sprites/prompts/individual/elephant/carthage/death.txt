@@ -1,0 +1,31 @@
+# elephant_carthage_death
+# Unit: elephant | Faction: carthage | Animation: death | Direction: N/A
+# Dimensions: 384x96 (4 frames of 96x96)
+# Output: elephant/carthage/death.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+4 frames showing elephant death animation,
+war elephant collapsing,
+tower falling apart, soldiers thrown off,
+mahout falling, elephant going down,
+death sequence: hit stagger, legs buckling, falling sideways, collapsed,
+dramatic war elephant death,
+96x96 pixels per frame, 384x96 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 24 color palette, transparent background
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 384x96

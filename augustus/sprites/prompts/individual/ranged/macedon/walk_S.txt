@@ -1,0 +1,33 @@
+# ranged_macedon_walk_S
+# Unit: ranged | Faction: macedon | Animation: walk | Direction: S
+# Dimensions: 384x64 (6 frames of 64x64)
+# Output: ranged/macedon/walk_S.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+6 frames showing walk cycle animation loop,
+macedonian auxiliary archer,
+light leather armor over bronze and blue tunic,
+composite recurve bow carried, quiver bouncing on back,
+simple bronze helmet, leather bracers, light sandals,
+quick skirmisher walk, light-footed movement,
+facing forward toward viewer, front view,
+64x64 pixels per frame, 384x64 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 16 color palette, transparent background,
+seamless loop animation
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 384x64

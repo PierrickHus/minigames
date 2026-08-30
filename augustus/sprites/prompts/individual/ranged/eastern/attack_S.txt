@@ -1,0 +1,33 @@
+# ranged_eastern_attack_S
+# Unit: ranged | Faction: eastern | Animation: attack | Direction: S
+# Dimensions: 384x64 (6 frames of 64x64)
+# Output: ranged/eastern/attack_S.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+6 frames showing bow attack animation,
+eastern auxiliary archer,
+light leather armor over orange and gold tunic,
+composite recurve bow, quiver on back, simple bronze helmet,
+archery attack sequence: reach for arrow, nock arrow,
+draw bowstring back, full draw aim, release arrow, follow through,
+facing forward toward viewer, front view,
+64x64 pixels per frame, 384x64 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 16 color palette, transparent background,
+ranged combat animation, arrow visible in flight on release frame
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 384x64

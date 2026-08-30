@@ -5,7 +5,10 @@
       "Bash(node --check:*)",
       "Bash(find:*)",
       "Bash(ls:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(wc:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)"
     ]
   }
 }

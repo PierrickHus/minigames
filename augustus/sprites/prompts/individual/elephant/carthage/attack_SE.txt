@@ -1,0 +1,34 @@
+# elephant_carthage_attack_SE
+# Unit: elephant | Faction: carthage | Animation: attack | Direction: SE
+# Dimensions: 576x96 (6 frames of 96x96)
+# Output: elephant/carthage/attack_SE.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+6 frames showing elephant attack animation,
+carthaginian war elephant, large african elephant,
+wooden tower howdah, archers firing from tower,
+mahout commanding attack,
+elephant attack sequence: trumpet roar, rear up slightly,
+charge forward, tusk attack, trample, recover,
+trunk raised trumpeting, aggressive pose,
+facing southeast diagonal, 3/4 front-right view,
+96x96 pixels per frame, 576x96 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 24 color palette, transparent background,
+war elephant combat animation
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 576x96

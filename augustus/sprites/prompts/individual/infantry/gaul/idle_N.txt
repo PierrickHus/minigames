@@ -1,0 +1,36 @@
+# infantry_gaul_idle_N
+# Unit: infantry | Faction: gaul | Animation: idle | Direction: N
+# Dimensions: 384x64 (6 frames of 64x64)
+# Output: infantry/gaul/idle_N.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+6 frames showing idle breathing animation loop,
+gallic infantry soldier,
+bare muscular chest with blue woad war paint swirling tribal patterns,
+large oval wooden shield with celtic knot spiral design,
+long iron celtic sword held at side,
+no helmet, long wild blonde hair and large mustache,
+colorful plaid tartan trousers, golden torc necklace, leather boots with fur trim,
+standing at attention pose, slight chest breathing movement,
+facing away from viewer, back view, looking north,
+64x64 pixels per frame, 384x64 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 16 color palette, transparent background,
+inspired by final fantasy tactics and fire emblem GBA,
+top-down RPG perspective, 3/4 view slightly from above
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 384x64

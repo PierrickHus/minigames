@@ -1,0 +1,12 @@
+POSITIVE:
+sprite sheet, 6 frames, Roman soldier,
+lorica segmentata silver plate armor, large rectangular scutum shield with golden eagle SPQR emblem on red background,
+short gladius sword, bronze galea helmet with tall red horsehair crest,
+idle stance, facing forward toward viewer, front view,
+pixel art, game sprite, retro, 16-bit
+
+NEGATIVE:
+blurry, smooth, anti-aliasing, gradient,
+realistic, photograph, watermark, text, 3d render,
+painting, sketch, noise, jpeg artifacts, cropped,
+deformed, bad anatomy, ugly, duplicate

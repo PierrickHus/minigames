@@ -1,0 +1,36 @@
+# cavalry_rebel_walk_NE
+# Unit: cavalry | Faction: rebel | Animation: walk | Direction: NE
+# Dimensions: 480x80 (6 frames of 80x80)
+# Output: cavalry/rebel/walk_NE.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+6 frames showing horse trot cycle animation,
+rebel cavalry soldier mounted on brown horse,
+rider wearing mismatched worn leather armor, ragged brown tunic,
+brown and grey military cloak flowing behind,
+oval cavalry shield, long spatha cavalry sword at side,
+no helmet or simple leather cap, dirty unkempt hair,
+horse with brown and grey saddle cloth,
+horse trotting animation, legs moving in trot gait,
+rider bobbing with horse movement, cloak billowing,
+facing away northeast diagonal, 3/4 back-right view,
+80x80 pixels per frame, 480x80 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 20 color palette, transparent background,
+seamless trot loop animation
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 480x80

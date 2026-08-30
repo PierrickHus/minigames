@@ -1,0 +1,37 @@
+# infantry_eastern_attack_SE
+# Unit: infantry | Faction: eastern | Animation: attack | Direction: SE
+# Dimensions: 384x64 (6 frames of 64x64)
+# Output: infantry/eastern/attack_SE.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+6 frames showing sword attack animation,
+eastern infantry soldier,
+colorful scale lamellar armor with bright orange and gold robes,
+wicker and leather crescent shield raised defensively,
+curved shamshir scimitar sword attacking forward,
+pointed bronze helmet with aventail mail curtain,
+baggy colorful silk trousers, pointed leather boots,
+attack sequence: ready stance, wind up, thrust forward,
+full extension, retract, return to ready,
+sword thrust attack motion, shield covering body,
+facing southeast diagonal, 3/4 front-right view,
+64x64 pixels per frame, 384x64 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 16 color palette, transparent background,
+dynamic action pose, combat animation
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 384x64

@@ -1,0 +1,36 @@
+# cavalry_eastern_idle_S
+# Unit: cavalry | Faction: eastern | Animation: idle | Direction: S
+# Dimensions: 480x80 (6 frames of 80x80)
+# Output: cavalry/eastern/idle_S.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+6 frames showing idle animation loop,
+eastern cavalry soldier mounted on brown horse,
+rider wearing colorful scale lamellar armor with bright orange and gold robes,
+orange and gold military cloak flowing,
+oval cavalry shield with emblem, long spatha cavalry sword,
+pointed bronze helmet with aventail mail curtain,
+horse with orange and gold saddle cloth,
+leather horse tack and bridle, horse standing still with slight movement,
+tail swishing, rider sitting upright,
+facing forward toward viewer, front view,
+80x80 pixels per frame, 480x80 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 20 color palette, transparent background,
+mounted warrior
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 480x80

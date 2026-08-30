@@ -1,0 +1,36 @@
+# infantry_carthage_idle_SE
+# Unit: infantry | Faction: carthage | Animation: idle | Direction: SE
+# Dimensions: 384x64 (6 frames of 64x64)
+# Output: infantry/carthage/idle_SE.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+6 frames showing idle breathing animation loop,
+carthaginian infantry soldier,
+bronze scale armor over purple tunic with white linen,
+round aspis shield with crescent moon emblem,
+curved falcata sword held at side,
+conical bronze helmet with cheek guards,
+leather sandals with leg wraps, african features,
+standing at attention pose, slight chest breathing movement,
+facing southeast diagonal, 3/4 front-right view,
+64x64 pixels per frame, 384x64 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 16 color palette, transparent background,
+inspired by final fantasy tactics and fire emblem GBA,
+top-down RPG perspective, 3/4 view slightly from above
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 384x64

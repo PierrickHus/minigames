@@ -1,0 +1,37 @@
+# infantry_roman_attack_NW
+# Unit: infantry | Faction: roman | Animation: attack | Direction: NW
+# Dimensions: 384x64 (6 frames of 64x64)
+# Output: infantry/roman/attack_NW.png
+
+## POSITIVE PROMPT:
+pixel art sprite sheet, game asset, single horizontal strip,
+6 frames showing sword attack animation,
+roman infantry soldier,
+lorica segmentata silver plate armor,
+large rectangular scutum shield with golden eagle SPQR emblem on red background raised defensively,
+short gladius sword attacking forward,
+bronze galea helmet with tall red horsehair crest,
+bright red tunic underneath, brown leather sandals,
+attack sequence: ready stance, wind up, thrust forward,
+full extension, retract, return to ready,
+sword thrust attack motion, shield covering body,
+facing away northwest diagonal, 3/4 back-left view,
+64x64 pixels per frame, 384x64 total image,
+16-bit retro game style, visible pixels, hard edges,
+limited 16 color palette, transparent background,
+dynamic action pose, combat animation
+
+## NEGATIVE PROMPT:
+blurry, blur, soft, smooth, anti-aliasing, anti aliasing,
+gradient, 3D render, 3d, realistic, photograph, photo, watermark,
+signature, text, label, modern, high detail, soft edges, painterly,
+oil painting, sketch, pencil, charcoal, noise, grain, jpeg artifacts,
+cropped, cut off, partial, incomplete frame, missing limbs,
+extra limbs, mutated, deformed, bad anatomy, poorly drawn,
+disfigured, out of frame, duplicate, clone, twin
+
+## SETTINGS:
+Steps: 40
+CFG Scale: 7.5
+Sampler: DPM++ 2M Karras
+Size: 384x64
