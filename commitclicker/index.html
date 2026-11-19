@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Commit Clicker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--panel2:#1c2330;--line:#2d3644;--txt:#e6edf3;--mut:#8b949e;--acc:#3fb950;--acc2:#58a6ff;--warn:#d29922;--bad:#f85149;--pur:#bc8cff}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:'JetBrains Mono',ui-monospace,Consolas,monospace;font-size:13px}
+button{font-family:inherit;color:inherit;cursor:pointer}
+#app{display:grid;grid-template-rows:auto auto 1fr;height:100vh}
+header{display:flex;align-items:center;gap:16px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font-size:16px;margin:0;font-weight:800;letter-spacing:.5px}
+header h1 span{color:var(--acc)}
+#goal{flex:1;display:flex;align-items:center;gap:10px;color:var(--mut)}
+#goalbar{flex:1;height:10px;background:#0b0f14;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+#goalfill{height:100%;width:0;background:linear-gradient(90deg,var(--acc2),var(--pur));transition:width .3s}
+#timer{color:var(--mut);min-width:70px;text-align:right}
+.hbtn{background:transparent;border:1px solid var(--line);border-radius:6px;padding:4px 8px;color:var(--mut);font-size:11px}
+.hbtn:hover{color:var(--txt);border-color:var(--mut)}
+#ticker{padding:6px 16px;border-bottom:1px solid var(--line);color:var(--mut);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#0f141b}
+#ticker b{color:var(--acc)}
+main{display:grid;grid-template-columns:340px 1fr 360px;min-height:0}
+section{border-right:1px solid var(--line);overflow:auto;padding:14px;min-height:0}
+section:last-child{border-right:none}
+h2{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--mut);margin:0 0 10px;font-weight:700}
+/* left */
+#loc{font-size:30px;font-weight:800;text-align:center;margin-top:6px}
+#locl{text-align:center;color:var(--mut);margin-bottom:2px}
+#pps{text-align:center;color:var(--acc);font-weight:700}
+#clickv{text-align:center;color:var(--mut);font-size:11px;margin-top:2px}
+#bigbtn{display:block;margin:18px auto;width:200px;height:200px;border-radius:50%;border:3px solid var(--acc);background:radial-gradient(circle at 35% 30%,#1f3a2a,#0d1a12 70%);font-size:54px;font-weight:800;color:var(--acc);box-shadow:0 0 30px rgba(63,185,80,.25);transition:transform .05s,box-shadow .2s;user-select:none;position:relative}
+#bigbtn:hover{box-shadow:0 0 45px rgba(63,185,80,.4)}
+#bigbtn:active{transform:scale(.95)}
+#bigbtn small{display:block;font-size:12px;color:var(--mut);font-weight:400;margin-top:4px}
+#bigbtn.frenzy{border-color:var(--warn);color:var(--warn);box-shadow:0 0 50px rgba(210,153,34,.6)}
+.float{position:fixed;pointer-events:none;font-weight:800;color:var(--acc);animation:fl 1s ease-out forwards;z-index:50;text-shadow:0 0 6px #000}
+@keyframes fl{to{transform:translateY(-70px);opacity:0}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:12px}
+#debtbar{height:12px;background:#0b0f14;border-radius:6px;overflow:hidden;border:1px solid var(--line);margin:6px 0}
+#debtfill{height:100%;width:0;background:var(--warn);transition:width .2s}
+#debtinfo{display:flex;justify-content:space-between;color:var(--mut);font-size:11px}
+.btn{width:100%;padding:8px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);font-weight:700;margin-top:8px}
+.btn:hover:not(:disabled){border-color:var(--acc2)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.pri{background:#1a3a24;border-color:var(--acc);color:var(--acc)}
+.btn.pur{background:#2a1f3d;border-color:var(--pur);color:var(--pur)}
+#buffs div{padding:6px 8px;border-radius:6px;margin-bottom:6px;font-size:12px;background:#2b2210;color:var(--warn);border:1px solid #5a4514}
+.stat{display:flex;justify-content:space-between;color:var(--mut);font-size:11px;padding:2px 0}
+.stat b{color:var(--txt);font-weight:400}
+/* gens */
+#buymode{display:flex;gap:6px;margin-bottom:10px}
+#buymode button{flex:1;padding:5px;border-radius:6px;border:1px solid var(--line);background:var(--panel);font-size:11px;color:var(--mut)}
+#buymode button.on{border-color:var(--acc2);color:var(--acc2)}
+.gen{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;cursor:pointer;user-select:none;transition:border-color .15s,opacity .15s}
+.gen:hover{border-color:var(--mut)}
+.gen.ok{border-color:#2f6b3a}
+.gen.ok:hover{border-color:var(--acc)}
+.gen.no{opacity:.55}
+.gen.hidden{display:none}
+.gen.mystery .gname,.gen.mystery .gdesc{filter:blur(4px)}
+.gicon{font-size:28px;text-align:center}
+.gname{font-weight:700}
+.gdesc{color:var(--mut);font-size:11px;margin-top:2px}
+.gprod{color:var(--acc2);font-size:11px;margin-top:3px}
+.gright{text-align:right}
+.gcount{font-size:22px;font-weight:800;color:var(--mut)}
+.gcost{font-size:12px;color:var(--acc);font-weight:700}
+.gen.no .gcost{color:var(--bad)}
+/* upgrades */
+#upgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px}
+.upg{aspect-ratio:1;border-radius:8px;border:1px solid var(--line);background:var(--panel);font-size:22px;display:flex;align-items:center;justify-content:center;position:relative;padding:0}
+.upg.ok{border-color:var(--acc);background:#14281b}
+.upg.no{opacity:.45}
+.upg .tier{position:absolute;bottom:1px;right:3px;font-size:9px;color:var(--mut);font-weight:700}
+#tip{position:fixed;z-index:60;max-width:280px;background:#0b0f14;border:1px solid var(--mut);border-radius:8px;padding:10px;pointer-events:none;display:none;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#tip .tn{font-weight:800;margin-bottom:4px}
+#tip .tc{color:var(--acc);margin-top:6px;font-weight:700}
+#tip .td{color:var(--mut)}
+#owned{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px}
+#owned span{font-size:14px;opacity:.8}
+#log{font-size:11px;color:var(--mut);max-height:200px;overflow:auto}
+#log div{padding:3px 0;border-bottom:1px dashed #222a35}
+#log div:first-child{color:var(--txt)}
+#pivotgain{font-size:20px;font-weight:800;color:var(--pur);text-align:center;margin:4px 0}
+#pivotdesc{color:var(--mut);font-size:11px;line-height:1.5}
+#pivotrec{color:var(--pur);font-size:11px;text-align:center;margin-top:6px;font-weight:700;display:none}
+/* bug */
+#bug{position:fixed;font-size:40px;cursor:pointer;z-index:40;display:none;filter:drop-shadow(0 0 10px var(--bad));animation:wig .5s infinite alternate;user-select:none}
+@keyframes wig{from{transform:rotate(-15deg) scale(1)}to{transform:rotate(15deg) scale(1.15)}}
+#toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#0b0f14;border:1px solid var(--warn);color:var(--warn);padding:10px 16px;border-radius:8px;z-index:70;display:none;font-weight:700;max-width:90vw;text-align:center}
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:80}
+.modal .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:520px;width:92vw;text-align:center;line-height:1.6}
+.modal h3{margin:0 0 8px;font-size:20px}
+.modal .row{display:flex;gap:10px;margin-top:16px}
+.modal .row .btn{margin:0}
+#win .box{border-color:var(--pur);box-shadow:0 0 80px rgba(188,140,255,.35)}
+#win h3{color:var(--pur);font-size:26px}
+#singbtn{display:none}
+@media (max-width:1000px){main{grid-template-columns:1fr}section{border-right:none;border-bottom:1px solid var(--line);overflow:visible}#app{height:auto}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>&lt;Commit<span>Clicker</span>/&gt;</h1>
+    <div id="goal"><span>Singularité</span><div id="goalbar"><div id="goalfill"></div></div><span id="goalpct">0%</span></div>
+    <div id="timer">00:00</div>
+    <button class="hbtn" id="helpbtn">Aide</button>
+    <button class="hbtn" id="resetbtn">Reset</button>
+  </header>
+  <div id="ticker">…</div>
+  <main>
+    <section>
+      <div id="locl">lignes de code</div>
+      <div id="loc">0</div>
+      <div id="pps">0 /s</div>
+      <div id="clickv">+1 par commit</div>
+      <button id="bigbtn">{ }<small>git commit</small></button>
+      <div id="buffs"></div>
+      <div class="card">
+        <h2>Dette technique</h2>
+        <div id="debtbar"><div id="debtfill"></div></div>
+        <div id="debtinfo"><span id="debtpct">0%</span><span id="debtpen">production −0%</span></div>
+        <button class="btn" id="refactobtn">Sprint de refacto</button>
+      </div>
+      <div class="card">
+        <h2>Statistiques</h2>
+        <div id="stats"></div>
+      </div>
+    </section>
+    <section>
+      <h2>Recrutement &amp; infra</h2>
+      <div id="buymode"><button data-n="1" class="on">×1</button><button data-n="10">×10</button><button data-n="max">Max</button></div>
+      <div id="gens"></div>
+    </section>
+    <section>
+      <button class="btn pur" id="singbtn" style="margin:0 0 12px;padding:14px;font-size:14px">🌌 Déclencher la Singularité</button>
+      <div class="card">
+        <h2>Améliorations</h2>
+        <div id="upgs"></div>
+        <div id="noupg" style="color:var(--mut);font-size:11px">Rien pour l'instant. Continue de coder.</div>
+        <div id="owned"></div>
+      </div>
+      <div class="card">
+        <h2>Pivot de la startup</h2>
+        <div id="pivotgain">+0 ⭐</div>
+        <div id="pivotdesc"></div>
+        <div id="pivotrec">✨ Pivot recommandé : ça doublera au moins ton bonus</div>
+        <button class="btn pur" id="pivotbtn">Pivoter</button>
+      </div>
+      <div class="card">
+        <h2>Journal</h2>
+        <div id="log"></div>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="bug">🐛</div>
+<div id="toast"></div>
+<div id="tip"></div>
+<div class="modal" id="confirm"><div class="box"><h3 id="cfT"></h3><div id="cfD"></div><div class="row"><button class="btn" id="cfNo">Annuler</button><button class="btn pri" id="cfYes">Confirmer</button></div></div></div>
+<div class="modal" id="win"><div class="box"><h3>🌌 SINGULARITÉ ATTEINTE</h3><div id="winD"></div><div class="row"><button class="btn" id="winCont">Continuer à jouer</button><button class="btn pur" id="winNew">Nouvelle partie</button></div></div></div>
+<div class="modal" id="help"><div class="box" style="text-align:left"><h3 style="text-align:center">Comment jouer</h3>
+<p>🎯 <b>Objectif</b> : accumuler <b id="goalTxt"></b> lignes de code pour déclencher la Singularité. Compte ~1h.</p>
+<p>⌨️ Clique sur <b>{ }</b> pour commiter, puis recrute des devs et monte de l'infra qui codent pour toi.</p>
+<p>🏚️ La <b>dette technique</b> monte avec le temps et réduit ta production (jusqu'à −50%). Un sprint de refacto la remet à zéro, contre 20 s de production.</p>
+<p>🐛 Des <b>bugs</b> apparaissent parfois à l'écran : clique-les vite pour un bonus.</p>
+<p>⭐ Le <b>pivot</b> remet ta startup à zéro mais donne des étoiles : +10% de production et de clic chacune. Indispensable pour finir.</p>
+<p style="color:var(--mut);font-size:11px">Sauvegarde automatique dans ce navigateur. Touche Espace = commit.</p>
+<div class="row"><button class="btn pri" id="helpOk">C'est parti</button></div></div></div>
+<script>
+
+const GENS = [
+  { id: 'stag', name: 'Stagiaire', icon: '🧑‍🎓', cost: 15, prod: 0.2, desc: 'Copie-colle depuis Stack Overflow.' },
+  { id: 'jun', name: 'Dev Junior', icon: '👶', cost: 100, prod: 1.5, desc: 'Motivé. Pose beaucoup de questions.' },
+  { id: 'sen', name: 'Dev Senior', icon: '🧔', cost: 800, prod: 10, desc: '« Ça marche sur ma machine. »' },
+  { id: 'ai', name: 'Copilote IA', icon: '🤖', cost: 6000, prod: 55, desc: 'Autocomplète des fonctions entières.' },
+  { id: 'agile', name: 'Squad Agile', icon: '🏉', cost: 50000, prod: 260, desc: 'Daily, rétro, et parfois du code.' },
+  { id: 'ci', name: 'Pipeline CI/CD', icon: '🔁', cost: 4e5, prod: 1400, desc: 'Déploie 40 fois par jour.' },
+  { id: 'k8s', name: 'Cluster Kubernetes', icon: '☸️', cost: 3.5e6, prod: 7800, desc: 'Personne ne sait vraiment comment il marche.' },
+  { id: 'dc', name: 'Data Center', icon: '🏢', cost: 3e7, prod: 44000, desc: 'Chauffe la moitié de la ville.' },
+  { id: 'llm', name: 'Ferme de LLM', icon: '🧠', cost: 2.6e8, prod: 260000, desc: 'Écrit du code qui écrit du code.' },
+  { id: 'qc', name: 'Compilateur quantique', icon: '⚛️', cost: 2.4e9, prod: 1.6e6, desc: 'Compile tous les états possibles à la fois.' },
+];
+const GEN_TIERS = [ [1, 6], [10, 30], [25, 300], [50, 3000], [100, 50000] ];
+const TIER_NAMES = ['Onboarding', 'Bonnes pratiques', 'Design patterns', 'Craftsmanship', 'Légende du code'];
+
+const UPGRADES = [];
+GENS.forEach((g, i) => GEN_TIERS.forEach(([n, m], t) => UPGRADES.push({
+  id: `g${i}t${t}`, name: `${g.name} : ${TIER_NAMES[t]}`, icon: g.icon,
+  cost: g.cost * m, desc: `Production des ${g.name} ×2`, req: s => s.gens[i] >= n,
+  kind: 'gen', gen: i, mult: 2,
+})));
+[
+  { id: 'c1', name: 'Clavier mécanique', icon: '⌨️', cost: 100, desc: 'Clic ×2', req: s => s.clicks >= 10, kind: 'clickMult', mult: 2 },
+  { id: 'c2', name: 'Raccourcis Vim', icon: '📝', cost: 1000, desc: 'Clic ×2', req: s => s.clicks >= 50, kind: 'clickMult', mult: 2 },
+  { id: 'c3', name: 'Pair programming', icon: '👯', cost: 3000, desc: 'Chaque clic gagne +2% de la prod/s', req: s => s.gens[1] >= 5, kind: 'clickPct', pct: 0.02 },
+  { id: 'c4', name: 'Mob programming', icon: '👥', cost: 2.5e6, desc: 'Chaque clic gagne +3% de la prod/s', req: s => s.gens[3] >= 5, kind: 'clickPct', pct: 0.03 },
+  { id: 'c5', name: 'Flow state', icon: '🌊', cost: 2.5e8, desc: 'Chaque clic gagne +5% de la prod/s', req: s => s.gens[5] >= 5, kind: 'clickPct', pct: 0.05 },
+  { id: 'd1', name: 'Tests unitaires', icon: '✅', cost: 5000, desc: 'Dette technique accumulée ÷2', req: s => s.maxDebt >= 20, kind: 'debt', mult: 0.5 },
+  { id: 'd2', name: 'Code review', icon: '🔍', cost: 2e6, desc: 'Dette technique accumulée ÷2', req: s => s.gens[4] >= 1, kind: 'debt', mult: 0.5 },
+  { id: 'd3', name: 'Clean Architecture', icon: '🏛️', cost: 5e9, desc: 'Dette technique accumulée ÷2', req: s => s.gens[7] >= 1, kind: 'debt', mult: 0.5 },
+  { id: 'd4', name: 'Équipe SRE', icon: '🚒', cost: 5e7, desc: 'Lance automatiquement un refacto à 60% de dette', req: s => s.refactos >= 3, kind: 'autoRefacto' },
+  { id: 'b1', name: 'Bug bounty', icon: '💰', cost: 50000, desc: 'Les bugs apparaissent 2× plus souvent', req: s => s.bugsCaught >= 1, kind: 'bugFreq', mult: 0.5 },
+  { id: 'b2', name: 'Monitoring Grafana', icon: '📈', cost: 5e7, desc: 'Les bugs restent visibles 2× plus longtemps, effets +50%', req: s => s.bugsCaught >= 5, kind: 'bugPower' },
+  { id: 'm1', name: 'Café illimité', icon: '☕', cost: 50000, desc: 'Toute la production +25%', req: s => s.gens[2] >= 1, kind: 'global', mult: 1.25 },
+  { id: 'm2', name: 'Télétravail', icon: '🏠', cost: 5e6, desc: 'Toute la production +50%', req: s => s.gens[4] >= 5, kind: 'global', mult: 1.5 },
+  { id: 'm3', name: 'Semaine de 4 jours', icon: '🌴', cost: 5e8, desc: 'Toute la production ×2 (les gens sont plus heureux)', req: s => s.gens[6] >= 3, kind: 'global', mult: 2 },
+  { id: 'm4', name: 'Monorepo', icon: '📦', cost: 5e10, desc: 'Toute la production ×2', req: s => s.gens[8] >= 1, kind: 'global', mult: 2 },
+  { id: 'syn', name: 'Synergie Junior–Senior', icon: '🤝', cost: 2e5, desc: 'Chaque Senior booste les Juniors de +5%', req: s => s.gens[2] >= 15, kind: 'synergy' },
+].forEach(u => UPGRADES.push(u));
+const UPG_BY_ID = Object.fromEntries(UPGRADES.map(u => [u.id, u]));
+
+const GOAL = 1e14;           // Coût de la Singularité
+const PIVOT_MIN = 1e9;       // Lignes (run) min pour pivoter
+const COST_GROWTH = 1.15;
+
+function newState() {
+  return {
+    loc: 0, runTotal: 0, allTotal: 0,
+    gens: GENS.map(() => 0), upg: {},
+    debt: 0, maxDebt: 0, refactos: 0,
+    clicks: 0, bugsCaught: 0,
+    xp: 0, pivots: 0,
+    buffProd: 1, buffProdUntil: 0, buffClick: 1, buffClickUntil: 0,
+    playTime: 0, won: false, winTime: 0,
+    nextBug: 45,
+  };
+}
+
+function genCost(s, i, n = 1) {
+  const g = GENS[i];
+  let total = 0;
+  for (let k = 0; k < n; k++) total += Math.ceil(g.cost * Math.pow(COST_GROWTH, s.gens[i] + k));
+  return total;
+}
+function maxAffordable(s, i) {
+  let n = 0, total = 0;
+  while (n < 1000) { const c = Math.ceil(GENS[i].cost * Math.pow(COST_GROWTH, s.gens[i] + n)); if (total + c > s.loc) break; total += c; n++; }
+  return n;
+}
+function genMult(s, i) {
+  let m = 1;
+  for (const u of UPGRADES) if (s.upg[u.id] && u.kind === 'gen' && u.gen === i) m *= u.mult;
+  if (i === 1 && s.upg.syn) m *= 1 + 0.05 * s.gens[2];
+  return m;
+}
+function globalMult(s) {
+  let m = 1;
+  for (const u of UPGRADES) if (s.upg[u.id] && u.kind === 'global') m *= u.mult;
+  m *= 1 + 0.1 * s.xp;
+  return m;
+}
+function debtPenalty(s) { return 1 - s.debt * 0.005; }
+function genProd(s, i) { return GENS[i].prod * genMult(s, i); }
+function baseProd(s) {
+  let p = 0;
+  for (let i = 0; i < GENS.length; i++) p += s.gens[i] * genProd(s, i);
+  return p * globalMult(s);
+}
+function prodPerSec(s, now) {
+  return baseProd(s) * debtPenalty(s) * (now < s.buffProdUntil ? s.buffProd : 1);
+}
+function clickValue(s, now) {
+  let v = 1;
+  for (const u of UPGRADES) if (s.upg[u.id] && u.kind === 'clickMult') v *= u.mult;
+  let pct = 0;
+  for (const u of UPGRADES) if (s.upg[u.id] && u.kind === 'clickPct') pct += u.pct;
+  v += pct * prodPerSec(s, now);
+  v *= (1 + 0.1 * s.xp);
+  return v * (now < s.buffClickUntil ? s.buffClick : 1);
+}
+function debtRate(s) {
+  const owned = s.gens.reduce((a, b) => a + b, 0);
+  if (owned === 0) return 0;
+  let r = 0.12 + 0.004 * owned;
+  for (const u of UPGRADES) if (s.upg[u.id] && u.kind === 'debt') r *= u.mult;
+  return r;
+}
+function refactoCost(s, now) { return prodPerSec(s, now) * 20; }
+function doRefacto(s, now) {
+  const c = refactoCost(s, now);
+  if (s.debt < 1) return false;
+  s.loc = Math.max(0, s.loc - c);
+  s.debt = 0; s.refactos++;
+  return true;
+}
+function pivotGain(s) {
+  if (s.runTotal < PIVOT_MIN) return 0;
+  return Math.floor(Math.pow(s.runTotal / PIVOT_MIN, 0.5) * 2);
+}
+function doPivot(s) {
+  const g = pivotGain(s);
+  if (g <= 0) return 0;
+  const keep = { xp: s.xp + g, pivots: s.pivots + 1, allTotal: s.allTotal, clicks: s.clicks, bugsCaught: s.bugsCaught,
+    playTime: s.playTime, refactos: s.refactos, maxDebt: s.maxDebt };
+  const keepUpg = {};
+  ['b1', 'b2', 'd4', 'c1', 'c2'].forEach(k => { if (s.upg[k]) keepUpg[k] = true; });
+  Object.assign(s, newState(), keep);
+  s.upg = keepUpg;
+  s.nextBug = 20;
+  return g;
+}
+function canBuyUpg(s, u) { return !s.upg[u.id] && u.req(s); }
+function buyUpg(s, id) {
+  const u = UPG_BY_ID[id];
+  if (!canBuyUpg(s, u) || s.loc < u.cost) return false;
+  s.loc -= u.cost; s.upg[id] = true; return true;
+}
+function buyGen(s, i, n = 1) {
+  const c = genCost(s, i, n);
+  if (s.loc < c) return false;
+  s.loc -= c; s.gens[i] += n; return true;
+}
+function bugInterval(s) {
+  let base = 70 + Math.random() * 50;
+  if (s.upg.b1) base *= 0.5;
+  return base;
+}
+const BUG_EFFECTS = ['hotfix', 'so', 'frenzy', 'clean'];
+function catchBug(s, now, effect) {
+  const pw = s.upg.b2 ? 1.5 : 1;
+  s.bugsCaught++;
+  if (effect === 'hotfix') { s.buffProd = 7; s.buffProdUntil = now + 30 * pw; return `🔥 Hotfix héroïque ! Production ×7 pendant ${Math.round(30 * pw)}s`; }
+  if (effect === 'frenzy') { s.buffClick = 77; s.buffClickUntil = now + 12 * pw; return `⚡ Rush avant la démo ! Clics ×77 pendant ${Math.round(12 * pw)}s`; }
+  if (effect === 'clean') { s.debt = 0; const g = prodPerSec(s, now) * 60 * pw; s.loc += g; s.runTotal += g; s.allTotal += g; return `🧹 Bug corrigé proprement : dette effacée et +${fmt(g)} lignes`; }
+  const g = Math.min(s.loc * 0.15, prodPerSec(s, now) * 900) * pw + 13;
+  s.loc += g; s.runTotal += g; s.allTotal += g;
+  return `📚 Réponse parfaite sur Stack Overflow : +${fmt(g)} lignes`;
+}
+function tick(s, dt, now) {
+  const p = prodPerSec(s, now) * dt;
+  s.loc += p; s.runTotal += p; s.allTotal += p;
+  s.debt = Math.min(100, s.debt + debtRate(s) * dt);
+  s.maxDebt = Math.max(s.maxDebt, s.debt);
+  if (s.upg.d4 && s.debt >= 60) doRefacto(s, now);
+  s.playTime += dt;
+}
+function doClick(s, now) {
+  const v = clickValue(s, now);
+  s.loc += v; s.runTotal += v; s.allTotal += v; s.clicks++;
+  return v;
+}
+const SUFFIX = ['', 'k', 'M', 'Md', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+function fmt(n) {
+  if (!isFinite(n)) return '∞';
+  if (n < 1000) return n < 10 && n % 1 ? n.toFixed(1) : Math.floor(n).toString();
+  const e = Math.floor(Math.log10(n) / 3);
+  if (e >= SUFFIX.length) return n.toExponential(2);
+  const v = n / Math.pow(1000, e);
+  return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : Math.floor(v)) + ' ' + SUFFIX[e];
+}
+
+</script>
+<script>
+const $ = id => document.getElementById(id);
+const SAVE_KEY = 'commitclicker_v1';
+let S = newState();
+let buyN = 1;
+let bugEl = $('bug'), bugTimeout = null, bugActive = false;
+
+function now() { return S.playTime; }
+function fmtTime(t) { t = Math.floor(t); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return (h ? h + ':' : '') + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0'); }
+
+/* ---------- save ---------- */
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ s: S, t: Date.now() })); } catch (e) {} }
+function load() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY); if (!raw) return false;
+    const d = JSON.parse(raw); const base = newState();
+    S = Object.assign(base, d.s); S.gens = GENS.map((_, i) => (d.s.gens || [])[i] || 0); S.upg = d.s.upg || {};
+    const away = Math.min(7200, (Date.now() - d.t) / 1000);
+    if (away > 30 && !S.won) {
+      const g = prodPerSec(S, now()) * away * 0.5;
+      S.loc += g; S.runTotal += g; S.allTotal += g;
+      S.debt = Math.min(100, S.debt + debtRate(S) * away);
+      log(`💤 Pendant ton absence (${fmtTime(away)}), l'équipe a écrit ${fmt(g)} lignes.`);
+    }
+    return true;
+  } catch (e) { return false; }
+}
+
+/* ---------- log / toast ---------- */
+function log(msg) { const d = document.createElement('div'); d.textContent = `[${fmtTime(S.playTime)}] ${msg}`; $('log').prepend(d); while ($('log').children.length > 40) $('log').lastChild.remove(); }
+let toastT;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toastT); toastT = setTimeout(() => t.style.display = 'none', 3500); }
+function confirmBox(title, desc, yes) {
+  $('cfT').textContent = title; $('cfD').innerHTML = desc; $('confirm').style.display = 'flex';
+  $('cfYes').onclick = () => { $('confirm').style.display = 'none'; yes(); };
+  $('cfNo').onclick = () => $('confirm').style.display = 'none';
+}
+
+/* ---------- click ---------- */
+function commit(x, y) {
+  const v = doClick(S, now());
+  const f = document.createElement('div'); f.className = 'float'; f.textContent = '+' + fmt(v);
+  f.style.left = (x - 20 + Math.random() * 40) + 'px'; f.style.top = (y - 20) + 'px';
+  document.body.appendChild(f); setTimeout(() => f.remove(), 1000);
+}
+$('bigbtn').addEventListener('click', e => {
+  const r = $('bigbtn').getBoundingClientRect();
+  commit(e.clientX || r.left + r.width / 2, e.clientY || r.top + r.height / 2);
+});
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !e.repeat && document.activeElement.tagName !== 'BUTTON') { e.preventDefault(); const r = $('bigbtn').getBoundingClientRect(); commit(r.left + r.width / 2, r.top + r.height / 2); }
+});
+
+/* ---------- gens ---------- */
+const genEls = [];
+GENS.forEach((g, i) => {
+  const el = document.createElement('div'); el.className = 'gen';
+  el.innerHTML = `<div class="gicon">${g.icon}</div><div><div class="gname">${g.name}</div><div class="gdesc">${g.desc}</div><div class="gprod"></div></div><div class="gright"><div class="gcount">0</div><div class="gcost"></div></div>`;
+  el.addEventListener('click', () => {
+    let n = buyN === 'max' ? Math.max(1, maxAffordableN(i)) : buyN;
+    if (buyGen(S, i, n)) { if (S.gens[i] === n) log(`${g.icon} Premier ${g.name} recruté !`); }
+  });
+  $('gens').appendChild(el);
+  genEls.push({ el, prod: el.querySelector('.gprod'), count: el.querySelector('.gcount'), cost: el.querySelector('.gcost') });
+});
+function maxAffordableN(i) { let n = 0; while (n < 500 && genCost(S, i, n + 1) <= S.loc) n++; return n; }
+document.querySelectorAll('#buymode button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#buymode button').forEach(x => x.classList.remove('on')); b.classList.add('on');
+  buyN = b.dataset.n === 'max' ? 'max' : +b.dataset.n;
+}));
+
+/* ---------- upgrades ---------- */
+let upgKey = '';
+function tierLabel(u) { const m = u.id.match(/t(\d)$/); return m ? ['I', 'II', 'III', 'IV', 'V'][+m[1]] : ''; }
+function renderUpgs() {
+  const avail = UPGRADES.filter(u => canBuyUpg(S, u)).sort((a, b) => a.cost - b.cost);
+  const owned = UPGRADES.filter(u => S.upg[u.id]);
+  const key = avail.map(u => u.id).join() + '|' + owned.length;
+  if (key === upgKey) return; upgKey = key;
+  const box = $('upgs'); box.innerHTML = '';
+  avail.forEach(u => {
+    const b = document.createElement('button'); b.className = 'upg'; b.dataset.id = u.id;
+    b.innerHTML = `${u.icon}<span class="tier">${tierLabel(u)}</span>`;
+    b.addEventListener('click', () => { if (buyUpg(S, u.id)) { log(`${u.icon} Amélioration : ${u.name}`); hideTip(); } });
+    b.addEventListener('mouseenter', e => showTip(e, u)); b.addEventListener('mouseleave', hideTip);
+    box.appendChild(b);
+  });
+  $('noupg').style.display = avail.length ? 'none' : 'block';
+  $('owned').innerHTML = owned.length ? owned.map(u => `<span title="${u.name}">${u.icon}</span>`).join('') : '';
+}
+function showTip(e, u) {
+  const t = $('tip'); t.innerHTML = `<div class="tn">${u.icon} ${u.name}</div><div class="td">${u.desc}</div><div class="tc">${fmt(u.cost)} lignes</div>`;
+  t.style.display = 'block'; const r = e.currentTarget.getBoundingClientRect();
+  t.style.left = Math.max(8, Math.min(innerWidth - 290, r.left - 120)) + 'px'; t.style.top = (r.bottom + 8) + 'px';
+}
+function hideTip() { $('tip').style.display = 'none'; }
+
+/* ---------- refacto / pivot / sing ---------- */
+$('refactobtn').addEventListener('click', () => { const c = refactoCost(S, now()); if (S.loc >= c && doRefacto(S, now())) log('🧽 Sprint de refacto terminé. Le code respire.'); });
+$('pivotbtn').addEventListener('click', () => {
+  const g = pivotGain(S); if (!g) return;
+  confirmBox('Pivoter la startup ?', `Tu repars de zéro (lignes, équipe, améliorations) mais tu gagnes <b style="color:var(--pur)">+${g} ⭐</b>.<br>Bonus total : +${(S.xp + g) * 10}% de production et de clic.<br><span style="color:var(--mut);font-size:11px">Conservés : étoiles, Bug bounty, Grafana, SRE, améliorations de clavier.</span>`, () => {
+    const x = doPivot(S); log(`🔄 Pivot n°${S.pivots} ! +${x} ⭐ (total ${S.xp})`); toast(`🔄 Nouveau départ : +${x} ⭐`); upgKey = ''; hideBug();
+  });
+});
+$('singbtn').addEventListener('click', () => {
+  if (S.loc < GOAL) return;
+  S.loc -= GOAL; S.won = true; S.winTime = S.playTime; save();
+  showWin();
+});
+function showWin() {
+  $('winD').innerHTML = `L'IA que ton équipe a codée vient de se réécrire elle-même.<br>Plus personne n'aura jamais besoin d'écrire une ligne de code.<br><br>
+  ⏱️ Temps : <b>${fmtTime(S.winTime)}</b><br>🖱️ Commits manuels : <b>${fmt(S.clicks)}</b><br>🐛 Bugs attrapés : <b>${S.bugsCaught}</b><br>🔄 Pivots : <b>${S.pivots}</b> (${S.xp} ⭐)<br>🧽 Refactos : <b>${S.refactos}</b><br>📜 Lignes écrites au total : <b>${fmt(S.allTotal)}</b>`;
+  $('win').style.display = 'flex';
+}
+$('winCont').onclick = () => $('win').style.display = 'none';
+$('winNew').onclick = () => { S = newState(); upgKey = ''; $('log').innerHTML = ''; $('win').style.display = 'none'; save(); log('🚀 Nouvelle startup fondée dans un garage.'); };
+$('resetbtn').onclick = () => confirmBox('Tout effacer ?', 'La partie entière (étoiles comprises) sera perdue.', () => { S = newState(); upgKey = ''; $('log').innerHTML = ''; hideBug(); save(); log('🚀 Nouvelle startup fondée dans un garage.'); });
+$('helpbtn').onclick = () => $('help').style.display = 'flex';
+$('helpOk').onclick = () => $('help').style.display = 'none';
+$('goalTxt').textContent = fmt(GOAL);
+
+/* ---------- bugs ---------- */
+function spawnBug() {
+  bugActive = true;
+  const x = 80 + Math.random() * (innerWidth - 160), y = 120 + Math.random() * (innerHeight - 220);
+  bugEl.style.left = x + 'px'; bugEl.style.top = y + 'px'; bugEl.style.display = 'block';
+  const life = (S.upg.b2 ? 24 : 12) * 1000;
+  bugTimeout = setTimeout(() => { hideBug(); log('🐛 Un bug s\'est échappé en prod… dommage.'); }, life);
+}
+function hideBug() { bugActive = false; bugEl.style.display = 'none'; clearTimeout(bugTimeout); }
+bugEl.addEventListener('click', () => {
+  if (!bugActive) return; hideBug();
+  let pool = BUG_EFFECTS.slice(); if (S.debt < 15) pool = pool.filter(e => e !== 'clean');
+  const msg = catchBug(S, now(), pool[Math.floor(Math.random() * pool.length)]);
+  toast(msg); log(msg); S.nextBug = bugInterval(S);
+});
+
+/* ---------- ticker ---------- */
+const NEWS = [
+  () => 'Un stagiaire a push directement sur <b>main</b>. Personne n\'a rien vu.',
+  () => 'Le PO demande « juste un petit bouton ». Estimation : 3 sprints.',
+  () => 'Débat de 2h en réunion : <b>tabs</b> ou <b>espaces</b> ? Pas de consensus.',
+  () => 'Un senior a supprimé 4000 lignes. Tout fonctionne mieux.',
+  () => 'Le build est vert. Personne ne sait pourquoi.',
+  () => 'Nouveau framework JS sorti ce matin. L\'équipe front veut tout migrer.',
+  () => '« C\'est pas un bug, c\'est une feature » — anonyme, 17h58 un vendredi.',
+  () => 'La doc est à jour. Non, c\'est une blague.',
+  () => `Ta startup a écrit <b>${fmt(S.allTotal)}</b> lignes depuis sa création.`,
+  () => 'Déploiement le vendredi après-midi : l\'équipe SRE a démissionné.',
+  () => 'Le Copilote IA a commenté son code. En haïku.',
+  () => 'Un microservice a été découpé en 12 nano-services.',
+  () => 'Le cluster Kubernetes a redémarré tout seul. Encore.',
+  () => 'Étude : 80% du code est écrit pour gérer les 20% de cas tordus.',
+  () => 'Le client a validé la maquette. Puis a changé d\'avis.',
+  () => 'Coverage des tests : 100%. Assertions : 0.',
+  () => S.debt > 60 ? '⚠️ Le code commence à ressembler à des spaghetti. Pensez au refacto.' : 'Revue de code : « LGTM 👍 » après 3 secondes de lecture.',
+];
+function nextNews() { $('ticker').innerHTML = '📰 ' + NEWS[Math.floor(Math.random() * NEWS.length)](); }
+setInterval(nextNews, 9000);
+
+/* ---------- render ---------- */
+function render() {
+  const t = now(), pps = prodPerSec(S, t);
+  $('loc').textContent = fmt(S.loc);
+  $('pps').textContent = fmt(pps) + ' /s';
+  $('clickv').textContent = '+' + fmt(clickValue(S, t)) + ' par commit';
+  $('timer').textContent = fmtTime(S.won ? S.winTime : S.playTime);
+  const gp = Math.min(1, Math.max(0, Math.log10(1 + S.loc) / Math.log10(GOAL)));
+  $('goalfill').style.width = (gp * 100) + '%';
+  $('goalpct').textContent = S.won ? '✓' : fmt(S.loc) + ' / ' + fmt(GOAL);
+  $('singbtn').style.display = (S.loc >= GOAL && !S.won) ? 'block' : 'none';
+  $('bigbtn').classList.toggle('frenzy', t < S.buffClickUntil);
+  // buffs
+  let bh = '';
+  if (t < S.buffProdUntil) bh += `<div>🔥 Production ×${S.buffProd} — ${Math.ceil(S.buffProdUntil - t)}s</div>`;
+  if (t < S.buffClickUntil) bh += `<div>⚡ Clics ×${S.buffClick} — ${Math.ceil(S.buffClickUntil - t)}s</div>`;
+  $('buffs').innerHTML = bh;
+  // debt
+  $('debtfill').style.width = S.debt + '%';
+  $('debtfill').style.background = S.debt > 66 ? 'var(--bad)' : S.debt > 33 ? 'var(--warn)' : 'var(--acc)';
+  $('debtpct').textContent = S.debt.toFixed(0) + '%';
+  $('debtpen').textContent = 'production −' + (S.debt * 0.5).toFixed(0) + '%';
+  const rc = refactoCost(S, t);
+  $('refactobtn').textContent = `Sprint de refacto (−${fmt(rc)})` + (S.upg.d4 ? ' · SRE auto' : '');
+  $('refactobtn').disabled = S.debt < 1 || S.loc < rc;
+  // gens
+  let maxSeen = 0; GENS.forEach((g, i) => { if (S.gens[i] > 0 || S.allTotal >= g.cost * 0.5) maxSeen = i; });
+  GENS.forEach((g, i) => {
+    const e = genEls[i];
+    const n = buyN === 'max' ? Math.max(1, maxAffordableN(i)) : buyN;
+    const c = genCost(S, i, n);
+    e.el.classList.toggle('hidden', i > maxSeen + 1);
+    e.el.classList.toggle('mystery', i === maxSeen + 1 && S.gens[i] === 0);
+    e.el.classList.toggle('ok', S.loc >= c); e.el.classList.toggle('no', S.loc < c);
+    e.count.textContent = S.gens[i];
+    e.cost.textContent = (n > 1 ? `×${n} · ` : '') + fmt(c);
+    const each = genProd(S, i) * globalMult(S) * debtPenalty(S);
+    e.prod.textContent = `${fmt(each)}/s chacun` + (S.gens[i] ? ` · ${fmt(each * S.gens[i])}/s au total` : '');
+  });
+  // upgrades
+  renderUpgs();
+  document.querySelectorAll('.upg').forEach(b => { const u = UPG_BY_ID[b.dataset.id]; const ok = S.loc >= u.cost; b.classList.toggle('ok', ok); b.classList.toggle('no', !ok); });
+  // pivot
+  const pg = pivotGain(S);
+  $('pivotgain').textContent = `+${pg} ⭐`;
+  $('pivotdesc').innerHTML = `Étoiles : <b style="color:var(--pur)">${S.xp} ⭐</b> (+${S.xp * 10}% prod &amp; clic)<br>` +
+    (S.runTotal < PIVOT_MIN ? `Disponible après ${fmt(PIVOT_MIN)} lignes écrites sur cette run (${fmt(S.runTotal)}).` : `Lignes écrites cette run : ${fmt(S.runTotal)}`);
+  $('pivotbtn').disabled = pg <= 0;
+  $('pivotrec').style.display = pg >= Math.max(10, S.xp) ? 'block' : 'none';
+  // stats
+  $('stats').innerHTML = [
+    ['Commits manuels', fmt(S.clicks)], ['Bugs attrapés', S.bugsCaught], ['Refactos', S.refactos],
+    ['Pivots', S.pivots], ['Lignes (total)', fmt(S.allTotal)], ['Effectif', S.gens.reduce((a, b) => a + b, 0)],
+  ].map(([a, b]) => `<div class="stat">${a}<b>${b}</b></div>`).join('');
+}
+
+/* ---------- loop ---------- */
+let last = performance.now(), saveAcc = 0, renderAcc = 0;
+function loop(ts) {
+  let dt = Math.min(1, (ts - last) / 1000); last = ts;
+  const prevD4 = S.refactos;
+  tick(S, dt, now());
+  if (S.refactos > prevD4) log('🚒 L\'équipe SRE a lancé un refacto automatique.');
+  if (!bugActive) { S.nextBug -= dt; if (S.nextBug <= 0) { S.nextBug = bugInterval(S); spawnBug(); } }
+  renderAcc += dt; if (renderAcc > 0.1) { renderAcc = 0; render(); }
+  saveAcc += dt; if (saveAcc > 10) { saveAcc = 0; save(); }
+  requestAnimationFrame(loop);
+}
+// Background tabs: keep progressing with a coarse interval
+setInterval(() => { const ts = performance.now(); if (ts - last > 1500) { const dt = Math.min(60, (ts - last) / 1000); last = ts; tick(S, dt, now()); } }, 1000);
+window.addEventListener('beforeunload', save);
+
+const had = load();
+if (!had) { log('🚀 Nouvelle startup fondée dans un garage.'); $('help').style.display = 'flex'; }
+nextNews(); render();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
